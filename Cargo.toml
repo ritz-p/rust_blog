@@ -1,0 +1,15 @@
+[package]
+name = "rust_blog"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+rocket = { version = "0.5", features = ["json"] }
+sea-orm = "0.12"
+sea-orm-migration = { version = "0.12", features = [
+    "sqlx-sqlite",
+    "runtime-tokio-rustls",
+] }
+pulldown-cmark = "0.9"
+sea-orm-rocket = "0.5.5"
+anyhow = "1.0.98"

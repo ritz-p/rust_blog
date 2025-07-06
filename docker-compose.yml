@@ -1,0 +1,14 @@
+version: "3.8"
+services:
+  web:
+    build: .
+    container_name: rust_blog
+    volumes:
+      - ./:/workspace/rust_blog
+    tty: true
+    ports:
+      - "8888:8888"
+    environment:
+      - DATABASE_URL=sqlite://./blog.db
+      - ROCKET_ENV=development
+    
