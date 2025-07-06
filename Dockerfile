@@ -7,3 +7,5 @@ RUN rustup component add rustfmt
 EXPOSE 8888
 
 ENV RUST_BACKTRACE=1
+
+RUN echo 'alias seaorm="sea-orm-cli"' >> ~/.bashrc

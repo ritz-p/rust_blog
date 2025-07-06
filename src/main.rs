@@ -5,12 +5,12 @@ use rocket::response::content::RawHtml;
 use sea_orm::{Database, DatabaseConnection, EntityTrait};
 
 mod entity;
-use crate::entity::{articles, prelude::*};
+use crate::entity::{article, prelude::*};
 
 #[rocket::main]
 async fn main() -> Result<(), anyhow::Error> {
     let db: DatabaseConnection = Database::connect(std::env::var("DATABASE_URL")?).await?;
-    let articles: Vec<articles::Model> = Articles::find().all(&db).await?;
+    let articles: Vec<article::Model> = Article::find().all(&db).await?;
     println!("記事数: {}", articles.len());
 
     let _rocket = rocket::build()
