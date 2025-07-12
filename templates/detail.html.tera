@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>{{ title }}</title>
+</head>
+<body>
+  <article>
+    {# Safe フィルタをつけてエスケープを無効化 #}
+    {{ content_html | safe }}
+  </article>
+  <footer>
+    <time>{{ created_at }}</time>
+  </footer>
+</body>
+</html>
