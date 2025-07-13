@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <title>{{ site_name }}</title>
+  <style>
+    body { font-family: sans-serif; max-width: 800px; margin: auto; padding: 1rem; }
+    h1 { border-bottom: 2px solid #333; padding-bottom: .5rem; }
+    ul { list-style: none; padding: 0; }
+    li { margin: 1rem 0; }
+    a { text-decoration: none; color: #0366d6; }
+    a:hover { text-decoration: underline; }
+    small { color: #666; margin-left: .5rem; }
+  </style>
+</head>
+<body>
+  <h1>404 Not Found</h1>
+</body>
+</html>

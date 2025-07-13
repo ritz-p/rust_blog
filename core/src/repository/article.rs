@@ -29,17 +29,17 @@ pub async fn get_article_by_slug(
         .await
 }
 
-// pub async fn get_article_by_tag_slug(
-//     db: &DatabaseConnection,
-//     tag_slug: &str,
-// ) -> Result<Vec<article::Model>, DbErr> {
-//     article::Entity::find()
-//         .join(JoinType::InnerJoin, article::Relation::ArticleTag.def())
-//         .join(JoinType::InnerJoin, article_tag::Relation::Tag.def())
-//         .filter(tag::Column::Slug.eq(tag_slug.to_string()))
-//         .all(db)
-//         .await
-// }
+pub async fn get_articles_by_tag_slug(
+    db: &DatabaseConnection,
+    tag_slug: &str,
+) -> Result<Vec<article::Model>, DbErr> {
+    article::Entity::find()
+        .join(JoinType::InnerJoin, article::Relation::ArticleTag.def())
+        .join(JoinType::InnerJoin, article_tag::Relation::Tag.def())
+        .filter(tag::Column::Slug.eq(tag_slug.to_string()))
+        .all(db)
+        .await
+}
 
 // pub async fn get_article_by_category_slug(
 //     db: &DatabaseConnection,

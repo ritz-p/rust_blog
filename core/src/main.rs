@@ -13,7 +13,7 @@ use crate::{
     repository::article::get_all_articles,
     utils::markdown::markdown_to_html,
 };
-use rocket::State;
+use rocket::{State, http::Status};
 use rocket_dyn_templates::{Template, context};
 use sea_orm::{ColumnTrait, Database, DatabaseConnection, EntityTrait, QueryFilter};
 use serde_json::json;
@@ -22,12 +22,12 @@ use serde_json::json;
 async fn main() -> Result<(), anyhow::Error> {
     let db: DatabaseConnection = Database::connect(std::env::var("DATABASE_URL")?).await?;
     let articles: Vec<article::Model> = Article::find().all(&db).await?;
-    println!("記事数: {}", articles.len());
 
     let _rocket = rocket::build()
         .manage(db)
         .attach(Template::fairing())
         .mount("/", routes![index, post_detail])
+        .register("/", catchers![not_found])
         .launch()
         .await?;
 
@@ -58,23 +58,38 @@ async fn index(db: &State<DatabaseConnection>) -> Template {
     )
 }
 
+#[catch(404)]
+fn not_found() -> Template {
+    Template::render(
+        "404",
+        context! {
+            site_name: "404 - My Rust Blog"
+        },
+    )
+}
+
 #[get("/posts/<slug>")]
-async fn post_detail(db: &State<DatabaseConnection>, slug: &str) -> Template {
-    let article: Model = Article::find()
-        .filter(article::Column::Slug.eq(slug))
+async fn post_detail(db: &State<DatabaseConnection>, slug: &str) -> Result<Template, Status> {
+    let maybe = article::Entity::find()
+        .filter(article::Column::Slug.eq(slug.to_string()))
         .one(db.inner())
         .await
-        .expect("DB Error")
-        .expect("Not found");
+        .map_err(|_| Status::InternalServerError)?
+        .ok_or(Status::NotFound);
+
+    let article = match maybe {
+        Ok(model) => model,
+        Err(_) => return Err(Status::NotFound),
+    };
 
     let content = markdown_to_html(&article.content);
 
-    Template::render(
+    Ok(Template::render(
         "detail",
         context! {
             title: article.title,
             content_html: content,
             created_at: article.created_at.to_string()
         },
-    )
+    ))
 }

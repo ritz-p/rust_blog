@@ -7,7 +7,7 @@ use walkdir::WalkDir;
 
 use rust_blog::entity::article::ActiveModel;
 use rust_blog::utils::front_matter::FrontMatter;
-#[rocket::main] // Tokio ランタイム
+#[rocket::main]
 async fn main() -> Result<(), DbErr> {
     let db: DatabaseConnection = Database::connect(std::env::var("DATABASE_URL").unwrap()).await?;
     for entry in WalkDir::new("content/articles")

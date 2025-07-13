@@ -9,6 +9,6 @@ services:
     ports:
       - "8888:8888"
     environment:
-      - DATABASE_URL=sqlite://./blog.db
+      - DATABASE_URL="sqlite://./blog.db?mode=rwc"
       - ROCKET_ENV=development
     
