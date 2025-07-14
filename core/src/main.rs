@@ -7,13 +7,17 @@ mod utils;
 
 use crate::{
     entity::{
-        article::{self, Model},
+        article::{self, Model as Article},
         prelude::*,
+        tag::{self, Model as Tag},
     },
-    repository::article::get_all_articles,
+    repository::{
+        article::{get_all_articles, get_articles_by_tag_slug},
+        tag::get_all_tags,
+    },
     utils::markdown::markdown_to_html,
 };
-use rocket::{State, http::Status};
+use rocket::{State, futures::TryFutureExt, http::Status};
 use rocket_dyn_templates::{Template, context};
 use sea_orm::{ColumnTrait, Database, DatabaseConnection, EntityTrait, QueryFilter};
 use serde_json::json;
@@ -21,12 +25,11 @@ use serde_json::json;
 #[rocket::main]
 async fn main() -> Result<(), anyhow::Error> {
     let db: DatabaseConnection = Database::connect(std::env::var("DATABASE_URL")?).await?;
-    let articles: Vec<article::Model> = Article::find().all(&db).await?;
 
     let _rocket = rocket::build()
         .manage(db)
         .attach(Template::fairing())
-        .mount("/", routes![index, post_detail])
+        .mount("/", routes![index, post_detail, tag_list, tag_detail])
         .register("/", catchers![not_found])
         .launch()
         .await?;
@@ -56,6 +59,47 @@ async fn index(db: &State<DatabaseConnection>) -> Template {
             articles:  articles,
         },
     )
+}
+
+#[get("/tags")]
+pub async fn tag_list(db: &State<DatabaseConnection>) -> Result<Template, Status> {
+    let models = get_all_tags(db)
+        .await
+        .map_err(|_| Status::InternalServerError)?;
+    let tags = models
+        .iter()
+        .map(|tag| {
+            json!({
+                "name": tag.name.clone(),"slug": tag.slug.clone()
+            })
+        })
+        .collect::<Vec<_>>();
+    Ok(Template::render("tags", context! {tags}))
+}
+
+#[get("/tag/<slug>")]
+pub async fn tag_detail(db: &State<DatabaseConnection>, slug: &str) -> Result<Template, Status> {
+    let articles = get_articles_by_tag_slug(db.inner(), slug)
+        .await
+        .map_err(|_| Status::InternalServerError)?;
+
+    if articles.is_empty() {
+        return Err(Status::NotFound);
+    }
+
+    Ok(Template::render(
+        "tag",
+        context! {
+            tag_slug: slug,
+            articles: articles.iter().map(|article| {
+                json!({
+                    "title": article.title.clone(),
+                    "slug": slug.to_string(),
+                    "create_at": article.created_at.to_string(),
+                })
+            }).collect::<Vec<_>>()
+        },
+    ))
 }
 
 #[catch(404)]

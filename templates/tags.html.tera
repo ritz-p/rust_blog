@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head><meta charset="utf-8"><title>タグ一覧</title></head>
+<body>
+  <h1>タグ一覧</h1>
+  <ul>
+  {%- for tag in tags -%}
+    <li><a href="/tags/{{ tag.slug }}">{{ tag.name }}</a></li>
+  {%- else -%}
+    <li>タグが登録されていません。</li>
+  {%- endfor -%}
+  </ul>
+  <p><a href="/">ホームへ戻る</a></p>
+</body>
+</html>

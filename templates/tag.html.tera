@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <title>タグ: {{ tag_slug }}</title>
+</head>
+<body>
+  <h1>タグ: {{ tag_slug }}</h1>
+  <ul>
+  {%- for article in articles -%}
+    <li>
+      <a href="/posts/{{ article.slug }}">{{ article.title }}</a>
+      <small>{{ article.created_at }}</small>
+    </li>
+  {%- else -%}
+    <li>この記事タグのついた投稿はまだありません。</li>
+  {%- endfor -%}
+  </ul>
+  <p><a href="/tags">タグ一覧へ戻る</a></p>
+  <p><a href="/">ホームへ戻る</a></p>
+</body>
+</html>
