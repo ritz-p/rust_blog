@@ -5,9 +5,19 @@
   <title>{{ title }}</title>
 </head>
 <body>
+  <h1>{{ title }}</h1>
+  {% if tags | length > 0 %}  {# タグが存在する場合のみ表示 #}
+    <ul class="tags-list">
+      {% for tag in tags %}
+        <li>
+          <!-- タグページへのリンク。Rocketではタグ詳細ルートを /tag/<slug> に定義 -->
+          <a href="/tag/{{ tag.slug }}">{{ tag.name }}</a>
+        </li>
+      {% endfor %}
+    </ul>
+  {% endif %}
   <article>
-    {# Safe フィルタをつけてエスケープを無効化 #}
-    {{ content_html | safe }}
+    {{ content_html | safe }}  <!-- 記事本文（HTMLにレンダリング済み） -->
   </article>
   <footer>
     <time>{{ created_at }}</time>

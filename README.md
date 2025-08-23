@@ -54,10 +54,10 @@ rust_blog/             ← ワークスペースルート
 1. マイグレーション適用後、`entity` クレートにモデルを出力：
 
    ```bash
-   sea-orm-cli generate entity -o entity/src/entity
+   sea-orm-cli generate entity -o core/src/entity
    ```
 
-2. `entity/src/entity/*.rs` に `Relation` 含むコードが生成されることを確認。
+2. `core/src/entity/*.rs` に `Relation` 含むコードが生成されることを確認。
 
 ## シード用バイナリの実行
 

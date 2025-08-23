@@ -8,8 +8,9 @@ mod utils;
 use crate::{
     entity::{
         article::{self, Model as Article},
+        article_tag,
         prelude::*,
-        tag::{self, Model as Tag},
+        tag::{self, Entity as TagEntity, Model as Tag},
     },
     repository::{
         article::{get_all_articles, get_articles_by_tag_slug},
@@ -19,7 +20,10 @@ use crate::{
 };
 use rocket::{State, futures::TryFutureExt, http::Status};
 use rocket_dyn_templates::{Template, context};
-use sea_orm::{ColumnTrait, Database, DatabaseConnection, EntityTrait, QueryFilter};
+use sea_orm::{
+    ColumnTrait, Database, DatabaseConnection, EntityTrait, JoinType, ModelTrait, QueryFilter,
+    QuerySelect, RelationTrait,
+};
 use serde_json::json;
 
 #[rocket::main]
@@ -128,12 +132,19 @@ async fn post_detail(db: &State<DatabaseConnection>, slug: &str) -> Result<Templ
 
     let content = markdown_to_html(&article.content);
 
+    let tags: Vec<_> = article
+        .find_related(tag::Entity)
+        .all(db.inner())
+        .await
+        .map_err(|_| Status::InternalServerError)?;
+
     Ok(Template::render(
         "detail",
         context! {
             title: article.title,
             content_html: content,
-            created_at: article.created_at.to_string()
+            created_at: article.created_at.to_string(),
+            tags: &tags
         },
     ))
 }
