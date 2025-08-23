@@ -6,7 +6,11 @@
 </head>
 <body>
   <h1>{{ title }}</h1>
-  {% if tags | length > 0 %}  {# タグが存在する場合のみ表示 #}
+  <article>
+    {{ content_html | safe }}  <!-- 記事本文（HTMLにレンダリング済み） -->
+  </article>
+  {% if tags | length > 0 %}
+    <p> タグ一覧 </p>
     <ul class="tags-list">
       {% for tag in tags %}
         <li>
@@ -16,9 +20,6 @@
       {% endfor %}
     </ul>
   {% endif %}
-  <article>
-    {{ content_html | safe }}  <!-- 記事本文（HTMLにレンダリング済み） -->
-  </article>
   <footer>
     <time>{{ created_at }}</time>
   </footer>

@@ -24,13 +24,15 @@ impl MigrationTrait for Migration {
                         ForeignKey::create()
                             .name("fk_article_tag_article")
                             .from(ArticleTag::Table, ArticleTag::ArticleId)
-                            .to(Article::Table, Article::Id),
+                            .to(Article::Table, Article::Id)
+                            .on_delete(ForeignKeyAction::Cascade),
                     )
                     .foreign_key(
                         ForeignKey::create()
                             .name("fk_article_tag_tag")
                             .from(ArticleTag::Table, ArticleTag::TagId)
-                            .to(Tag::Table, Tag::Id),
+                            .to(Tag::Table, Tag::Id)
+                            .on_delete(ForeignKeyAction::Cascade),
                     )
                     .to_owned(),
             )

@@ -4,7 +4,7 @@ extern crate rocket;
 mod entity;
 mod repository;
 mod utils;
-
+mod view;
 use crate::{
     entity::{
         article::{self, Model as Article},
@@ -17,6 +17,7 @@ use crate::{
         tag::get_all_tags,
     },
     utils::markdown::markdown_to_html,
+    view::tag::TagView,
 };
 use rocket::{State, futures::TryFutureExt, http::Status};
 use rocket_dyn_templates::{Template, context};
@@ -136,7 +137,13 @@ async fn post_detail(db: &State<DatabaseConnection>, slug: &str) -> Result<Templ
         .find_related(tag::Entity)
         .all(db.inner())
         .await
-        .map_err(|_| Status::InternalServerError)?;
+        .map_err(|_| Status::InternalServerError)?
+        .into_iter()
+        .map(|tag| TagView {
+            name: tag.name,
+            slug: tag.slug,
+        })
+        .collect();
 
     Ok(Template::render(
         "detail",
