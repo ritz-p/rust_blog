@@ -1,4 +1,5 @@
 use rust_blog::entity::article::Model;
+use rust_blog::entity::article_tag;
 use rust_blog::entity::{
     article::ActiveModel as ArticleActiveModel, article::Column as ArticleColumn,
     article::Entity as ArticleEntity, article::Model as ArticleModel,
@@ -6,6 +7,7 @@ use rust_blog::entity::{
     tag::Entity as TagEntity,
 };
 use rust_blog::utils::front_matter::FrontMatter;
+use sea_orm::sea_query::OnConflict;
 use sea_orm::{
     ActiveModelTrait, ActiveValue, ColumnTrait, Database, DatabaseConnection, DbErr, EntityTrait,
     IntoActiveModel, QueryFilter, Set,
@@ -98,28 +100,32 @@ async fn seed_tag(
     article_id: i32,
 ) -> Result<(), DbErr> {
     for tag_slug in &front_matter.tags {
-        let tag_model = TagEntity::find()
+        let tag_model = tag::Entity::find()
             .filter(tag::Column::Slug.eq(tag_slug.clone()))
             .one(db)
             .await?;
-        let tag_active_model = match tag_model {
-            Some(tag) => tag.into_active_model(),
-            None => {
-                let mut active_model: TagActiveModel = Default::default();
-                active_model.slug = Set(tag_slug.clone());
-                active_model.name = Set(tag_slug.clone());
-                active_model.save(db).await?
-            }
-        };
-        let tag_id: i32 = match tag_active_model.id {
-            ActiveValue::Set(id) | ActiveValue::Unchanged(id) => id,
-            ActiveValue::NotSet => return Err(DbErr::Custom("tag id not set".into())),
-        };
 
-        let mut article_tag_active_model: ArticleTagActiveModel = Default::default();
-        article_tag_active_model.article_id = Set(article_id);
-        article_tag_active_model.tag_id = Set(tag_id);
-        article_tag_active_model.save(db).await?;
+        let tag_id = if let Some(m) = tag_model {
+            m.id
+        } else {
+            let am = tag::ActiveModel {
+                name: Set(tag_slug.clone()),
+                slug: Set(tag_slug.clone()),
+                ..Default::default()
+            };
+            am.insert(db).await?.id
+        };
+        article_tag::Entity::insert(article_tag::ActiveModel {
+            article_id: Set(article_id),
+            tag_id: Set(tag_id),
+        })
+        .on_conflict(
+            OnConflict::columns([article_tag::Column::ArticleId, article_tag::Column::TagId])
+                .do_nothing()
+                .to_owned(),
+        )
+        .exec(db)
+        .await?;
     }
     Ok(())
 }
