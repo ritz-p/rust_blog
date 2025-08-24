@@ -34,6 +34,11 @@ impl MigrationTrait for Migration {
                             .to(Tag::Table, Tag::Id)
                             .on_delete(ForeignKeyAction::Cascade),
                     )
+                    .primary_key(
+                        Index::create()
+                            .col(ArticleTag::ArticleId)
+                            .col(ArticleTag::TagId),
+                    )
                     .to_owned(),
             )
             .await

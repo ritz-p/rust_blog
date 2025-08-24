@@ -5,22 +5,22 @@ mod entity;
 mod repository;
 mod utils;
 mod view;
-use crate::{
-    entity::{
-        article::{self, Model as Article},
-        article_tag,
-        prelude::*,
-        tag::{self, Entity as TagEntity, Model as Tag},
-    },
-    repository::{
-        article::{get_all_articles, get_articles_by_tag_slug},
-        tag::get_all_tags,
-    },
-    utils::markdown::markdown_to_html,
-    view::tag::TagView,
+use entity::{
+    article::{self, Model as Article},
+    article_tag,
+    category::{self, Entity as CategoryEntity, Model as Category},
+    prelude::*,
+    tag::{self, Entity as TagEntity, Model as Tag},
+};
+use repository::{
+    article::{get_all_articles, get_articles_by_tag_slug},
+    tag::get_all_tags,
 };
 use rocket::{State, futures::TryFutureExt, http::Status};
 use rocket_dyn_templates::{Template, context};
+use utils::markdown::markdown_to_html;
+use view::{category::CategoryView, tag::TagView};
+
 use sea_orm::{
     ColumnTrait, Database, DatabaseConnection, EntityTrait, JoinType, ModelTrait, QueryFilter,
     QuerySelect, RelationTrait,
@@ -119,9 +119,10 @@ fn not_found() -> Template {
 
 #[get("/posts/<slug>")]
 async fn post_detail(db: &State<DatabaseConnection>, slug: &str) -> Result<Template, Status> {
+    let conn = db.inner();
     let maybe = article::Entity::find()
         .filter(article::Column::Slug.eq(slug.to_string()))
-        .one(db.inner())
+        .one(conn)
         .await
         .map_err(|_| Status::InternalServerError)?
         .ok_or(Status::NotFound);
@@ -135,7 +136,7 @@ async fn post_detail(db: &State<DatabaseConnection>, slug: &str) -> Result<Templ
 
     let tags: Vec<_> = article
         .find_related(tag::Entity)
-        .all(db.inner())
+        .all(conn)
         .await
         .map_err(|_| Status::InternalServerError)?
         .into_iter()
@@ -145,13 +146,26 @@ async fn post_detail(db: &State<DatabaseConnection>, slug: &str) -> Result<Templ
         })
         .collect();
 
+    let categories: Vec<_> = article
+        .find_related(category::Entity)
+        .all(conn)
+        .await
+        .map_err(|_| Status::InternalServerError)?
+        .into_iter()
+        .map(|category| CategoryView {
+            name: category.name,
+            slug: category.slug,
+        })
+        .collect();
+
     Ok(Template::render(
         "detail",
         context! {
             title: article.title,
             content_html: content,
             created_at: article.created_at.to_string(),
-            tags: &tags
+            tags: &tags,
+            categories: &categories
         },
     ))
 }

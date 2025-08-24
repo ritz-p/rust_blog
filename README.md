@@ -105,3 +105,39 @@ rust_blog/             ← ワークスペースルート
 - **バージョン衝突**
 
   - workspace 内で対象のライブラリのバージョンを揃える
+
+## SeaOrm について
+
+1. テーブル作成
+
+```bash
+seaorm migrate generate ${table_name}
+```
+
+2. 生成されたファイルを編集してテーブル定義を書く
+
+# migration/src/mYYYYMMDDHHMMSS\_${table_name}.rs
+
+3. マイグレーションを適用
+
+```bash
+seaorm migrate up -u "$DATABASE_URL"
+```
+
+4. Entity を DB から再生成
+
+```bash
+seaorm generate entity -u "$DATABASE_URL" -o core/src/entity --with-serde both
+```
+
+5. 適用状況を確認
+
+```bash
+seaorm migrate status -u "$DATABASE_URL"
+```
+
+6. 全部やり直す（drop→up）
+
+```bash
+seaorm migrate refresh -u "$DATABASE_URL"
+```
