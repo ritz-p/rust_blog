@@ -27,6 +27,8 @@ use sea_orm::{
 };
 use serde_json::json;
 
+use crate::repository::{article::get_article_by_category_slug, category::get_all_categories};
+
 #[rocket::main]
 async fn main() -> Result<(), anyhow::Error> {
     let db: DatabaseConnection = Database::connect(std::env::var("DATABASE_URL")?).await?;
@@ -34,7 +36,10 @@ async fn main() -> Result<(), anyhow::Error> {
     let _rocket = rocket::build()
         .manage(db)
         .attach(Template::fairing())
-        .mount("/", routes![index, post_detail, tag_list, tag_detail])
+        .mount(
+            "/",
+            routes![index, post_detail, tag_list, tag_detail, category_detail],
+        )
         .register("/", catchers![not_found])
         .launch()
         .await?;
@@ -82,6 +87,22 @@ pub async fn tag_list(db: &State<DatabaseConnection>) -> Result<Template, Status
     Ok(Template::render("tags", context! {tags}))
 }
 
+#[get("/categories")]
+pub async fn categoy_list(db: &State<DatabaseConnection>) -> Result<Template, Status> {
+    let models = get_all_categories(db)
+        .await
+        .map_err(|_| Status::InternalServerError)?;
+    let categories = models
+        .iter()
+        .map(|category| {
+            json!({
+                "name": category.name.clone(),"slug": category.slug.clone()
+            })
+        })
+        .collect::<Vec<_>>();
+    Ok(Template::render("tags", context! {categories}))
+}
+
 #[get("/tag/<slug>")]
 pub async fn tag_detail(db: &State<DatabaseConnection>, slug: &str) -> Result<Template, Status> {
     let articles = get_articles_by_tag_slug(db.inner(), slug)
@@ -96,6 +117,34 @@ pub async fn tag_detail(db: &State<DatabaseConnection>, slug: &str) -> Result<Te
         "tag",
         context! {
             tag_slug: slug,
+            articles: articles.iter().map(|article| {
+                json!({
+                    "title": article.title.clone(),
+                    "slug": slug.to_string(),
+                    "create_at": article.created_at.to_string(),
+                })
+            }).collect::<Vec<_>>()
+        },
+    ))
+}
+
+#[get("/category/<slug>")]
+pub async fn category_detail(
+    db: &State<DatabaseConnection>,
+    slug: &str,
+) -> Result<Template, Status> {
+    let articles = get_article_by_category_slug(db.inner(), slug)
+        .await
+        .map_err(|_| Status::InternalServerError)?;
+
+    if articles.is_empty() {
+        return Err(Status::NotFound);
+    }
+
+    Ok(Template::render(
+        "tag",
+        context! {
+            category_slug: slug,
             articles: articles.iter().map(|article| {
                 json!({
                     "title": article.title.clone(),
