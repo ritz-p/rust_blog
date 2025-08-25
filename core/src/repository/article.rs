@@ -41,13 +41,16 @@ pub async fn get_articles_by_tag_slug(
         .await
 }
 
-// pub async fn get_article_by_category_slug(
-//     db: &DatabaseConnection,
-//     category_slug: &str,
-// ) -> Result<Vec<article::Model>, DbErr> {
-//     article::Entity::find()
-//         .join(JoinType::InnerJoin, article::Relation::Category.def())
-//         .filter(category::Column::Slug.eq(category_slug.to_string()))
-//         .all(db)
-//         .await
-// }
+pub async fn get_article_by_category_slug(
+    db: &DatabaseConnection,
+    category_slug: &str,
+) -> Result<Vec<article::Model>, DbErr> {
+    article::Entity::find()
+        .join(
+            JoinType::InnerJoin,
+            article::Relation::ArticleCategory.def(),
+        )
+        .filter(category::Column::Slug.eq(category_slug.to_string()))
+        .all(db)
+        .await
+}

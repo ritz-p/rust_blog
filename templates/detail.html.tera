@@ -11,11 +11,22 @@
   </article>
   {% if tags | length > 0 %}
     <p> タグ一覧 </p>
-    <ul class="tags-list">
+    <ul class="tag-list">
       {% for tag in tags %}
         <li>
           <!-- タグページへのリンク。Rocketではタグ詳細ルートを /tag/<slug> に定義 -->
           <a href="/tag/{{ tag.slug }}">{{ tag.name }}</a>
+        </li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+  {% if categories | length > 0 %}
+    <p> カテゴリ一覧 </p>
+    <ul class="category-list">
+      {% for category in categories %}
+        <li>
+          <!-- タグページへのリンク。Rocketではタグ詳細ルートを /category/<slug> に定義 -->
+          <a href="/category/{{ category.slug }}">{{ category.name }}</a>
         </li>
       {% endfor %}
     </ul>

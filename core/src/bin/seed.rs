@@ -1,13 +1,8 @@
-use rust_blog::entity::article::Model;
-use rust_blog::entity::article_tag;
 use rust_blog::entity::{
-    article::ActiveModel as ArticleActiveModel, article::Column as ArticleColumn,
-    article::Entity as ArticleEntity, article::Model as ArticleModel,
-    article_tag::ActiveModel as ArticleTagActiveModel, tag, tag::ActiveModel as TagActiveModel,
-    tag::Entity as TagEntity,
+    article::Column as ArticleColumn, article::Entity as ArticleEntity,
+    article::Model as ArticleModel, article_category, article_tag, category, tag,
 };
 use rust_blog::utils::front_matter::FrontMatter;
-use sea_orm::sea_query::OnConflict;
 use sea_orm::{
     ActiveModelTrait, ActiveValue, ColumnTrait, Database, DatabaseConnection, DbErr, EntityTrait,
     IntoActiveModel, QueryFilter, Set,
@@ -40,7 +35,8 @@ async fn run_seed(db: &DatabaseConnection, dir: &str) -> Result<(), DbErr> {
         };
 
         let article_id = seed_article(db, &front_matter, &body).await?;
-        seed_tag(db, front_matter, article_id).await?;
+        seed_tag(db, &front_matter, article_id).await?;
+        seed_category(db, &front_matter, article_id).await?;
     }
     Ok(())
 }
@@ -96,36 +92,113 @@ async fn seed_article(
 
 async fn seed_tag(
     db: &DatabaseConnection,
-    front_matter: FrontMatter,
+    front_matter: &FrontMatter,
     article_id: i32,
 ) -> Result<(), DbErr> {
     for tag_slug in &front_matter.tags {
-        let tag_model = tag::Entity::find()
-            .filter(tag::Column::Slug.eq(tag_slug.clone()))
+        let existing = tag::Entity::find()
+            .filter(tag::Column::Slug.eq(tag_slug.as_str()))
             .one(db)
             .await?;
-
-        let tag_id = if let Some(m) = tag_model {
+        let tag_id = if let Some(m) = existing {
             m.id
         } else {
-            let am = tag::ActiveModel {
+            tag::ActiveModel {
                 name: Set(tag_slug.clone()),
                 slug: Set(tag_slug.clone()),
                 ..Default::default()
-            };
-            am.insert(db).await?.id
+            }
+            .insert(db)
+            .await?
+            .id
         };
-        article_tag::Entity::insert(article_tag::ActiveModel {
-            article_id: Set(article_id),
-            tag_id: Set(tag_id),
-        })
-        .on_conflict(
-            OnConflict::columns([article_tag::Column::ArticleId, article_tag::Column::TagId])
-                .do_nothing()
-                .to_owned(),
-        )
-        .exec(db)
-        .await?;
+
+        let exists_link = article_tag::Entity::find()
+            .filter(article_tag::Column::ArticleId.eq(article_id))
+            .filter(article_tag::Column::TagId.eq(tag_id))
+            .one(db)
+            .await?
+            .is_some();
+
+        if !exists_link {
+            article_tag::ActiveModel {
+                article_id: Set(article_id),
+                tag_id: Set(tag_id),
+            }
+            .insert(db)
+            .await?;
+        }
+    }
+    Ok(())
+}
+
+async fn seed_category(
+    db: &DatabaseConnection,
+    front_matter: &FrontMatter,
+    article_id: i32,
+) -> Result<(), DbErr> {
+    for category_slug in &front_matter.categories {
+        let existing = category::Entity::find()
+            .filter(category::Column::Slug.eq(category_slug.as_str()))
+            .one(db)
+            .await?;
+        let category_id = if let Some(m) = existing {
+            m.id
+        } else {
+            category::ActiveModel {
+                name: Set(category_slug.clone()),
+                slug: Set(category_slug.clone()),
+                ..Default::default()
+            }
+            .insert(db)
+            .await?
+            .id
+        };
+
+        let exists_link = article_category::Entity::find()
+            .filter(article_category::Column::ArticleId.eq(article_id))
+            .filter(article_category::Column::CategoryId.eq(category_id))
+            .one(db)
+            .await?
+            .is_some();
+
+        if !exists_link {
+            article_category::ActiveModel {
+                article_id: Set(article_id),
+                category_id: Set(category_id),
+            }
+            .insert(db)
+            .await?;
+        }
+        // let category_model = category::Entity::find()
+        //     .filter(category::Column::Slug.eq(category_slug.clone()))
+        //     .one(db)
+        //     .await?;
+
+        // let category_id = if let Some(m) = category_model {
+        //     m.id
+        // } else {
+        //     let am = category::ActiveModel {
+        //         name: Set(category_slug.clone()),
+        //         slug: Set(category_slug.clone()),
+        //         ..Default::default()
+        //     };
+        //     am.insert(db).await?.id
+        // };
+        // article_category::Entity::insert(article_category::ActiveModel {
+        //     article_id: Set(article_id),
+        //     category_id: Set(category_id),
+        // })
+        // .on_conflict(
+        //     OnConflict::columns([
+        //         article_category::Column::ArticleId,
+        //         article_category::Column::CategoryId,
+        //     ])
+        //     .do_nothing()
+        //     .to_owned(),
+        // )
+        // .exec(db)
+        // .await?;
     }
     Ok(())
 }

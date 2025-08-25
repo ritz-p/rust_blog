@@ -4,12 +4,12 @@ use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq, Serialize, Deserialize)]
-#[sea_orm(table_name = "article_tag")]
+#[sea_orm(table_name = "article_category")]
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub article_id: i32,
     #[sea_orm(primary_key, auto_increment = false)]
-    pub tag_id: i32,
+    pub category_id: i32,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
@@ -19,17 +19,17 @@ pub enum Relation {
         from = "Column::ArticleId",
         to = "super::article::Column::Id",
         on_update = "NoAction",
-        on_delete = "NoAction"
+        on_delete = "Cascade"
     )]
     Article,
     #[sea_orm(
-        belongs_to = "super::tag::Entity",
-        from = "Column::TagId",
-        to = "super::tag::Column::Id",
+        belongs_to = "super::category::Entity",
+        from = "Column::CategoryId",
+        to = "super::category::Column::Id",
         on_update = "NoAction",
-        on_delete = "NoAction"
+        on_delete = "Cascade"
     )]
-    Tag,
+    Category,
 }
 
 impl Related<super::article::Entity> for Entity {
@@ -38,9 +38,9 @@ impl Related<super::article::Entity> for Entity {
     }
 }
 
-impl Related<super::tag::Entity> for Entity {
+impl Related<super::category::Entity> for Entity {
     fn to() -> RelationDef {
-        Relation::Tag.def()
+        Relation::Category.def()
     }
 }
 
