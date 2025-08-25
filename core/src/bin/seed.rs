@@ -1,10 +1,6 @@
-use rust_blog::entity::article::Model;
-use rust_blog::entity::article_tag;
 use rust_blog::entity::{
-    article::ActiveModel as ArticleActiveModel, article::Column as ArticleColumn,
-    article::Entity as ArticleEntity, article::Model as ArticleModel,
-    article_tag::ActiveModel as ArticleTagActiveModel, tag, tag::ActiveModel as TagActiveModel,
-    tag::Entity as TagEntity,
+    article::Column as ArticleColumn, article::Entity as ArticleEntity,
+    article::Model as ArticleModel, article_category, article_tag, tag,
 };
 use rust_blog::utils::front_matter::FrontMatter;
 use sea_orm::sea_query::OnConflict;
@@ -40,7 +36,8 @@ async fn run_seed(db: &DatabaseConnection, dir: &str) -> Result<(), DbErr> {
         };
 
         let article_id = seed_article(db, &front_matter, &body).await?;
-        seed_tag(db, front_matter, article_id).await?;
+        seed_tag(db, &front_matter, article_id).await?;
+        seed_category(db, &front_matter, article_id).await?;
     }
     Ok(())
 }
@@ -96,7 +93,7 @@ async fn seed_article(
 
 async fn seed_tag(
     db: &DatabaseConnection,
-    front_matter: FrontMatter,
+    front_matter: &FrontMatter,
     article_id: i32,
 ) -> Result<(), DbErr> {
     for tag_slug in &front_matter.tags {
@@ -118,6 +115,42 @@ async fn seed_tag(
         article_tag::Entity::insert(article_tag::ActiveModel {
             article_id: Set(article_id),
             tag_id: Set(tag_id),
+        })
+        .on_conflict(
+            OnConflict::columns([article_tag::Column::ArticleId, article_tag::Column::TagId])
+                .do_nothing()
+                .to_owned(),
+        )
+        .exec(db)
+        .await?;
+    }
+    Ok(())
+}
+
+async fn seed_category(
+    db: &DatabaseConnection,
+    front_matter: &FrontMatter,
+    article_id: i32,
+) -> Result<(), DbErr> {
+    for category_slug in &front_matter.categories {
+        let category_model = tag::Entity::find()
+            .filter(tag::Column::Slug.eq(category_slug.clone()))
+            .one(db)
+            .await?;
+
+        let category_id = if let Some(m) = category_model {
+            m.id
+        } else {
+            let am = tag::ActiveModel {
+                name: Set(category_slug.clone()),
+                slug: Set(category_slug.clone()),
+                ..Default::default()
+            };
+            am.insert(db).await?.id
+        };
+        article_category::Entity::insert(article_category::ActiveModel {
+            article_id: Set(article_id),
+            category_id: Set(category_id),
         })
         .on_conflict(
             OnConflict::columns([article_tag::Column::ArticleId, article_tag::Column::TagId])
