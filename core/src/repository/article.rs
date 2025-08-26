@@ -4,7 +4,7 @@ use sea_orm::{
     QuerySelect, prelude::*,
 };
 
-use crate::entity::{article, category, tag};
+use crate::entity::{article, article_category, category, tag};
 
 pub async fn get_all_articles(db: &DatabaseConnection) -> Result<Vec<article::Model>, DbErr> {
     article::Entity::find()
@@ -33,24 +33,22 @@ pub async fn get_articles_by_tag_slug(
     db: &DatabaseConnection,
     tag_slug: &str,
 ) -> Result<Vec<article::Model>, DbErr> {
-    article::Entity::find()
-        .join(JoinType::InnerJoin, article::Relation::ArticleTag.def())
-        .join(JoinType::InnerJoin, article_tag::Relation::Tag.def())
-        .filter(tag::Column::Slug.eq(tag_slug.to_string()))
+    let rows = tag::Entity::find()
+        .filter(tag::Column::Slug.eq(tag_slug))
+        .find_with_related(article::Entity)
         .all(db)
-        .await
+        .await?; // Vec<(tag::Model, Vec<article::Model>)>
+    Ok(rows.into_iter().flat_map(|(_, arts)| arts).collect())
 }
 
 pub async fn get_article_by_category_slug(
     db: &DatabaseConnection,
     category_slug: &str,
 ) -> Result<Vec<article::Model>, DbErr> {
-    article::Entity::find()
-        .join(
-            JoinType::InnerJoin,
-            article::Relation::ArticleCategory.def(),
-        )
-        .filter(category::Column::Slug.eq(category_slug.to_string()))
+    let rows = category::Entity::find()
+        .filter(category::Column::Slug.eq(category_slug))
+        .find_with_related(article::Entity)
         .all(db)
-        .await
+        .await?;
+    Ok(rows.into_iter().flat_map(|(_, arts)| arts).collect())
 }
