@@ -120,8 +120,8 @@ pub async fn tag_detail(db: &State<DatabaseConnection>, slug: &str) -> Result<Te
             articles: articles.iter().map(|article| {
                 json!({
                     "title": article.title.clone(),
-                    "slug": slug.to_string(),
-                    "create_at": article.created_at.to_string(),
+                    "slug": article.slug,
+                    "created_at": article.created_at.to_string(),
                 })
             }).collect::<Vec<_>>()
         },
@@ -142,14 +142,14 @@ pub async fn category_detail(
     }
 
     Ok(Template::render(
-        "tag",
+        "category",
         context! {
             category_slug: slug,
             articles: articles.iter().map(|article| {
                 json!({
                     "title": article.title.clone(),
-                    "slug": slug.to_string(),
-                    "create_at": article.created_at.to_string(),
+                    "slug": article.slug,
+                    "created_at": article.created_at.to_string(),
                 })
             }).collect::<Vec<_>>()
         },
