@@ -17,7 +17,7 @@ use repository::{
     tag::get_all_tags,
 };
 use rocket::{State, futures::TryFutureExt, http::Status};
-use rocket_dyn_templates::{Template, context};
+use rocket_dyn_templates::{Template, context, tera};
 use utils::markdown::markdown_to_html;
 use view::{category::CategoryView, tag::TagView};
 

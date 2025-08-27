@@ -4,3 +4,6 @@ port = 80
 [debug]
 port = 8888
 address = "0.0.0.0"
+
+[global.templates]
+dir = "templates"
