@@ -3,7 +3,7 @@
   <div class="is-size-7 has-text-weight-semibold has-text-grey">Tags</div>
   <div class="tags mt-1">
     {% for item in items %}
-      <a class="tag is-light" href="/tags/{{ item.slug }}">#{{ item.name }}</a>
+      <a class="tag is-light" href="/tag/{{ item.slug }}">#{{ item.name }}</a>
     {% endfor %}
   </div>
 </div>

@@ -1,30 +1,48 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-  <meta charset="utf-8">
-  <title>{{ site_name }}</title>
-  <style>
-    body { font-family: sans-serif; max-width: 800px; margin: auto; padding: 1rem; }
-    h1 { border-bottom: 2px solid #333; padding-bottom: .5rem; }
-    ul { list-style: none; padding: 0; }
-    li { margin: 1rem 0; }
-    a { text-decoration: none; color: #0366d6; }
-    a:hover { text-decoration: underline; }
-    small { color: #666; margin-left: .5rem; }
-  </style>
-</head>
-<body>
-  <h1>{{ site_name }} – 記事一覧</h1>
+{% extends "base" %}
+{% block title %}記事一覧 – My Blog{% endblock title %}
 
-  <ul>
-  {%- for article in articles -%}
-    <li>
-      <a href="/posts/{{ article.slug }}">{{ article.title }}</a>
-      <small>{{ article.created_at }}</small>
-    </li>
-  {%- else -%}
-    <li>まだ記事がありません。</li>
-  {%- endfor -%}
-  </ul>
-</body>
-</html>
+{% block content %}
+<h1 class="title">記事一覧</h1>
+
+{% if articles and articles | length > 0 %}
+  <div class="block">
+    {% for article in articles %}
+    <section class="mb-6">
+      <h2 class="title is-4">
+        <a href="/posts/{{ article.slug }}">{{ article.title }}</a>
+      </h2>
+      <p class="is-size-7 has-text-grey mb-3">{{ article.created_at }}</p>
+
+      {% if article.excerpt is defined and article.excerpt | length > 0 %}
+        <p class="mb-4">{{ article.excerpt }}</p>
+      {% endif %}
+      {% if article.categories and article.categories | length > 0 %}
+      <div class="mb-2">
+        <div class="is-size-7 has-text-weight-semibold has-text-grey">Categories</div>
+        <div class="tags mt-1">
+          {% for category in article.categories %}
+            <a class="tag is-info is-light" href="/category/{{ category.slug }}">{{ category.name }}</a>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
+      {% if article.tags and article.tags | length > 0 %}
+      <div>
+        <div class="is-size-7 has-text-weight-semibold has-text-grey">Tags</div>
+        <div class="tags mt-1">
+          {% for tag in article.tags %}
+            <a class="tag is-light" href="/tag/{{ tag.slug }}">#{{ tag.name }}</a>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
+      <hr class="mt-4">
+    </section>
+    {% endfor %}
+  </div>
+{% else %}
+  <p class="has-text-grey">まだ記事がありません。</p>
+{% endif %}
+{% endblock content %}

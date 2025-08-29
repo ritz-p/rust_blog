@@ -1,0 +1,28 @@
+{% extends "base" %}
+{% block title %}Categories – My Blog{% endblock title %}
+
+{% block content %}
+<h1 class="title">Categories</h1>
+
+{% if categories and categories | length > 0 %}
+  <div class="columns is-multiline">
+    {% for category in categories %}
+    <div class="column is-one-third">
+      <div class="box">
+        <h2 class="title is-5">
+          <a href="/category/{{ category.slug }}">{{ category.name }}</a>
+        </h2>
+        {% if category.count is defined %}
+          <p class="is-size-7 has-text-grey">記事数: {{ category.count }}</p>
+        {% endif %}
+        <div class="tags mt-2">
+          <a class="tag is-info is-light" href="/category/{{ category.slug }}">{{ category.name }}</a>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+{% else %}
+  <p class="has-text-grey">カテゴリはまだありません。</p>
+{% endif %}
+{% endblock content %}

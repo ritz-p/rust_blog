@@ -8,7 +8,7 @@ pub async fn get_all_categories(db: &DatabaseConnection) -> Result<Vec<category:
         .await
 }
 
-pub async fn get_tag_by_slug(
+pub async fn get_category_by_slug(
     db: &DatabaseConnection,
     slug: &str,
 ) -> Result<Option<category::Model>, DbErr> {
