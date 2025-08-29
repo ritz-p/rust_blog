@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{{ title | default(value="My Blog") }}{% endblock title %}</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+  {% block head %}{% endblock head %}
+</head>
+<body>
+  <nav class="navbar is-light" role="navigation" aria-label="main navigation">
+    <div class="container">
+      <div class="navbar-brand">
+        <a class="navbar-item has-text-weight-semibold" href="/">My Blog</a>
+        <a role="button" class="navbar-burger" aria-label="menu" aria-expanded="false" data-target="mainNav">
+          <span aria-hidden="true"></span>
+          <span aria-hidden="true"></span>
+          <span aria-hidden="true"></span>
+        </a>
+      </div>
+
+      <div id="mainNav" class="navbar-menu">
+        <div class="navbar-start">
+          <a class="navbar-item" href="/tags">Tags</a>
+          <a class="navbar-item" href="/categories">Categories</a>
+          <a class="navbar-item" href="/about">About</a>
+        </div>
+      </div>
+    </div>
+  </nav>
+  <section class="section">
+    <div class="container">
+      {% block content %}{% endblock content %}
+    </div>
+  </section>
+  <footer class="footer">
+    <div class="content has-text-centered">
+      <p>© {{ year | default(value=2025) }} My Blog</p>
+    </div>
+  </footer>
+  {% block scripts %}
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const $burgers = Array.prototype.slice.call(document.querySelectorAll('.navbar-burger'), 0);
+      $burgers.forEach(el => {
+        el.addEventListener('click', () => {
+          const target = el.dataset.target;
+          const $target = document.getElementById(target);
+          el.classList.toggle('is-active');
+          if ($target) $target.classList.toggle('is-active');
+        });
+      });
+    });
+  </script>
+  {% endblock scripts %}
+</body>
+</html>

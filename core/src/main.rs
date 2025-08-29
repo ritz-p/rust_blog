@@ -17,7 +17,7 @@ use repository::{
     tag::get_all_tags,
 };
 use rocket::{State, futures::TryFutureExt, http::Status};
-use rocket_dyn_templates::{Template, context};
+use rocket_dyn_templates::{Template, context, tera};
 use utils::markdown::markdown_to_html;
 use view::{category::CategoryView, tag::TagView};
 
@@ -38,7 +38,14 @@ async fn main() -> Result<(), anyhow::Error> {
         .attach(Template::fairing())
         .mount(
             "/",
-            routes![index, post_detail, tag_list, tag_detail, category_detail],
+            routes![
+                index,
+                post_detail,
+                tag_list,
+                tag_detail,
+                categoy_list,
+                category_detail
+            ],
         )
         .register("/", catchers![not_found])
         .launch()
@@ -100,7 +107,7 @@ pub async fn categoy_list(db: &State<DatabaseConnection>) -> Result<Template, St
             })
         })
         .collect::<Vec<_>>();
-    Ok(Template::render("tags", context! {categories}))
+    Ok(Template::render("categories", context! {categories}))
 }
 
 #[get("/tag/<slug>")]
@@ -208,7 +215,7 @@ async fn post_detail(db: &State<DatabaseConnection>, slug: &str) -> Result<Templ
         .collect();
 
     Ok(Template::render(
-        "detail",
+        "article_detail",
         context! {
             title: article.title,
             content_html: content,

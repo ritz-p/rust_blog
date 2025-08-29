@@ -1,22 +1,32 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-  <meta charset="utf-8">
-  <title>タグ: {{ tag_slug }}</title>
-</head>
-<body>
-  <h1>タグ: {{ tag_slug }}</h1>
-  <ul>
-  {%- for article in articles -%}
-    <li>
-      <a href="/posts/{{ article.slug }}">{{ article.title }}</a>
-      <small>{{ article.created_at }}</small>
-    </li>
-  {%- else -%}
-    <li>この記事タグのついた投稿はまだありません。</li>
-  {%- endfor -%}
-  </ul>
-  <p><a href="/tags">タグ一覧へ戻る</a></p>
-  <p><a href="/">ホームへ戻る</a></p>
-</body>
-</html>
+{% extends "base" %}
+{% import "partial/tags" as tags_macro %}
+{% import "partial/categories" as categories_macro%}
+
+{% block title %}Tag: #{{ tag_slug }} – My Blog{% endblock title %}
+
+{% block content %}
+<h1 class="title">Tag: #{{ tag_slug }}</h1>
+
+{% if articles and articles | length > 0 %}
+  <div class="block">
+    {% for article in articles %}
+    <section class="mb-6">
+      <h2 class="title is-4">
+        <a href="/posts/{{ article.slug }}">{{ article.title }}</a>
+      </h2>
+      <p class="is-size-7 has-text-grey mb-2">{{ article.created_at }}</p>
+
+      {% if article.excerpt %}
+        <p class="mb-3">{{ article.excerpt }}</p>
+      {% endif %}
+      {# {{ categories_macro::input(items=article.categories) }}
+      {{ tags_macro::input(items=article.tags) }} #}
+
+      <hr class="mt-4">
+    </section>
+    {% endfor %}
+  </div>
+{% else %}
+  <p class="has-text-grey">このタグには記事がありません。</p>
+{% endif %}
+{% endblock content %}

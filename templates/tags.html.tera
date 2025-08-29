@@ -1,15 +1,23 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head><meta charset="utf-8"><title>タグ一覧</title></head>
-<body>
-  <h1>タグ一覧</h1>
-  <ul>
-  {%- for tag in tags -%}
-    <li><a href="/tags/{{ tag.slug }}">{{ tag.name }}</a></li>
-  {%- else -%}
-    <li>タグが登録されていません。</li>
-  {%- endfor -%}
-  </ul>
-  <p><a href="/">ホームへ戻る</a></p>
-</body>
-</html>
+{% extends "base" %}
+{% block title %}Tags – My Blog{% endblock title %}
+
+{% block content %}
+<h1 class="title">Tags</h1>
+
+{% if tags and tags | length > 0 %}
+  <div class="content">
+    <ul>
+      {% for tag in tags %}
+      <li class="mb-3">
+        <a class="tag is-light is-medium" href="/tag/{{ tag.slug }}">#{{ tag.name }}</a>
+        {% if tag.count is defined %}
+          <span class="is-size-7 has-text-grey">（{{ tag.count }}）</span>
+        {% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+{% else %}
+  <p class="has-text-grey">タグはまだありません。</p>
+{% endif %}
+{% endblock content %}
