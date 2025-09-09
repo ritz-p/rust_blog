@@ -1,7 +1,9 @@
+use anyhow::Context;
 use rust_blog::entity::{
     article::Column as ArticleColumn, article::Entity as ArticleEntity,
     article::Model as ArticleModel, article_category, article_tag, category, tag,
 };
+use rust_blog::slug_config::SlugConfig;
 use rust_blog::utils::front_matter::FrontMatter;
 use sea_orm::{
     ActiveModelTrait, ActiveValue, ColumnTrait, Database, DatabaseConnection, DbErr, EntityTrait,
@@ -12,10 +14,12 @@ use std::default::Default;
 use std::fs;
 use walkdir::WalkDir;
 #[rocket::main]
-async fn main() -> Result<(), DbErr> {
+async fn main() -> anyhow::Result<()> {
     let db = connect_db().await?;
     run_seed(&db, "content/articles").await?;
     println!("✅ Markdown → DB のシード完了");
+    seed_tags_from_toml(&db, "content/config/tag_slug.toml").await?;
+    println!("✅ Toml → DB のシード完了");
     Ok(())
 }
 
@@ -26,6 +30,7 @@ async fn connect_db() -> Result<DatabaseConnection, DbErr> {
 
 async fn run_seed(db: &DatabaseConnection, dir: &str) -> Result<(), DbErr> {
     for path in markdown_files(dir) {
+        println!("{:?}", path);
         let (front_matter, body) = match parse_markdown(&path) {
             Ok(x) => x,
             Err(e) => {
@@ -170,35 +175,46 @@ async fn seed_category(
             .insert(db)
             .await?;
         }
-        // let category_model = category::Entity::find()
-        //     .filter(category::Column::Slug.eq(category_slug.clone()))
-        //     .one(db)
-        //     .await?;
-
-        // let category_id = if let Some(m) = category_model {
-        //     m.id
-        // } else {
-        //     let am = category::ActiveModel {
-        //         name: Set(category_slug.clone()),
-        //         slug: Set(category_slug.clone()),
-        //         ..Default::default()
-        //     };
-        //     am.insert(db).await?.id
-        // };
-        // article_category::Entity::insert(article_category::ActiveModel {
-        //     article_id: Set(article_id),
-        //     category_id: Set(category_id),
-        // })
-        // .on_conflict(
-        //     OnConflict::columns([
-        //         article_category::Column::ArticleId,
-        //         article_category::Column::CategoryId,
-        //     ])
-        //     .do_nothing()
-        //     .to_owned(),
-        // )
-        // .exec(db)
-        // .await?;
     }
+    Ok(())
+}
+
+pub async fn seed_tags_from_toml(db: &DatabaseConnection, toml_path: &str) -> anyhow::Result<()> {
+    let cfg = SlugConfig::from_toml_file(toml_path)
+        .with_context(|| format!("failed to read slug config: {}", toml_path))?;
+
+    for (name, slug) in cfg.tags {
+        let existing = tag::Entity::find()
+            .filter(tag::Column::Slug.eq(slug.as_str()))
+            .one(db)
+            .await
+            .with_context(|| format!("DB find failed for slug={}", slug))?;
+
+        match existing {
+            Some(model) => {
+                if model.name != name {
+                    let mut am: tag::ActiveModel = model.into();
+                    am.name = Set(name.clone());
+                    am.update(db)
+                        .await
+                        .with_context(|| format!("DB update failed for slug={}", slug))?;
+                    println!("[tags] updated: slug={} name={}", slug, name);
+                } else {
+                }
+            }
+            None => {
+                let am = tag::ActiveModel {
+                    name: Set(name.clone()),
+                    slug: Set(slug.clone()),
+                    ..Default::default()
+                };
+                am.insert(db)
+                    .await
+                    .with_context(|| format!("DB insert failed for slug={}", slug))?;
+                println!("[tags] inserted: slug={} name={}", slug, name);
+            }
+        }
+    }
+
     Ok(())
 }

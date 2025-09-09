@@ -22,8 +22,8 @@ use utils::markdown::markdown_to_html;
 use view::{category::CategoryView, tag::TagView};
 
 use sea_orm::{
-    ColumnTrait, Database, DatabaseConnection, EntityTrait, JoinType, ModelTrait, QueryFilter,
-    QuerySelect, RelationTrait,
+    ColumnTrait, Database, DatabaseConnection, DbErr, EntityTrait, JoinType, ModelTrait,
+    QueryFilter, QuerySelect, RelationTrait,
 };
 use serde_json::json;
 
@@ -112,27 +112,26 @@ pub async fn categoy_list(db: &State<DatabaseConnection>) -> Result<Template, St
 
 #[get("/tag/<slug>")]
 pub async fn tag_detail(db: &State<DatabaseConnection>, slug: &str) -> Result<Template, Status> {
-    let articles = get_articles_by_tag_slug(db.inner(), slug)
-        .await
-        .map_err(|_| Status::InternalServerError)?;
-
-    if articles.is_empty() {
-        return Err(Status::NotFound);
+    match get_articles_by_tag_slug(&db, slug).await {
+        Ok(articles) => Ok(Template::render(
+            "tag",
+            context! {
+                tag_slug: slug,
+                articles: articles.iter().map(|article| {
+                    json!({
+                        "title": article.title.clone(),
+                        "slug": article.slug,
+                        "created_at": article.created_at.to_string(),
+                    })
+                }).collect::<Vec<_>>()
+            },
+        )),
+        Err(DbErr::RecordNotFound(_)) => Err(Status::NotFound),
+        Err(e) => {
+            error!("tag_detail error for {}: {}", slug, e);
+            Err(Status::InternalServerError)
+        }
     }
-
-    Ok(Template::render(
-        "tag",
-        context! {
-            tag_slug: slug,
-            articles: articles.iter().map(|article| {
-                json!({
-                    "title": article.title.clone(),
-                    "slug": article.slug,
-                    "created_at": article.created_at.to_string(),
-                })
-            }).collect::<Vec<_>>()
-        },
-    ))
 }
 
 #[get("/category/<slug>")]
