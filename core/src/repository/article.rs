@@ -33,12 +33,24 @@ pub async fn get_articles_by_tag_slug(
     db: &DatabaseConnection,
     tag_slug: &str,
 ) -> Result<Vec<article::Model>, DbErr> {
-    let rows = tag::Entity::find()
+    let Some(_tag) = tag::Entity::find()
         .filter(tag::Column::Slug.eq(tag_slug))
-        .find_with_related(article::Entity)
+        .one(db)
+        .await?
+    else {
+        return Err(DbErr::RecordNotFound("tag not found".into()));
+    };
+
+    let articles = article::Entity::find()
+        .join(JoinType::InnerJoin, article::Relation::ArticleTag.def())
+        .join(JoinType::InnerJoin, article_tag::Relation::Tag.def())
+        .filter(tag::Column::Slug.eq(tag_slug))
+        .order_by_desc(article::Column::CreatedAt)
+        .distinct()
         .all(db)
-        .await?; // Vec<(tag::Model, Vec<article::Model>)>
-    Ok(rows.into_iter().flat_map(|(_, arts)| arts).collect())
+        .await?;
+
+    Ok(articles)
 }
 
 pub async fn get_article_by_category_slug(
