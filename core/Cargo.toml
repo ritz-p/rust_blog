@@ -5,7 +5,7 @@ edition = "2024"
 default-run = "rust_blog"
 
 [[bin]]
-path = "src/bin/seed.rs"
+path = "src/bin/main.rs"
 name = "seed"
 
 [dependencies]
