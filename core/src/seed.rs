@@ -1,0 +1,100 @@
+use anyhow::Context;
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, DatabaseConnection, DbErr, EntityTrait, IntoActiveModel,
+    QueryFilter, Value,
+};
+
+pub mod blog_component;
+pub mod markdown;
+pub mod toml;
+
+use blog_component::{seed_article, seed_category, seed_tag};
+use markdown::{markdown_files, parse_markdown};
+
+use crate::{
+    entity::{category, tag},
+    entity_trait::{
+        name_slug_entity::{NameSlugEntity, set_name_slug},
+        name_slug_model::NameSlugModel,
+    },
+    slug_config::SlugConfig,
+};
+
+pub async fn run_all(db: DatabaseConnection) -> anyhow::Result<()> {
+    run_seed(&db, "content/articles").await?;
+    println!("✅ Markdown → DB のシード完了");
+    seed_from_toml::<tag::Entity>(&db, "content/config/slug.toml", "tags").await?;
+    println!("✅ Tag Toml → DB のシード完了");
+    seed_from_toml::<category::Entity>(&db, "content/config/slug.toml", "categories").await?;
+    println!("✅ Category Toml → DB のシード完了");
+    Ok(())
+}
+
+async fn run_seed(db: &DatabaseConnection, dir: &str) -> Result<(), DbErr> {
+    for path in markdown_files(dir) {
+        println!("{:?}", path);
+        let (front_matter, body) = match parse_markdown(&path) {
+            Ok(x) => x,
+            Err(e) => {
+                eprintln!("FrontMatter parse error {:?}", e);
+                continue;
+            }
+        };
+
+        let article_id = seed_article(db, &front_matter, &body).await?;
+        seed_tag(db, &front_matter, article_id).await?;
+        seed_category(db, &front_matter, article_id).await?;
+    }
+    Ok(())
+}
+
+async fn seed_from_toml<T>(
+    db: &DatabaseConnection,
+    toml_path: &str,
+    entity_name: &str,
+) -> anyhow::Result<()>
+where
+    T: EntityTrait + NameSlugEntity,
+    T::Column: ColumnTrait + Copy,
+    T::Model: NameSlugModel,
+    T::ActiveModel: ActiveModelTrait + Default,
+    <T as EntityTrait>::ActiveModel: From<<T as EntityTrait>::Model>,
+    <T as EntityTrait>::Model: IntoActiveModel<<T as EntityTrait>::ActiveModel>,
+    <T as EntityTrait>::ActiveModel: std::marker::Send,
+{
+    let cfg = SlugConfig::from_toml_file_key(toml_path, entity_name)
+        .with_context(|| format!("failed to read slug config: {}", toml_path))?;
+
+    for (name, slug) in cfg.map {
+        let existing = T::find()
+            .filter(T::col_slug().eq(slug.as_str()))
+            .one(db)
+            .await
+            .with_context(|| format!("DB find failed for slug={}", slug))?;
+
+        match existing {
+            Some(model) => {
+                if model.name() != name {
+                    let mut am: T::ActiveModel = model.into();
+                    am.set(T::col_name(), Value::from(name.clone()));
+                    am.set(T::col_slug(), Value::from(slug.clone()));
+
+                    am.update(db)
+                        .await
+                        .with_context(|| format!("DB update failed for slug={}", slug))?;
+                    println!("[{}] updated: slug={} name={}", entity_name, slug, name);
+                }
+            }
+            None => {
+                let mut am: T::ActiveModel = Default::default();
+                set_name_slug::<T>(&mut am, &name, &slug);
+                am.insert(db)
+                    .await
+                    .with_context(|| format!("DB insert failed for slug={}", slug))?;
+                println!("[{}] inserted: slug={} name={}", entity_name, slug, name);
+            }
+        }
+    }
+
+    Ok(())
+}
