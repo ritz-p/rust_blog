@@ -4,8 +4,8 @@ mod m20250706_065150_create_article_table;
 mod m20250706_143055_create_tag_table;
 mod m20250706_144332_create_category_table;
 mod m20250706_145116_create_article_tag_table;
-mod m20250824_170452_create_article_category;mod m20251024_190826_create_fixed_table;
-
+mod m20250824_170452_create_article_category_table;
+mod m20251024_190826_create_fixed_content_table;
 
 pub struct Migrator;
 
@@ -17,7 +17,8 @@ impl MigratorTrait for Migrator {
             Box::new(m20250706_143055_create_tag_table::Migration),
             Box::new(m20250706_144332_create_category_table::Migration),
             Box::new(m20250706_145116_create_article_tag_table::Migration),
-            Box::new(m20250824_170452_create_article_category::Migration),
+            Box::new(m20250824_170452_create_article_category_table::Migration),
+            Box::new(m20251024_190826_create_fixed_content_table::Migration),
         ]
     }
 }

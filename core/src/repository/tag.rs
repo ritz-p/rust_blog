@@ -1,4 +1,4 @@
-use rust_blog::entity::tag;
+use crate::entity::tag;
 use sea_orm::{ColumnTrait, DatabaseConnection, DbErr, EntityTrait, QueryFilter, QueryOrder};
 
 pub async fn get_all_tags(db: &DatabaseConnection) -> Result<Vec<tag::Model>, DbErr> {

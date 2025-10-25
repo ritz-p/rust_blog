@@ -4,4 +4,5 @@ pub use super::article::Entity as Article;
 pub use super::article_category::Entity as ArticleCategory;
 pub use super::article_tag::Entity as ArticleTag;
 pub use super::category::Entity as Category;
+pub use super::fixed_content::Entity as FixedContent;
 pub use super::tag::Entity as Tag;

@@ -1,4 +1,4 @@
-use rust_blog::entity::category;
+use crate::entity::category;
 use sea_orm::{ColumnTrait, DatabaseConnection, DbErr, EntityTrait, QueryFilter, QueryOrder};
 
 pub async fn get_all_categories(db: &DatabaseConnection) -> Result<Vec<category::Model>, DbErr> {
