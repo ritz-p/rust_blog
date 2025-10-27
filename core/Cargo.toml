@@ -1,4 +1,5 @@
 [package]
+resolver = "3"
 name = "rust_blog"
 version = "0.1.0"
 edition = "2024"
