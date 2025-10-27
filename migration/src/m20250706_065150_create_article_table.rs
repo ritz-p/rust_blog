@@ -12,11 +12,11 @@ impl MigrationTrait for Migration {
                     .table(Article::Table)
                     .if_not_exists()
                     .col(pk_auto(Article::Id))
-                    .col(ColumnDef::new(Article::Title).string().not_null())
+                    .col(string(Article::Title).not_null())
                     .col(string_uniq(Article::Slug).not_null())
-                    .col(ColumnDef::new(Article::Content).text().not_null())
-                    .col(ColumnDef::new(Article::CreatedAt).timestamp().not_null())
-                    .col(ColumnDef::new(Article::UpdatedAt).timestamp().not_null())
+                    .col(text(Article::Content).not_null())
+                    .col(timestamp(Article::CreatedAt).not_null())
+                    .col(timestamp(Article::UpdatedAt).not_null())
                     .to_owned(),
             )
             .await

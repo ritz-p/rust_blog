@@ -16,16 +16,8 @@ impl MigrationTrait for Migration {
                 Table::create()
                     .table(ArticleCategory::Table)
                     .if_not_exists()
-                    .col(
-                        ColumnDef::new(ArticleCategory::ArticleId)
-                            .not_null()
-                            .integer(),
-                    )
-                    .col(
-                        ColumnDef::new(ArticleCategory::CategoryId)
-                            .not_null()
-                            .integer(),
-                    )
+                    .col(integer(ArticleCategory::ArticleId).not_null())
+                    .col(integer(ArticleCategory::CategoryId).not_null())
                     .foreign_key(
                         ForeignKey::create()
                             .name("fk_article_category_article")

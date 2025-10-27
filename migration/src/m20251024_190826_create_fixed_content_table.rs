@@ -12,19 +12,11 @@ impl MigrationTrait for Migration {
                     .table(FixedContent::Table)
                     .if_not_exists()
                     .col(pk_auto(FixedContent::Id))
-                    .col(string(FixedContent::Title))
-                    .col(string(FixedContent::Content))
+                    .col(string(FixedContent::Title).not_null())
+                    .col(text(FixedContent::Content).not_null())
                     .col(string_uniq(FixedContent::Slug).not_null())
-                    .col(
-                        ColumnDef::new(FixedContent::CreatedAt)
-                            .timestamp()
-                            .not_null(),
-                    )
-                    .col(
-                        ColumnDef::new(FixedContent::UpdatedAt)
-                            .timestamp()
-                            .not_null(),
-                    )
+                    .col(timestamp(FixedContent::CreatedAt).not_null())
+                    .col(timestamp(FixedContent::UpdatedAt).not_null())
                     .to_owned(),
             )
             .await
