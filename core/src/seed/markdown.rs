@@ -1,4 +1,4 @@
-use crate::utils;
+use crate::utils::{self, fixed_content_matter::FixedContentMatter};
 use std::fs;
 use utils::front_matter::FrontMatter;
 use walkdir::WalkDir;
@@ -14,7 +14,9 @@ pub fn markdown_files(dir: &str) -> impl Iterator<Item = std::path::PathBuf> {
         .map(|entry| entry.into_path())
 }
 
-pub fn parse_markdown(path: &std::path::Path) -> Result<(FrontMatter, String), serde_yaml::Error> {
+pub fn parse_markdown_to_front_matter(
+    path: &std::path::Path,
+) -> Result<(FrontMatter, String), serde_yaml::Error> {
     let text = fs::read_to_string(path).expect("Failed to load file");
     let parts: Vec<&str> = text.splitn(3, "---").collect();
     if parts.len() != 3 {
@@ -23,4 +25,17 @@ pub fn parse_markdown(path: &std::path::Path) -> Result<(FrontMatter, String), s
     let front_matter = serde_yaml::from_str(parts[1])?;
     let body = parts[2].trim_start().to_string();
     Ok((front_matter, body))
+}
+
+pub fn parse_markdown_to_fixed_content_matter(
+    path: &std::path::Path,
+) -> Result<(FixedContentMatter, String), serde_yaml::Error> {
+    let text = fs::read_to_string(path).expect("Failed to load file");
+    let parts: Vec<&str> = text.splitn(3, "---").collect();
+    if parts.len() != 3 {
+        panic!("FrontMatter not found in {:?}", path);
+    }
+    let fixed_content_matter = serde_yaml::from_str(parts[1])?;
+    let body = parts[2].trim_start().to_string();
+    Ok((fixed_content_matter, body))
 }

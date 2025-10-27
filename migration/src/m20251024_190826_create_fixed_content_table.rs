@@ -9,14 +9,14 @@ impl MigrationTrait for Migration {
         manager
             .create_table(
                 Table::create()
-                    .table(Article::Table)
+                    .table(FixedContent::Table)
                     .if_not_exists()
-                    .col(pk_auto(Article::Id))
-                    .col(string(Article::Title).not_null())
-                    .col(string_uniq(Article::Slug).not_null())
-                    .col(text(Article::Content).not_null())
-                    .col(timestamp(Article::CreatedAt).not_null())
-                    .col(timestamp(Article::UpdatedAt).not_null())
+                    .col(pk_auto(FixedContent::Id))
+                    .col(string(FixedContent::Title).not_null())
+                    .col(text(FixedContent::Content).not_null())
+                    .col(string_uniq(FixedContent::Slug).not_null())
+                    .col(timestamp(FixedContent::CreatedAt).not_null())
+                    .col(timestamp(FixedContent::UpdatedAt).not_null())
                     .to_owned(),
             )
             .await
@@ -24,18 +24,18 @@ impl MigrationTrait for Migration {
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
-            .drop_table(Table::drop().table(Article::Table).to_owned())
+            .drop_table(Table::drop().table(FixedContent::Table).to_owned())
             .await
     }
 }
 
 #[derive(DeriveIden)]
-pub enum Article {
+enum FixedContent {
     Table,
     Id,
     Title,
-    Slug,
     Content,
+    Slug,
     CreatedAt,
     UpdatedAt,
 }

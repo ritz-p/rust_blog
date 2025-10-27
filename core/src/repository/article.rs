@@ -1,4 +1,4 @@
-use rust_blog::entity::article_tag;
+use crate::entity::article_tag;
 use sea_orm::{
     ColumnTrait, DatabaseConnection, DbErr, EntityTrait, JoinType, Order, QueryFilter, QueryOrder,
     QuerySelect, prelude::*,

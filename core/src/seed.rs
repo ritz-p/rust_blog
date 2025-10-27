@@ -5,11 +5,10 @@ use sea_orm::{
 };
 
 pub mod blog_component;
+pub mod fixed_content;
 pub mod markdown;
 pub mod toml;
-
 use blog_component::{seed_article, seed_category, seed_tag};
-use markdown::{markdown_files, parse_markdown};
 
 use crate::{
     entity::{category, tag},
@@ -17,23 +16,32 @@ use crate::{
         name_slug_entity::{NameSlugEntity, set_name_slug},
         name_slug_model::NameSlugModel,
     },
+    seed::{
+        fixed_content::seed_fixed_content,
+        markdown::{
+            markdown_files, parse_markdown_to_fixed_content_matter, parse_markdown_to_front_matter,
+        },
+    },
     slug_config::SlugConfig,
 };
 
 pub async fn run_all(db: DatabaseConnection) -> anyhow::Result<()> {
-    run_seed(&db, "content/articles").await?;
-    println!("✅ Markdown → DB のシード完了");
+    run_fixed_content_seed(&db, "content/fixed_contents").await?;
+    println!("✅ 固定ページ Markdown → DB のシード完了");
+    run_article_seed(&db, "content/articles").await?;
+    println!("✅ Article Markdown → DB のシード完了");
     seed_from_toml::<tag::Entity>(&db, "content/config/slug.toml", "tags").await?;
     println!("✅ Tag Toml → DB のシード完了");
     seed_from_toml::<category::Entity>(&db, "content/config/slug.toml", "categories").await?;
     println!("✅ Category Toml → DB のシード完了");
+
     Ok(())
 }
 
-async fn run_seed(db: &DatabaseConnection, dir: &str) -> Result<(), DbErr> {
+async fn run_article_seed(db: &DatabaseConnection, dir: &str) -> Result<(), DbErr> {
     for path in markdown_files(dir) {
         println!("{:?}", path);
-        let (front_matter, body) = match parse_markdown(&path) {
+        let (front_matter, body) = match parse_markdown_to_front_matter(&path) {
             Ok(x) => x,
             Err(e) => {
                 eprintln!("FrontMatter parse error {:?}", e);
@@ -44,6 +52,22 @@ async fn run_seed(db: &DatabaseConnection, dir: &str) -> Result<(), DbErr> {
         let article_id = seed_article(db, &front_matter, &body).await?;
         seed_tag(db, &front_matter, article_id).await?;
         seed_category(db, &front_matter, article_id).await?;
+    }
+    Ok(())
+}
+
+async fn run_fixed_content_seed(db: &DatabaseConnection, dir: &str) -> Result<(), DbErr> {
+    for path in markdown_files(dir) {
+        println!("{:?}", path);
+        let (front_matter, body) = match parse_markdown_to_fixed_content_matter(&path) {
+            Ok(x) => x,
+            Err(e) => {
+                eprintln!("FrontMatter parse error {:?}", e);
+                continue;
+            }
+        };
+
+        seed_fixed_content(db, &front_matter, &body).await?;
     }
     Ok(())
 }

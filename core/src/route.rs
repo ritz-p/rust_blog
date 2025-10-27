@@ -5,6 +5,7 @@ use sea_orm::DatabaseConnection;
 mod get;
 
 use get::{
+    about::about,
     article::post_detail,
     category::{category_detail, category_list},
     error::not_found,
@@ -19,6 +20,7 @@ pub async fn launch(db: DatabaseConnection) -> Result<Rocket<Ignite>, rocket::Er
         .mount(
             "/",
             routes![
+                about,
                 index,
                 post_detail,
                 tag_list,

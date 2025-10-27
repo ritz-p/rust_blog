@@ -1,11 +1,12 @@
 [package]
+resolver = "3"
 name = "rust_blog"
 version = "0.1.0"
 edition = "2024"
 default-run = "rust_blog"
 
 [[bin]]
-path = "src/bin/main.rs"
+path = "src/bin/seed.rs"
 name = "seed"
 
 [dependencies]
