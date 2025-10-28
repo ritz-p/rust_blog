@@ -11,6 +11,7 @@ pub struct Model {
     pub title: String,
     #[sea_orm(unique)]
     pub slug: String,
+    pub excerpt: Option<String>,
     #[sea_orm(column_type = "Text")]
     pub content: String,
     pub created_at: DateTimeUtc,

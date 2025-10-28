@@ -13,8 +13,9 @@ impl MigrationTrait for Migration {
                     .if_not_exists()
                     .col(pk_auto(FixedContent::Id))
                     .col(string(FixedContent::Title).not_null())
-                    .col(text(FixedContent::Content).not_null())
                     .col(string_uniq(FixedContent::Slug).not_null())
+                    .col(string_null(FixedContent::Excerpt))
+                    .col(text(FixedContent::Content).not_null())
                     .col(timestamp(FixedContent::CreatedAt).not_null())
                     .col(timestamp(FixedContent::UpdatedAt).not_null())
                     .to_owned(),
@@ -34,8 +35,9 @@ enum FixedContent {
     Table,
     Id,
     Title,
-    Content,
     Slug,
+    Excerpt,
+    Content,
     CreatedAt,
     UpdatedAt,
 }

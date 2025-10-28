@@ -4,7 +4,7 @@ use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, ModelTrait, QueryFil
 
 use crate::{
     entity::{article, category, tag},
-    utils::markdown::markdown_to_html,
+    utils::{cut_out_string, markdown::markdown_to_html},
     view::{category::CategoryView, tag::TagView},
 };
 

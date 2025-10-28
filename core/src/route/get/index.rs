@@ -3,7 +3,7 @@ use rocket_dyn_templates::{Template, context};
 use sea_orm::DatabaseConnection;
 use serde_json::json;
 
-use crate::repository::article::get_all_articles;
+use crate::{repository::article::get_all_articles, utils::cut_out_string};
 
 #[get("/")]
 pub async fn index(db: &State<DatabaseConnection>) -> Template {
@@ -15,6 +15,11 @@ pub async fn index(db: &State<DatabaseConnection>) -> Template {
             json!({
                 "title":      m.title,
                 "slug":       m.slug,
+                "excerpt": if let Some(excerpt) = m.excerpt{
+                    excerpt
+                }else{
+                    cut_out_string(&m.content, 100)
+                },
                 "created_at": m.created_at.to_string(),
             })
         })
