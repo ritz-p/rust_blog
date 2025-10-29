@@ -26,6 +26,7 @@ pub async fn seed_article(
     };
     active_model.title = Set(front_matter.title.clone());
     active_model.slug = Set(front_matter.slug.clone());
+    active_model.excerpt = Set(front_matter.excerpt.clone());
     active_model.content = Set(body.to_string());
     active_model.created_at = Set(front_matter.created_at.clone());
     active_model.updated_at = Set(front_matter.updated_at.clone());
