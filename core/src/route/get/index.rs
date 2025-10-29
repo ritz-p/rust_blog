@@ -12,15 +12,16 @@ pub async fn index(db: &State<DatabaseConnection>) -> Template {
     let articles: Vec<_> = models
         .into_iter()
         .map(|m| {
+            let excerpt = match m.excerpt.as_ref() {
+                Some(value) => value.clone(),
+                None => cut_out_string(&m.content, 100),
+            };
             json!({
                 "title":      m.title,
                 "slug":       m.slug,
-                "excerpt": if let Some(excerpt) = m.excerpt{
-                    excerpt
-                }else{
-                    cut_out_string(&m.content, 100)
-                },
+                "excerpt":    excerpt,
                 "created_at": m.created_at.to_string(),
+                "updated_at": m.updated_at.to_string(),
             })
         })
         .collect();

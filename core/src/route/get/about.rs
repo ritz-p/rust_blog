@@ -24,10 +24,9 @@ pub async fn fixed_content_detail(
     };
 
     let content = markdown_to_html(&about_page.content);
-    let excerpt = if let Some(excerpt) = about_page.excerpt {
-        excerpt
-    } else {
-        cut_out_string(&content, 100)
+    let excerpt = match about_page.excerpt.as_ref() {
+        Some(value) => value.clone(),
+        None => cut_out_string(&about_page.content, 100),
     };
 
     Ok(Template::render(
