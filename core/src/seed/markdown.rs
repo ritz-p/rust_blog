@@ -16,8 +16,8 @@ pub fn markdown_files(dir: &str) -> impl Iterator<Item = std::path::PathBuf> {
 
 pub fn parse_markdown_to_front_matter(
     path: &std::path::Path,
-) -> Result<(FrontMatter, String), serde_yaml::Error> {
-    let text = fs::read_to_string(path).expect("Failed to load file");
+) -> Result<(FrontMatter, String), Box<dyn std::error::Error>> {
+    let text = fs::read_to_string(path)?;
     let parts: Vec<&str> = text.splitn(3, "---").collect();
     if parts.len() != 3 {
         panic!("FrontMatter not found in {:?}", path);
@@ -29,8 +29,8 @@ pub fn parse_markdown_to_front_matter(
 
 pub fn parse_markdown_to_fixed_content_matter(
     path: &std::path::Path,
-) -> Result<(FixedContentMatter, String), serde_yaml::Error> {
-    let text = fs::read_to_string(path).expect("Failed to load file");
+) -> Result<(FixedContentMatter, String), Box<dyn std::error::Error>> {
+    let text = fs::read_to_string(path)?;
     let parts: Vec<&str> = text.splitn(3, "---").collect();
     if parts.len() != 3 {
         panic!("FrontMatter not found in {:?}", path);

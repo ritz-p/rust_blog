@@ -19,12 +19,13 @@ pub async fn seed_fixed_content(
         .filter(FixedContentColumn::Slug.eq(fixed_content_matter.slug.clone()))
         .one(db)
         .await?;
-    let mut active_model = match model {
+    let mut active_model: entity::fixed_content::ActiveModel = match model {
         Some(model) => model.into_active_model(),
         None => Default::default(),
     };
     active_model.title = Set(fixed_content_matter.title.clone());
     active_model.slug = Set(fixed_content_matter.slug.clone());
+    active_model.excerpt = Set(fixed_content_matter.excerpt.clone());
     active_model.content = Set(body.to_string());
     active_model.created_at = Set(fixed_content_matter.created_at.clone());
     active_model.updated_at = Set(fixed_content_matter.updated_at.clone());

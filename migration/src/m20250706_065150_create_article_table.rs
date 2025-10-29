@@ -14,6 +14,7 @@ impl MigrationTrait for Migration {
                     .col(pk_auto(Article::Id))
                     .col(string(Article::Title).not_null())
                     .col(string_uniq(Article::Slug).not_null())
+                    .col(string_null(Article::Excerpt))
                     .col(text(Article::Content).not_null())
                     .col(timestamp(Article::CreatedAt).not_null())
                     .col(timestamp(Article::UpdatedAt).not_null())
@@ -35,6 +36,7 @@ pub enum Article {
     Id,
     Title,
     Slug,
+    Excerpt,
     Content,
     CreatedAt,
     UpdatedAt,

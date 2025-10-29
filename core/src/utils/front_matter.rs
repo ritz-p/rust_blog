@@ -1,10 +1,11 @@
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 pub struct FrontMatter {
     pub title: String,
     pub slug: String,
+    pub excerpt: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub tags: Vec<String>,
