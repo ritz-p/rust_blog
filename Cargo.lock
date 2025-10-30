@@ -2677,6 +2677,7 @@ dependencies = [
  "anyhow",
  "askama",
  "chrono",
+ "dotenvy",
  "pulldown-cmark",
  "rocket",
  "rocket_dyn_templates",

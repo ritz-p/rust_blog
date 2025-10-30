@@ -1,14 +1,8 @@
-use anyhow::Context;
-use sea_orm::{
-    ActiveModelTrait, ColumnTrait, DatabaseConnection, DbErr, EntityTrait, IntoActiveModel,
-    QueryFilter, Value,
-};
-
 pub mod blog_component;
 pub mod fixed_content;
 pub mod markdown;
 pub mod toml;
-use blog_component::{seed_article, seed_category, seed_tag};
+use std::env;
 
 use crate::{
     entity::{category, tag},
@@ -24,15 +18,27 @@ use crate::{
     },
     slug_config::SlugConfig,
 };
+use anyhow::Context;
+use blog_component::{seed_article, seed_category, seed_tag};
+use dotenvy::dotenv;
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, DatabaseConnection, DbErr, EntityTrait, IntoActiveModel,
+    QueryFilter, Value,
+};
 
 pub async fn run_all(db: DatabaseConnection) -> anyhow::Result<()> {
-    run_fixed_content_seed(&db, "content/fixed_contents").await?;
+    dotenv().expect(".env not found");
+    let fixed_content_path = env::var("FIXED_CONTENT_PATH")?;
+    let article_path = env::var("ARTICLE_PATH")?;
+    let tag_config_toml_path = env::var("TAG_CONFIG_TOML_PATH")?;
+    let category_config_toml_path = env::var("CATEGORY_CONFIG_TOML_PATH")?;
+    run_fixed_content_seed(&db, &fixed_content_path).await?;
     println!("✅ 固定ページ Markdown → DB のシード完了");
-    run_article_seed(&db, "content/articles").await?;
+    run_article_seed(&db, &article_path).await?;
     println!("✅ Article Markdown → DB のシード完了");
-    seed_from_toml::<tag::Entity>(&db, "content/config/slug.toml", "tags").await?;
+    seed_from_toml::<tag::Entity>(&db, &tag_config_toml_path, "tags").await?;
     println!("✅ Tag Toml → DB のシード完了");
-    seed_from_toml::<category::Entity>(&db, "content/config/slug.toml", "categories").await?;
+    seed_from_toml::<category::Entity>(&db, &category_config_toml_path, "categories").await?;
     println!("✅ Category Toml → DB のシード完了");
 
     Ok(())
