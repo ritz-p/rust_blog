@@ -1,15 +1,8 @@
-use anyhow::Context;
-use sea_orm::{
-    ActiveModelTrait, ColumnTrait, DatabaseConnection, DbErr, EntityTrait, IntoActiveModel,
-    QueryFilter, Value,
-};
-
 pub mod blog_component;
+pub mod config;
 pub mod fixed_content;
 pub mod markdown;
-pub mod toml;
-use blog_component::{seed_article, seed_category, seed_tag};
-
+pub mod tag_toml;
 use crate::{
     entity::{category, tag},
     entity_trait::{
@@ -17,6 +10,7 @@ use crate::{
         name_slug_model::NameSlugModel,
     },
     seed::{
+        config::{PathConfig, PathConfigTrait},
         fixed_content::seed_fixed_content,
         markdown::{
             markdown_files, parse_markdown_to_fixed_content_matter, parse_markdown_to_front_matter,
@@ -24,15 +18,33 @@ use crate::{
     },
     slug_config::SlugConfig,
 };
+use anyhow::{Context, Error};
+use blog_component::{seed_article, seed_category, seed_tag};
+use dotenvy::dotenv;
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, DatabaseConnection, DbErr, EntityTrait, IntoActiveModel,
+    QueryFilter, Value,
+};
+use std::{env, fs};
+use toml;
 
 pub async fn run_all(db: DatabaseConnection) -> anyhow::Result<()> {
-    run_fixed_content_seed(&db, "content/fixed_contents").await?;
+    let mut config = load_env();
+    println!("{:?}", config);
+    config = load_config_toml("blog_config.toml", config)?;
+    println!("{:?}", config);
+    run_fixed_content_seed(&db, &config.fixed_content_path.unwrap()).await?;
     println!("✅ 固定ページ Markdown → DB のシード完了");
-    run_article_seed(&db, "content/articles").await?;
+    run_article_seed(&db, &config.article_path.unwrap()).await?;
     println!("✅ Article Markdown → DB のシード完了");
-    seed_from_toml::<tag::Entity>(&db, "content/config/slug.toml", "tags").await?;
+    seed_from_toml::<tag::Entity>(&db, &config.tag_config_toml_path.unwrap(), "tags").await?;
     println!("✅ Tag Toml → DB のシード完了");
-    seed_from_toml::<category::Entity>(&db, "content/config/slug.toml", "categories").await?;
+    seed_from_toml::<category::Entity>(
+        &db,
+        &config.category_config_toml_path.unwrap(),
+        "categories",
+    )
+    .await?;
     println!("✅ Category Toml → DB のシード完了");
 
     Ok(())
@@ -121,4 +133,23 @@ where
     }
 
     Ok(())
+}
+
+fn load_env() -> PathConfig {
+    dotenv().expect(".env not found");
+    PathConfig::new(
+        env::var("FIXED_CONTENT_PATH").ok().or_else(|| None),
+        env::var("ARTICLE_PATH").ok().or_else(|| None),
+        env::var("TAG_CONFIG_TOML_PATH").ok().or_else(|| None),
+        env::var("CATEGORY_CONFIG_TOML_PATH").ok().or_else(|| None),
+    )
+}
+
+fn load_config_toml(path: &str, mut config: PathConfig) -> Result<PathConfig, Error> {
+    let toml = fs::read_to_string(path)?;
+    let value: toml::Value = toml::from_str(&toml)?;
+    let new_config = value.get("path_config").unwrap().clone().try_into()?;
+    println!("{:?}", new_config);
+    config.update(new_config);
+    Ok(config)
 }
