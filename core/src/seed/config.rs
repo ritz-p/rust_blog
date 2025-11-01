@@ -48,21 +48,15 @@ impl PathConfigTrait for PathConfig {
     }
 
     fn update(&mut self, new: Self) {
-        self.article_path = new
-            .fixed_content_path
-            .clone()
-            .or_else(|| self.fixed_content_path.clone());
+        self.article_path = new.article_path.or_else(|| self.article_path.clone());
         self.fixed_content_path = new
             .fixed_content_path
-            .clone()
             .or_else(|| self.fixed_content_path.clone());
         self.tag_config_toml_path = new
             .tag_config_toml_path
-            .clone()
             .or_else(|| self.tag_config_toml_path.clone());
         self.category_config_toml_path = new
             .category_config_toml_path
-            .clone()
             .or_else(|| self.category_config_toml_path.clone());
     }
 }
