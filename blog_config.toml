@@ -1,0 +1,5 @@
+[path_config]
+fixed_content_path = "content/fixed_contents"
+article_path = "content/articles"
+tag_config_toml_path = "content/config/tag_slug.toml"
+category_config_toml_path = "content/config/category_slug.toml"
