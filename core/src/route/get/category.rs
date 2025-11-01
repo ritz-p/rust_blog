@@ -1,6 +1,6 @@
 use rocket::{State, http::Status};
 use rocket_dyn_templates::{Template, context};
-use sea_orm::DatabaseConnection;
+use sea_orm::{DatabaseConnection, DbErr};
 use serde_json::json;
 
 use crate::repository::{article::get_article_by_category_slug, category::get_all_categories};
@@ -26,25 +26,24 @@ pub async fn category_detail(
     db: &State<DatabaseConnection>,
     slug: &str,
 ) -> Result<Template, Status> {
-    let articles = get_article_by_category_slug(db.inner(), slug)
-        .await
-        .map_err(|_| Status::InternalServerError)?;
-
-    if articles.is_empty() {
-        return Err(Status::NotFound);
+    match get_article_by_category_slug(db.inner(), slug).await {
+        Ok(articles) => Ok(Template::render(
+            "category",
+            context! {
+                category_slug: slug,
+                articles: articles.iter().map(|article| {
+                    json!({
+                        "title": article.title.clone(),
+                        "slug": article.slug,
+                        "created_at": article.created_at.to_string(),
+                    })
+                }).collect::<Vec<_>>()
+            },
+        )),
+        Err(DbErr::RecordNotFound(_)) => Err(Status::NotFound),
+        Err(e) => {
+            error!("tag_detail error for {}: {}", slug, e);
+            Err(Status::InternalServerError)
+        }
     }
-
-    Ok(Template::render(
-        "category",
-        context! {
-            category_slug: slug,
-            articles: articles.iter().map(|article| {
-                json!({
-                    "title": article.title.clone(),
-                    "slug": article.slug,
-                    "created_at": article.created_at.to_string(),
-                })
-            }).collect::<Vec<_>>()
-        },
-    ))
 }

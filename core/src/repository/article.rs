@@ -33,34 +33,40 @@ pub async fn get_articles_by_tag_slug(
     db: &DatabaseConnection,
     tag_slug: &str,
 ) -> Result<Vec<article::Model>, DbErr> {
-    let Some(_tag) = tag::Entity::find()
+    if let Some(tag) = tag::Entity::find()
         .filter(tag::Column::Slug.eq(tag_slug))
         .one(db)
         .await?
-    else {
-        return Err(DbErr::RecordNotFound("tag not found".into()));
-    };
-
-    let articles = article::Entity::find()
-        .join(JoinType::InnerJoin, article::Relation::ArticleTag.def())
-        .join(JoinType::InnerJoin, article_tag::Relation::Tag.def())
-        .filter(tag::Column::Slug.eq(tag_slug))
-        .order_by_desc(article::Column::CreatedAt)
-        .distinct()
-        .all(db)
-        .await?;
-
-    Ok(articles)
+    {
+        let articles: Vec<article::Model> = tag
+            .find_related(article::Entity)
+            .order_by_desc(article::Column::CreatedAt)
+            .distinct()
+            .all(db)
+            .await?;
+        Ok(articles)
+    } else {
+        Err(DbErr::RecordNotFound("tag not found".into()))
+    }
 }
 
 pub async fn get_article_by_category_slug(
     db: &DatabaseConnection,
     category_slug: &str,
 ) -> Result<Vec<article::Model>, DbErr> {
-    let rows = category::Entity::find()
+    if let Some(category) = category::Entity::find()
         .filter(category::Column::Slug.eq(category_slug))
-        .find_with_related(article::Entity)
-        .all(db)
-        .await?;
-    Ok(rows.into_iter().flat_map(|(_, arts)| arts).collect())
+        .one(db)
+        .await?
+    {
+        let articles: Vec<article::Model> = category
+            .find_related(article::Entity)
+            .order_by_desc(article::Column::CreatedAt)
+            .distinct()
+            .all(db)
+            .await?;
+        Ok(articles)
+    } else {
+        Err(DbErr::RecordNotFound("category not found".into()))
+    }
 }

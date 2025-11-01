@@ -12,8 +12,8 @@ impl MigrationTrait for Migration {
                     .table(Category::Table)
                     .if_not_exists()
                     .col(pk_auto(Category::Id))
-                    .col(string(Category::Name))
-                    .col(string(Category::Slug))
+                    .col(string_uniq(Category::Name))
+                    .col(string_uniq(Category::Slug))
                     .to_owned(),
             )
             .await
