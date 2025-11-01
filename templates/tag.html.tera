@@ -19,9 +19,6 @@
       {% if article.excerpt %}
         <p class="mb-3">{{ article.excerpt }}</p>
       {% endif %}
-      {# {{ categories_macro::input(items=article.categories) }}
-      {{ tags_macro::input(items=article.tags) }} #}
-
       <hr class="mt-4">
     </section>
     {% endfor %}
