@@ -16,8 +16,18 @@ impl MigrationTrait for Migration {
                     .col(string_uniq(FixedContent::Slug).not_null())
                     .col(string_null(FixedContent::Excerpt))
                     .col(text(FixedContent::Content).not_null())
-                    .col(timestamp(FixedContent::CreatedAt).not_null())
-                    .col(timestamp(FixedContent::UpdatedAt).not_null())
+                    .col(
+                        timestamp(FixedContent::CreatedAt)
+                            .timestamp()
+                            .default(Expr::current_timestamp())
+                            .not_null(),
+                    )
+                    .col(
+                        timestamp(FixedContent::UpdatedAt)
+                            .timestamp()
+                            .default(Expr::current_timestamp())
+                            .not_null(),
+                    )
                     .to_owned(),
             )
             .await

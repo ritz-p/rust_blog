@@ -18,25 +18,25 @@ pub async fn fixed_content_detail(
         .await?
         .ok_or(Status::NotFound);
 
-    let about_page = match maybe {
+    let fixed_content_page = match maybe {
         Ok(model) => model,
         Err(_) => return Err(Status::NotFound),
     };
 
-    let content = markdown_to_html(&about_page.content);
-    let excerpt = match about_page.excerpt.as_ref() {
+    let content = markdown_to_html(&fixed_content_page.content);
+    let excerpt = match fixed_content_page.excerpt.as_ref() {
         Some(value) => value.clone(),
-        None => cut_out_string(&about_page.content, 100),
+        None => cut_out_string(&fixed_content_page.content, 100),
     };
 
     Ok(Template::render(
         "about",
         context! {
-            title: about_page.title,
+            title: fixed_content_page.title,
             excerpt: excerpt,
             content_html: content,
-            created_at: about_page.created_at.to_string(),
-            updated_at: about_page.updated_at.to_string(),
+            created_at: fixed_content_page.created_at.to_string(),
+            updated_at: fixed_content_page.updated_at.to_string(),
         },
     ))
 }

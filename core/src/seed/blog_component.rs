@@ -1,5 +1,7 @@
 use crate::entity;
 use crate::utils;
+use chrono::Timelike;
+use chrono::Utc;
 use entity::{
     article::Column as ArticleColumn, article::Entity as ArticleEntity,
     article::Model as ArticleModel, article_category, article_tag, category, tag,
@@ -28,9 +30,11 @@ pub async fn seed_article(
     active_model.slug = Set(front_matter.slug.clone());
     active_model.excerpt = Set(front_matter.excerpt.clone());
     active_model.content = Set(body.to_string());
-    active_model.created_at = Set(front_matter.created_at.clone());
-    active_model.updated_at = Set(front_matter.updated_at.clone());
-
+    if check_update(&active_model) {
+        if let Some(utc) = Utc::now().with_nanosecond(0) {
+            active_model.updated_at = Set(utc);
+        }
+    }
     let saved = active_model.save(db).await?;
     let article_id: i32 = match saved.id {
         ActiveValue::Set(id) | ActiveValue::Unchanged(id) => id,
@@ -121,4 +125,11 @@ pub async fn seed_category(
         }
     }
     Ok(())
+}
+
+fn check_update(active_model: &entity::article::ActiveModel) -> bool {
+    let title_changed = matches!(active_model.title, Set(_));
+    let content_changed = matches!(active_model.content, Set(_));
+    let excerpt_changed = matches!(active_model.excerpt, Set(_));
+    title_changed || content_changed || excerpt_changed
 }
