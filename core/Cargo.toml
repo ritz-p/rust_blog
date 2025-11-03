@@ -29,3 +29,4 @@ chrono = "0.4.41"
 toml = "0.9.8"
 dotenvy = "0.15.7"
 taplo = { version = "0.14.0", features = ["serde"] }
+chrono-tz = "0.10.4"

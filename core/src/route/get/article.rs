@@ -1,12 +1,11 @@
+use crate::{
+    entity::{article, category, tag},
+    utils::{markdown::markdown_to_html, utc_to_jst},
+    view::{category::CategoryView, tag::TagView},
+};
 use rocket::{State, http::Status};
 use rocket_dyn_templates::{Template, context};
 use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, ModelTrait, QueryFilter};
-
-use crate::{
-    entity::{article, category, tag},
-    utils::{cut_out_string, markdown::markdown_to_html},
-    view::{category::CategoryView, tag::TagView},
-};
 
 #[get("/posts/<slug>")]
 pub async fn post_detail(db: &State<DatabaseConnection>, slug: &str) -> Result<Template, Status> {
@@ -48,13 +47,16 @@ pub async fn post_detail(db: &State<DatabaseConnection>, slug: &str) -> Result<T
             slug: category.slug,
         })
         .collect();
+    let created_at = utc_to_jst(article.created_at);
+    let updated_at = utc_to_jst(article.updated_at);
 
     Ok(Template::render(
         "article_detail",
         context! {
             title: article.title,
             content_html: content,
-            created_at: article.created_at.to_string(),
+            created_at: created_at,
+            updated_at: updated_at,
             tags: &tags,
             categories: &categories
         },

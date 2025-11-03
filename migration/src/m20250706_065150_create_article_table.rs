@@ -16,8 +16,18 @@ impl MigrationTrait for Migration {
                     .col(string_uniq(Article::Slug).not_null())
                     .col(string_null(Article::Excerpt))
                     .col(text(Article::Content).not_null())
-                    .col(timestamp(Article::CreatedAt).not_null())
-                    .col(timestamp(Article::UpdatedAt).not_null())
+                    .col(
+                        timestamp(Article::CreatedAt)
+                            .timestamp()
+                            .default(Expr::current_timestamp())
+                            .not_null(),
+                    )
+                    .col(
+                        timestamp(Article::UpdatedAt)
+                            .timestamp()
+                            .default(Expr::current_timestamp())
+                            .not_null(),
+                    )
                     .to_owned(),
             )
             .await
