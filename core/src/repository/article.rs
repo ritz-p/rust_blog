@@ -84,39 +84,26 @@ pub async fn get_articles_by_tag_slug_with_updated_at(
 pub async fn get_article_by_category_slug(
     db: &DatabaseConnection,
     category_slug: &str,
+    sort_key: &str,
 ) -> Result<Vec<article::Model>, DbErr> {
     if let Some(category) = category::Entity::find()
         .filter(category::Column::Slug.eq(category_slug))
         .one(db)
         .await?
     {
-        let articles: Vec<article::Model> = category
-            .find_related(article::Entity)
-            .order_by_desc(article::Column::CreatedAt)
-            .distinct()
-            .all(db)
-            .await?;
-        Ok(articles)
-    } else {
-        Err(DbErr::RecordNotFound("category not found".into()))
-    }
-}
-
-pub async fn get_article_by_category_slug_with_updated_at(
-    db: &DatabaseConnection,
-    category_slug: &str,
-) -> Result<Vec<article::Model>, DbErr> {
-    if let Some(category) = category::Entity::find()
-        .filter(category::Column::Slug.eq(category_slug))
-        .one(db)
-        .await?
-    {
-        let articles: Vec<article::Model> = category
-            .find_related(article::Entity)
-            .order_by_desc(article::Column::UpdatedAt)
-            .distinct()
-            .all(db)
-            .await?;
+        let mut find = category.find_related(article::Entity).distinct();
+        match sort_key {
+            "updated" => {
+                find = find.order_by_desc(article::Column::UpdatedAt);
+            }
+            "created" => {
+                find = find.order_by_desc(article::Column::CreatedAt);
+            }
+            _ => {
+                find = find.order_by_desc(article::Column::CreatedAt);
+            }
+        }
+        let articles = find.all(db).await?;
         Ok(articles)
     } else {
         Err(DbErr::RecordNotFound("category not found".into()))
