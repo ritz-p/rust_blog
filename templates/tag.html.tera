@@ -8,6 +8,15 @@
 <h1 class="title">Tag: #{{ tag_slug }}</h1>
 
 {% if articles and articles | length > 0 %}
+  <div class="mb-4">
+    並び順:
+    <a href="?sort_key=created_at" class="mr-2">
+      作成日順
+    </a>
+    <a href="?sort_key=updated_at" class="mr-2">
+      更新日順
+    </a>
+  </div>
   <div class="block">
     {% for article in articles %}
     <section class="mb-6">
