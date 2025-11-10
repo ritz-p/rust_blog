@@ -21,13 +21,19 @@ pub async fn tag_list(db: &State<DatabaseConnection>) -> Result<Template, Status
     Ok(Template::render("tags", context! {tags}))
 }
 
-#[get("/tag/<slug>")]
-pub async fn tag_detail(db: &State<DatabaseConnection>, slug: &str) -> Result<Template, Status> {
-    match get_articles_by_tag_slug(&db, slug).await {
+#[get("/tag/<slug>?<sort_key>")]
+pub async fn tag_detail(
+    db: &State<DatabaseConnection>,
+    slug: &str,
+    sort_key: Option<String>,
+) -> Result<Template, Status> {
+    let sort_key = sort_key.unwrap_or_else(|| "created_at".to_string());
+    match get_articles_by_tag_slug(&db, slug, &sort_key).await {
         Ok(articles) => Ok(Template::render(
             "tag",
             context! {
                 tag_slug: slug,
+                sort_key: sort_key,
                 articles: articles.iter().map(|article| {
                     json!({
                         "title": article.title.clone(),
