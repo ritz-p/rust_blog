@@ -15,14 +15,8 @@ pub async fn index(
     db: &State<DatabaseConnection>,
     query: Option<PagingQuery>,
 ) -> Template {
-    let query = query.unwrap_or(PagingQuery {
-        page: None,
-        per: None,
-    });
-    let page = Page {
-        page: query.page.unwrap_or(1),
-        per: query.per.unwrap_or(10),
-    };
+    let query = query.unwrap_or(PagingQuery::new());
+    let page = Page::new_from_query(query);
     let (models, page_info) = get_all_articles(db.inner(), page).await.unwrap();
 
     let base_path = "/";

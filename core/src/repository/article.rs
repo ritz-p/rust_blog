@@ -14,34 +14,13 @@ pub async fn get_all_articles(
     page: Page,
 ) -> Result<(Vec<article::Model>, PageInfo), DbErr> {
     let page = page.normalize(50);
-
     let base = article::Entity::find().order_by_desc(article::Column::CreatedAt);
-
     let total = base.clone().count(db).await?;
-
     let page_info = PageInfo::new(page.page, page.per, total);
-
     let offset = (page_info.page - 1) * page_info.per;
     let items = base.limit(page_info.per).offset(offset).all(db).await?;
     Ok((items, page_info))
 }
-
-pub async fn get_all_articles_with_updated_at(
-    db: &DatabaseConnection,
-) -> Result<Vec<article::Model>, DbErr> {
-    article::Entity::find()
-        .order_by(article::Column::CreatedAt, Order::Desc)
-        .all(db)
-        .await
-}
-
-pub async fn get_article_by_id(
-    db: &DatabaseConnection,
-    id: i32,
-) -> Result<Option<article::Model>, DbErr> {
-    article::Entity::find_by_id(id).one(db).await
-}
-
 pub async fn get_article_by_slug(
     db: &DatabaseConnection,
     slug: &str,

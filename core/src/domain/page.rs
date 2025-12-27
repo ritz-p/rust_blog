@@ -14,6 +14,13 @@ impl Page {
     pub fn offset(self) -> u64 {
         (self.page - 1) * self.per
     }
+
+    pub fn new_from_query(query: PagingQuery) -> Self {
+        Self {
+            page: query.page.unwrap_or(1),
+            per: query.per.unwrap_or(10),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -67,4 +74,13 @@ impl PageInfo {
 pub struct PagingQuery {
     pub page: Option<u64>,
     pub per: Option<u64>,
+}
+
+impl PagingQuery {
+    pub fn new() -> Self {
+        Self {
+            page: None,
+            per: None,
+        }
+    }
 }
