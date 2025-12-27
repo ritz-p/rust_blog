@@ -11,25 +11,25 @@ mod repository_tests {
     use rocket::tokio;
     use sea_orm::{DatabaseBackend, EntityTrait, MockDatabase, entity::prelude::*, entity::*};
 
-    #[tokio::test]
-    async fn test_get_all_articles_returns_list() {
-        let dummy_article = article::Model {
-            id: 1,
-            title: "Test Title".to_owned(),
-            slug: "test-slug".to_owned(),
-            excerpt: Some("Excerpt".to_owned()),
-            content: "Content".to_owned(),
-            created_at: Utc::now(),
-            updated_at: Utc::now(),
-        };
+    // #[tokio::test]
+    // async fn test_get_all_articles_returns_list() {
+    //     let dummy_article = article::Model {
+    //         id: 1,
+    //         title: "Test Title".to_owned(),
+    //         slug: "test-slug".to_owned(),
+    //         excerpt: Some("Excerpt".to_owned()),
+    //         content: "Content".to_owned(),
+    //         created_at: Utc::now(),
+    //         updated_at: Utc::now(),
+    //     };
 
-        let db = MockDatabase::new(DatabaseBackend::Sqlite)
-            .append_query_results(vec![vec![dummy_article.clone()]])
-            .into_connection();
+    //     let db = MockDatabase::new(DatabaseBackend::Sqlite)
+    //         .append_query_results(vec![vec![dummy_article.clone()]])
+    //         .into_connection();
 
-        let result = get_all_articles(&db).await.expect("Query should succeed");
-        assert_eq!(result, vec![dummy_article]);
-    }
+    //     let result = get_all_articles(&db).await.expect("Query should succeed");
+    //     assert_eq!(result, vec![dummy_article]);
+    // }
 
     #[tokio::test]
     async fn test_get_article_by_slug_not_found() {

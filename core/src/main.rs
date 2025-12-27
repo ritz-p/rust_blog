@@ -1,14 +1,12 @@
 #[macro_use]
 extern crate rocket;
 
+mod domain;
 mod entity;
 mod repository;
 mod route;
 mod utils;
 mod view;
-use std::collections::HashMap;
-
-use anyhow::Context;
 use sea_orm::{Database, DatabaseConnection};
 
 use crate::{route::launch, utils::config::load_config};
