@@ -4,11 +4,12 @@ use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, ModelTrait, QueryFil
 
 use crate::{
     repository::fixed_content::get_fixed_content_by_slug,
-    utils::{cut_out_string, markdown::markdown_to_html},
+    utils::{config::CommonConfig, cut_out_string, markdown::markdown_to_html},
 };
 
 #[get("/<slug>")]
 pub async fn fixed_content_detail(
+    config: &State<CommonConfig>,
     db: &State<DatabaseConnection>,
     slug: &str,
 ) -> Result<Template, Status> {
@@ -32,6 +33,7 @@ pub async fn fixed_content_detail(
     Ok(Template::render(
         "about",
         context! {
+            site_name: &config.site_name,
             title: fixed_content_page.title,
             excerpt: excerpt,
             content_html: content,

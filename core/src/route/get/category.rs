@@ -10,8 +10,8 @@ use crate::{
 
 #[get("/categories")]
 pub async fn category_list(
-    db: &State<DatabaseConnection>,
     config: &State<CommonConfig>,
+    db: &State<DatabaseConnection>,
 ) -> Result<Template, Status> {
     let models = get_all_categories(db)
         .await
@@ -35,6 +35,7 @@ pub async fn category_list(
 
 #[get("/category/<slug>?<sort_key>")]
 pub async fn category_detail(
+    config: &State<CommonConfig>,
     db: &State<DatabaseConnection>,
     slug: &str,
     sort_key: Option<String>,
@@ -44,6 +45,7 @@ pub async fn category_detail(
         Ok(articles) => Ok(Template::render(
             "category",
             context! {
+                site_name: &config.site_name,
                 category_slug: slug,
                 sort_key: sort_key,
                 articles: articles.iter().map(|article| {

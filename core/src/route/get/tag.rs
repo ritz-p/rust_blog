@@ -10,8 +10,8 @@ use crate::{
 
 #[get("/tags")]
 pub async fn tag_list(
-    db: &State<DatabaseConnection>,
     config: &State<CommonConfig>,
+    db: &State<DatabaseConnection>,
 ) -> Result<Template, Status> {
     let models = get_all_tags(db)
         .await
@@ -35,6 +35,7 @@ pub async fn tag_list(
 
 #[get("/tag/<slug>?<sort_key>")]
 pub async fn tag_detail(
+    config: &State<CommonConfig>,
     db: &State<DatabaseConnection>,
     slug: &str,
     sort_key: Option<String>,
@@ -44,6 +45,7 @@ pub async fn tag_detail(
         Ok(articles) => Ok(Template::render(
             "tag",
             context! {
+                site_name: &config.site_name,
                 tag_slug: slug,
                 sort_key: sort_key,
                 articles: articles.iter().map(|article| {

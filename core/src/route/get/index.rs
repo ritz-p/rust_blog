@@ -9,7 +9,7 @@ use crate::{
 };
 
 #[get("/")]
-pub async fn index(db: &State<DatabaseConnection>, config: &State<CommonConfig>) -> Template {
+pub async fn index(config: &State<CommonConfig>, db: &State<DatabaseConnection>) -> Template {
     let models = get_all_articles(db.inner()).await.unwrap();
 
     let articles: Vec<_> = models

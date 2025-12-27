@@ -9,7 +9,7 @@ mod get;
 use get::{
     article::post_detail,
     category::{category_detail, category_list},
-    error::not_found,
+    error_404::not_found,
     fixed_component::fixed_content_detail,
     index::index,
     tag::{tag_detail, tag_list},
