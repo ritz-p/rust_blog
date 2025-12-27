@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use rocket::{Ignite, Rocket};
 use rocket_dyn_templates::Template;
 use sea_orm::DatabaseConnection;
@@ -13,9 +15,17 @@ use get::{
     tag::{tag_detail, tag_list},
 };
 
-pub async fn launch(db: DatabaseConnection) -> Result<Rocket<Ignite>, rocket::Error> {
+use crate::utils::config::CommonConfig;
+
+pub async fn launch(
+    db: DatabaseConnection,
+    config_map: HashMap<String, String>,
+) -> Result<Rocket<Ignite>, rocket::Error> {
     return rocket::build()
         .manage(db)
+        .manage(CommonConfig {
+            site_name: config_map.get("site_name").cloned(),
+        })
         .attach(Template::fairing())
         .mount(
             "/",

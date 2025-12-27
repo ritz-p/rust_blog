@@ -3,10 +3,13 @@ use rocket_dyn_templates::{Template, context};
 use sea_orm::DatabaseConnection;
 use serde_json::json;
 
-use crate::{repository::article::get_all_articles, utils::cut_out_string};
+use crate::{
+    repository::article::get_all_articles,
+    utils::{config::CommonConfig, cut_out_string},
+};
 
 #[get("/")]
-pub async fn index(db: &State<DatabaseConnection>) -> Template {
+pub async fn index(db: &State<DatabaseConnection>, config: &State<CommonConfig>) -> Template {
     let models = get_all_articles(db.inner()).await.unwrap();
 
     let articles: Vec<_> = models
@@ -29,7 +32,7 @@ pub async fn index(db: &State<DatabaseConnection>) -> Template {
     Template::render(
         "index",
         context! {
-            site_name: "My Rust Blog",
+            site_name: &config.site_name,
             articles:  articles,
         },
     )

@@ -1,5 +1,5 @@
 {% extends "base" %}
-{% block title %}{{ title }} – My Blog{% endblock title %}
+{% block title %}{{ title }}{% endblock title %}
 
 {% block content %}
 <article aria-labelledby="post-title">

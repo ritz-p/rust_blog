@@ -3,10 +3,16 @@ use rocket_dyn_templates::{Template, context};
 use sea_orm::{DatabaseConnection, DbErr};
 use serde_json::json;
 
-use crate::repository::{article::get_article_by_category_slug, category::get_all_categories};
+use crate::{
+    repository::{article::get_article_by_category_slug, category::get_all_categories},
+    utils::config::CommonConfig,
+};
 
 #[get("/categories")]
-pub async fn category_list(db: &State<DatabaseConnection>) -> Result<Template, Status> {
+pub async fn category_list(
+    db: &State<DatabaseConnection>,
+    config: &State<CommonConfig>,
+) -> Result<Template, Status> {
     let models = get_all_categories(db)
         .await
         .map_err(|_| Status::InternalServerError)?;
@@ -18,7 +24,13 @@ pub async fn category_list(db: &State<DatabaseConnection>) -> Result<Template, S
             })
         })
         .collect::<Vec<_>>();
-    Ok(Template::render("categories", context! {categories}))
+    Ok(Template::render(
+        "categories",
+        context! {
+            site_name: &config.site_name,
+            categories
+        },
+    ))
 }
 
 #[get("/category/<slug>?<sort_key>")]
