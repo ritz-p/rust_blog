@@ -26,24 +26,8 @@ pub async fn index(
     let (models, page_info) = get_all_articles(db.inner(), page).await.unwrap();
 
     let base_path = "/";
-
-    let prev_url = if page_info.has_prev {
-        format!(
-            "{}?page={}&per={}",
-            base_path, page_info.prev_page, page_info.per
-        )
-    } else {
-        String::new()
-    };
-
-    let next_url = if page_info.has_next {
-        format!(
-            "{}?page={}&per={}",
-            base_path, page_info.next_page, page_info.per
-        )
-    } else {
-        String::new()
-    };
+    let prev_url = PageInfo::get_prev_url(&page_info, base_path);
+    let next_url = PageInfo::get_next_url(&page_info, base_path);
 
     let articles: Vec<_> = models
         .into_iter()

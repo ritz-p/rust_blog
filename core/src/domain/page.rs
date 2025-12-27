@@ -47,6 +47,20 @@ impl PageInfo {
             next_page: if has_next { page + 1 } else { total_pages },
         }
     }
+    pub fn get_prev_url(&self, base_path: &str) -> String {
+        if self.has_next {
+            format!("{}?page={}&per={}", base_path, self.next_page, self.per)
+        } else {
+            String::new()
+        }
+    }
+    pub fn get_next_url(&self, base_path: &str) -> String {
+        if self.has_prev {
+            format!("{}?page={}&per={}", base_path, self.prev_page, self.per)
+        } else {
+            String::new()
+        }
+    }
 }
 
 #[derive(FromForm, Debug, Clone, Copy)]
