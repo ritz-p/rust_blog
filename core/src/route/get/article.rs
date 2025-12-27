@@ -1,6 +1,6 @@
 use crate::{
     entity::{article, category, tag},
-    utils::{markdown::markdown_to_html, utc_to_jst},
+    utils::{config::CommonConfig, markdown::markdown_to_html, utc_to_jst},
     view::{category::CategoryView, tag::TagView},
 };
 use rocket::{State, http::Status};
@@ -8,7 +8,11 @@ use rocket_dyn_templates::{Template, context};
 use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, ModelTrait, QueryFilter};
 
 #[get("/posts/<slug>")]
-pub async fn post_detail(db: &State<DatabaseConnection>, slug: &str) -> Result<Template, Status> {
+pub async fn post_detail(
+    config: &State<CommonConfig>,
+    db: &State<DatabaseConnection>,
+    slug: &str,
+) -> Result<Template, Status> {
     let conn = db.inner();
     let maybe = article::Entity::find()
         .filter(article::Column::Slug.eq(slug.to_string()))
@@ -53,6 +57,7 @@ pub async fn post_detail(db: &State<DatabaseConnection>, slug: &str) -> Result<T
     Ok(Template::render(
         "article_detail",
         context! {
+            site_name: &config.site_name,
             title: article.title,
             content_html: content,
             created_at: created_at,

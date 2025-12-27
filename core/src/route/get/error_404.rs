@@ -5,7 +5,7 @@ pub fn not_found() -> Template {
     Template::render(
         "404",
         context! {
-            site_name: "404 - My Rust Blog"
+            site_name: "404 Not Found"
         },
     )
 }

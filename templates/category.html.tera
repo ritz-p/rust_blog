@@ -2,7 +2,7 @@
 {% import "partial/tags" as tags_macro %}
 {% import "partial/categories" as categories_macro%}
 
-{% block title %}Category: {{ category_slug }} – My Blog{% endblock title %}
+{% block title %}Category: {{ category_slug }} {% endblock title %}
 
 {% block content %}
 <h1 class="title">Category: {{ category_slug }}</h1>

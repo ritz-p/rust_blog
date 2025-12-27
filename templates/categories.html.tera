@@ -1,5 +1,5 @@
 {% extends "base" %}
-{% block title %}Categories – My Blog{% endblock title %}
+{% block title %}Categories - {{ site_name }}{% endblock title %}
 
 {% block content %}
 <h1 class="title">Categories</h1>

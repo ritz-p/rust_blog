@@ -3,10 +3,16 @@ use rocket_dyn_templates::{Template, context};
 use sea_orm::{DatabaseConnection, DbErr};
 use serde_json::json;
 
-use crate::repository::{article::get_articles_by_tag_slug, tag::get_all_tags};
+use crate::{
+    repository::{article::get_articles_by_tag_slug, tag::get_all_tags},
+    utils::config::CommonConfig,
+};
 
 #[get("/tags")]
-pub async fn tag_list(db: &State<DatabaseConnection>) -> Result<Template, Status> {
+pub async fn tag_list(
+    config: &State<CommonConfig>,
+    db: &State<DatabaseConnection>,
+) -> Result<Template, Status> {
     let models = get_all_tags(db)
         .await
         .map_err(|_| Status::InternalServerError)?;
@@ -18,11 +24,18 @@ pub async fn tag_list(db: &State<DatabaseConnection>) -> Result<Template, Status
             })
         })
         .collect::<Vec<_>>();
-    Ok(Template::render("tags", context! {tags}))
+    Ok(Template::render(
+        "tags",
+        context! {
+            site_name: &config.site_name,
+            tags
+        },
+    ))
 }
 
 #[get("/tag/<slug>?<sort_key>")]
 pub async fn tag_detail(
+    config: &State<CommonConfig>,
     db: &State<DatabaseConnection>,
     slug: &str,
     sort_key: Option<String>,
@@ -32,6 +45,7 @@ pub async fn tag_detail(
         Ok(articles) => Ok(Template::render(
             "tag",
             context! {
+                site_name: &config.site_name,
                 tag_slug: slug,
                 sort_key: sort_key,
                 articles: articles.iter().map(|article| {

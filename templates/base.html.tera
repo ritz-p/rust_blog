@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}{{ title | default(value="My Blog") }}{% endblock title %}</title>
+  <title>{% block title %}{{ site_name | default(value="My Blog") }}{% endblock title %}</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
   {% block head %}{% endblock head %}
 </head>
@@ -11,7 +11,7 @@
   <nav class="navbar is-light" role="navigation" aria-label="main navigation">
     <div class="container">
       <div class="navbar-brand">
-        <a class="navbar-item has-text-weight-semibold" href="/">My Blog</a>
+        <a class="navbar-item has-text-weight-semibold" href="/">記事一覧</a>
         <a role="button" class="navbar-burger" aria-label="menu" aria-expanded="false" data-target="mainNav">
           <span aria-hidden="true"></span>
           <span aria-hidden="true"></span>
@@ -35,7 +35,7 @@
   </section>
   <footer class="footer">
     <div class="content has-text-centered">
-      <p>© {{ year | default(value=2025) }} My Blog</p>
+      <p>© {{ year | default(value=2025) }} {{ site_name }} </p>
     </div>
   </footer>
   {% block scripts %}
