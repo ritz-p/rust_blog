@@ -4,14 +4,33 @@ use sea_orm::DatabaseConnection;
 use serde_json::json;
 
 use crate::{
+    domain::{
+        page::{Page, PageInfo},
+        query::{PagingQuery, index::IndexQuery},
+    },
     repository::article::get_all_articles,
     utils::{config::CommonConfig, cut_out_string},
 };
 
-#[get("/")]
-pub async fn index(config: &State<CommonConfig>, db: &State<DatabaseConnection>) -> Template {
-    let models = get_all_articles(db.inner()).await.unwrap();
+#[get("/?<query..>")]
+pub async fn index(
+    config: &State<CommonConfig>,
+    db: &State<DatabaseConnection>,
+    query: Option<IndexQuery>,
+) -> Template {
+    println!("{:?}", query);
+    let query = query.unwrap_or(IndexQuery::new());
+    let page = Page::new_from_query(&query);
+    println!("{:?}", page);
+    let (models, page_info) = get_all_articles(db.inner(), page).await.unwrap();
 
+    let base_path = "/";
+    let prev_url = PageInfo::get_prev_url(&page_info, base_path, None);
+    let next_url = PageInfo::get_next_url(&page_info, base_path, None);
+    println!(
+        "pageinfo={:?} prev={} next={}",
+        page_info, prev_url, next_url
+    );
     let articles: Vec<_> = models
         .into_iter()
         .map(|m| {
@@ -34,6 +53,15 @@ pub async fn index(config: &State<CommonConfig>, db: &State<DatabaseConnection>)
         context! {
             site_name: &config.site_name,
             articles:  articles,
+            page: page_info.count,
+            per: page_info.per,
+            total_pages: page_info.total_pages,
+            has_prev: page_info.has_prev,
+            has_next: page_info.has_next,
+            prev_page: page_info.prev_page,
+            next_page: page_info.next_page,
+            prev_url: prev_url,
+            next_url: next_url,
         },
     )
 }

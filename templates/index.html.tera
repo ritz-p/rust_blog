@@ -45,4 +45,5 @@
 {% else %}
   <p class="has-text-grey">まだ記事がありません。</p>
 {% endif %}
+{% include "partial/page" %}
 {% endblock content %}
