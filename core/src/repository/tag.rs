@@ -1,5 +1,7 @@
-use crate::entity::tag;
-use sea_orm::{ColumnTrait, DatabaseConnection, DbErr, EntityTrait, QueryFilter, QueryOrder};
+use crate::entity::{article, tag};
+use sea_orm::{
+    ColumnTrait, DatabaseConnection, DbErr, EntityTrait, ModelTrait, QueryFilter, QueryOrder,
+};
 
 pub async fn get_all_tags(db: &DatabaseConnection) -> Result<Vec<tag::Model>, DbErr> {
     tag::Entity::find()
@@ -16,4 +18,11 @@ pub async fn get_tag_by_slug(
         .filter(tag::Column::Slug.eq(slug.to_string()))
         .one(db)
         .await
+}
+
+pub async fn get_tags_by_article(
+    db: &DatabaseConnection,
+    article: &article::Model,
+) -> Result<Vec<tag::Model>, DbErr> {
+    article.find_related(tag::Entity).all(db).await
 }

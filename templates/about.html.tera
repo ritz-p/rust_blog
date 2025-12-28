@@ -2,21 +2,26 @@
 {% block title %}{{ title }}{% endblock title %}
 
 {% block content %}
-<article aria-labelledby="post-title">
-  <header class="mb-5">
-    <h1 id="post-title" class="title is-2">{{ title }}</h1>
-    <p class="is-size-7 has-text-grey">
-      公開: {{ created_at }}{% if updated_at %} / 更新: {{ updated_at }}{% endif %}
-    </p>
-    <hr>
-  </header>
-  <div class="content is-medium">
-    {{ content_html | safe }}
+<div class="columns">
+  <div class="column is-8">
+    <article aria-labelledby="post-title">
+      <header class="mb-5">
+        <h1 id="post-title" class="title is-2">{{ title }}</h1>
+        <p class="is-size-7 has-text-grey">
+          公開: {{ created_at }}{% if updated_at %} / 更新: {{ updated_at }}{% endif %}
+        </p>
+        <hr>
+      </header>
+      <div class="content is-medium">
+        {{ content_html | safe }}
+      </div>
+      <nav class="level">
+        <div class="level-left">
+          <a class="button is-light" href="/">← 一覧へ</a>
+        </div>
+      </nav>
+    </article>
   </div>
-  <nav class="level">
-    <div class="level-left">
-      <a class="button is-light" href="/">← 一覧へ</a>
-    </div>
-  </nav>
-</article>
+  {% include "partial/sidemenu" %}
+</div>
 {% endblock content %}

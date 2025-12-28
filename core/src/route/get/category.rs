@@ -46,17 +46,12 @@ pub async fn category_detail(
 ) -> Result<Template, Status> {
     let query = query.unwrap_or(CategoryQuery::new());
     let page = Page::new_from_query(&query);
-    println!("{:?}", page);
     let sort_key = query.sort_key.unwrap_or_else(|| "created_at".to_string());
     match get_article_by_category_slug(db.inner(), page, slug, &sort_key).await {
         Ok((articles, page_info)) => {
             let base_path = "/category/".to_owned() + slug;
             let prev_url = PageInfo::get_prev_url(&page_info, &base_path, Some(&sort_key));
             let next_url = PageInfo::get_next_url(&page_info, &base_path, Some(&sort_key));
-            println!(
-                "pageinfo={:?} prev={} next={}",
-                page_info, prev_url, next_url
-            );
 
             Ok(Template::render(
                 "category",

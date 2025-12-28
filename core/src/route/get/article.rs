@@ -1,11 +1,17 @@
 use crate::{
     entity::{article, category, tag},
-    utils::{config::CommonConfig, markdown::markdown_to_html, utc_to_jst},
+    repository::{
+        article::{get_article_by_slug, get_latest_articles},
+        category::get_categories_by_article,
+        tag::get_tags_by_article,
+    },
+    utils::{config::CommonConfig, cut_out_string, markdown::markdown_to_html, utc_to_jst},
     view::{category::CategoryView, tag::TagView},
 };
 use rocket::{State, http::Status};
 use rocket_dyn_templates::{Template, context};
 use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, ModelTrait, QueryFilter};
+use serde_json::json;
 
 #[get("/posts/<slug>")]
 pub async fn post_detail(
@@ -14,9 +20,7 @@ pub async fn post_detail(
     slug: &str,
 ) -> Result<Template, Status> {
     let conn = db.inner();
-    let maybe = article::Entity::find()
-        .filter(article::Column::Slug.eq(slug.to_string()))
-        .one(conn)
+    let maybe = get_article_by_slug(conn, slug)
         .await
         .map_err(|_| Status::InternalServerError)?
         .ok_or(Status::NotFound);
@@ -28,9 +32,7 @@ pub async fn post_detail(
 
     let content = markdown_to_html(&article.content);
 
-    let tags: Vec<_> = article
-        .find_related(tag::Entity)
-        .all(conn)
+    let tags: Vec<_> = get_tags_by_article(conn, &article)
         .await
         .map_err(|_| Status::InternalServerError)?
         .into_iter()
@@ -40,9 +42,7 @@ pub async fn post_detail(
         })
         .collect();
 
-    let categories: Vec<_> = article
-        .find_related(category::Entity)
-        .all(conn)
+    let categories: Vec<_> = get_categories_by_article(conn, &article)
         .await
         .map_err(|_| Status::InternalServerError)?
         .into_iter()
@@ -54,6 +54,18 @@ pub async fn post_detail(
     let created_at = utc_to_jst(article.created_at);
     let updated_at = utc_to_jst(article.updated_at);
 
+    let latest_articles: Vec<_> = get_latest_articles(db, 5)
+        .await
+        .map_err(|_| Status::InternalServerError)?
+        .into_iter()
+        .map(|model| {
+            json!({
+                "title":      model.title,
+                "slug":       model.slug,
+            })
+        })
+        .collect();
+
     Ok(Template::render(
         "article_detail",
         context! {
@@ -63,7 +75,8 @@ pub async fn post_detail(
             created_at: created_at,
             updated_at: updated_at,
             tags: &tags,
-            categories: &categories
+            categories: &categories,
+            latest_articles: latest_articles
         },
     ))
 }

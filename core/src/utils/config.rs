@@ -47,7 +47,6 @@ pub fn load_config() -> HashMap<String, String> {
         Ok(config) => config.map,
         Err(_) => HashMap::new(),
     };
-    println!("{:?}", map);
     if !map.contains_key("site_name") {
         map.insert("site_name".to_string(), "My Blog".to_string());
     }

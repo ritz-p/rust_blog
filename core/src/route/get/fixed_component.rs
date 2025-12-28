@@ -1,9 +1,10 @@
 use rocket::{State, futures::TryFutureExt, http::Status};
 use rocket_dyn_templates::{Template, context};
 use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, ModelTrait, QueryFilter};
+use serde_json::json;
 
 use crate::{
-    repository::fixed_content::get_fixed_content_by_slug,
+    repository::{article::get_latest_articles, fixed_content::get_fixed_content_by_slug},
     utils::{config::CommonConfig, cut_out_string, markdown::markdown_to_html},
 };
 
@@ -30,6 +31,18 @@ pub async fn fixed_content_detail(
         None => cut_out_string(&fixed_content_page.content, 100),
     };
 
+    let latest_articles: Vec<_> = get_latest_articles(db, 5)
+        .await
+        .map_err(|_| Status::InternalServerError)?
+        .into_iter()
+        .map(|model| {
+            json!({
+                "title":      model.title,
+                "slug":       model.slug,
+            })
+        })
+        .collect();
+
     Ok(Template::render(
         "about",
         context! {
@@ -39,6 +52,7 @@ pub async fn fixed_content_detail(
             content_html: content,
             created_at: fixed_content_page.created_at.to_string(),
             updated_at: fixed_content_page.updated_at.to_string(),
+            latest_articles: latest_articles,
         },
     ))
 }
