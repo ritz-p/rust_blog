@@ -26,14 +26,21 @@ pub async fn seed_article(
         Some(model) => model.into_active_model(),
         None => Default::default(),
     };
-    active_model.title = Set(front_matter.title.clone());
-    active_model.slug = Set(front_matter.slug.clone());
-    active_model.excerpt = Set(front_matter.excerpt.clone());
-    active_model.content = Set(body.to_string());
-    if check_update(&active_model) {
+    active_model
+        .title
+        .set_if_not_equals(front_matter.title.clone());
+    active_model
+        .slug
+        .set_if_not_equals(front_matter.slug.clone());
+    active_model
+        .excerpt
+        .set_if_not_equals(front_matter.excerpt.clone());
+    active_model.content.set_if_not_equals(body.to_string());
+    if active_model.is_changed() {
         if let Some(utc) = Utc::now().with_nanosecond(0) {
             active_model.updated_at = Set(utc);
         }
+        println!("{} updated", front_matter.title);
     }
     let saved = active_model.save(db).await?;
     let article_id: i32 = match saved.id {
@@ -125,11 +132,4 @@ pub async fn seed_category(
         }
     }
     Ok(())
-}
-
-fn check_update(active_model: &entity::article::ActiveModel) -> bool {
-    let title_changed = matches!(active_model.title, Set(_));
-    let content_changed = matches!(active_model.content, Set(_));
-    let excerpt_changed = matches!(active_model.excerpt, Set(_));
-    title_changed || content_changed || excerpt_changed
 }
