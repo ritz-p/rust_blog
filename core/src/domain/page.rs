@@ -49,18 +49,14 @@ impl PageInfo {
         let has_next = count < total_pages;
 
         Self {
-            count: page.count,
+            count: count,
             per: page.per,
             total,
             total_pages,
             has_prev,
             has_next,
-            prev_page: if has_prev { page.count - 1 } else { 1 },
-            next_page: if has_next {
-                page.count + 1
-            } else {
-                total_pages
-            },
+            prev_page: if has_prev { count - 1 } else { 1 },
+            next_page: if has_next { count + 1 } else { total_pages },
         }
     }
     pub fn get_prev_url(&self, base_path: &str, sort_key: Option<&String>) -> String {
