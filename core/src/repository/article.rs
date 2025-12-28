@@ -13,14 +13,17 @@ pub async fn get_all_articles(
     db: &DatabaseConnection,
     page: Page,
 ) -> Result<(Vec<article::Model>, PageInfo), DbErr> {
-    let base = article::Entity::find().order_by_desc(article::Column::CreatedAt);
-    let total = base.clone().count(db).await?;
+    let total = article::Entity::find().count(db).await?;
     let page = page.normalize(50);
     let page_info = PageInfo::new(page, total);
-    println!("{:?}", page_info);
     let offset = (page_info.count - 1) * page_info.per;
-    let items = base.limit(page_info.per).offset(offset).all(db).await?;
-    Ok((items, page_info))
+    let articles = article::Entity::find()
+        .order_by_desc(article::Column::CreatedAt)
+        .offset(offset)
+        .limit(page_info.per)
+        .all(db)
+        .await?;
+    Ok((articles, page_info))
 }
 pub async fn get_article_by_slug(
     db: &DatabaseConnection,
@@ -43,17 +46,43 @@ pub async fn get_articles_by_tag_slug(
         .one(db)
         .await?
     {
-        let mut find: Select<article::Entity> = tag.find_related(article::Entity).distinct();
-        match sort_key {
-            "updated_at" => find = find.order_by_desc(article::Column::UpdatedAt),
-            "created_at" => find = find.order_by_desc(article::Column::CreatedAt),
-            _ => find = find.order_by_desc(article::Column::CreatedAt),
-        }
-        let total = find.clone().count(db).await?;
+        let total = tag
+            .find_related(article::Entity)
+            .distinct()
+            .count(db)
+            .await?;
         let page = page.normalize(50);
         let page_info = PageInfo::new(page, total);
         let offset = (page_info.count - 1) * page_info.per;
-        let articles = find.limit(page_info.per).offset(offset).all(db).await?;
+        let articles = match sort_key {
+            "updated_at" => {
+                tag.find_related(article::Entity)
+                    .distinct()
+                    .order_by_desc(article::Column::UpdatedAt)
+                    .offset(offset)
+                    .limit(page_info.per)
+                    .all(db)
+                    .await?
+            }
+            "created_at" => {
+                tag.find_related(article::Entity)
+                    .distinct()
+                    .order_by_desc(article::Column::CreatedAt)
+                    .offset(offset)
+                    .limit(page_info.per)
+                    .all(db)
+                    .await?
+            }
+            _ => {
+                tag.find_related(article::Entity)
+                    .distinct()
+                    .order_by_desc(article::Column::UpdatedAt)
+                    .offset(offset)
+                    .limit(page_info.per)
+                    .all(db)
+                    .await?
+            }
+        };
         Ok((articles, page_info))
     } else {
         Err(DbErr::RecordNotFound("tag not found".into()))
@@ -71,23 +100,46 @@ pub async fn get_article_by_category_slug(
         .one(db)
         .await?
     {
-        let mut find = category.find_related(article::Entity).distinct();
-        match sort_key {
-            "updated_at" => {
-                find = find.order_by_desc(article::Column::UpdatedAt);
-            }
-            "created_at" => {
-                find = find.order_by_desc(article::Column::CreatedAt);
-            }
-            _ => {
-                find = find.order_by_desc(article::Column::CreatedAt);
-            }
-        }
-        let total = find.clone().count(db).await?;
+        let total = category
+            .find_related(article::Entity)
+            .distinct()
+            .count(db)
+            .await?;
         let page = page.normalize(50);
         let page_info = PageInfo::new(page, total);
         let offset = (page_info.count - 1) * page_info.per;
-        let articles = find.limit(page_info.per).offset(offset).all(db).await?;
+        let articles = match sort_key {
+            "updated_at" => {
+                category
+                    .find_related(article::Entity)
+                    .distinct()
+                    .order_by_desc(article::Column::UpdatedAt)
+                    .offset(offset)
+                    .limit(page_info.per)
+                    .all(db)
+                    .await?
+            }
+            "created_at" => {
+                category
+                    .find_related(article::Entity)
+                    .distinct()
+                    .order_by_desc(article::Column::CreatedAt)
+                    .offset(offset)
+                    .limit(page_info.per)
+                    .all(db)
+                    .await?
+            }
+            _ => {
+                category
+                    .find_related(article::Entity)
+                    .distinct()
+                    .order_by_desc(article::Column::UpdatedAt)
+                    .offset(offset)
+                    .limit(page_info.per)
+                    .all(db)
+                    .await?
+            }
+        };
         Ok((articles, page_info))
     } else {
         Err(DbErr::RecordNotFound("category not found".into()))

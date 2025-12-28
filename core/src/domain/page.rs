@@ -32,7 +32,6 @@ impl Page {
 pub struct PageInfo {
     pub count: u64,
     pub per: u64,
-    pub total: u64,
     pub total_pages: u64,
     pub has_prev: bool,
     pub has_next: bool,
@@ -51,7 +50,6 @@ impl PageInfo {
         Self {
             count: count,
             per: page.per,
-            total,
             total_pages,
             has_prev,
             has_next,
