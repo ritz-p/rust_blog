@@ -1,6 +1,13 @@
-[path_config]
-fixed_content_path = "content/fixed_contents"
-article_path = "content/articles"
-tag_config_toml_path = "content/config/tag_slug.toml"
-category_config_toml_path = "content/config/category_slug.toml"
-common_config_toml_path = "content/config/common.toml"
+[common]
+"site_name" = "Ritz のブログ"
+
+[categories]
+"Category slug file" = "Category Slug file"
+"開発" = "development"
+"日記" = "diary"
+
+[tags]
+"tag slug file" = "Tag Slug file"
+"Rust" = "rust"
+"Hello World" = "hello-world"
+"Test" = "test"

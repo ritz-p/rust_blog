@@ -29,22 +29,15 @@ use std::{env, fs};
 use toml;
 
 pub async fn run_all(db: DatabaseConnection) -> anyhow::Result<()> {
-    let mut config = load_env();
+    let config = load_env();
     println!("{:?}", config);
-    config = load_config_toml("blog_config.toml", config)?;
-    println!("{:?}", config);
-    run_fixed_content_seed(&db, &config.fixed_content_path.unwrap()).await?;
+    run_fixed_content_seed(&db, &config.fixed_content_path).await?;
     println!("✅ 固定ページ Markdown → DB のシード完了");
-    run_article_seed(&db, &config.article_path.unwrap()).await?;
+    run_article_seed(&db, &config.article_path).await?;
     println!("✅ Article Markdown → DB のシード完了");
-    seed_from_toml::<tag::Entity>(&db, &config.tag_config_toml_path.unwrap(), "tags").await?;
+    seed_from_toml::<tag::Entity>(&db, &config.config_toml_path, "tags").await?;
     println!("✅ Tag Toml → DB のシード完了");
-    seed_from_toml::<category::Entity>(
-        &db,
-        &config.category_config_toml_path.unwrap(),
-        "categories",
-    )
-    .await?;
+    seed_from_toml::<category::Entity>(&db, &config.config_toml_path, "categories").await?;
     println!("✅ Category Toml → DB のシード完了");
 
     Ok(())
@@ -140,16 +133,6 @@ fn load_env() -> PathConfig {
     PathConfig::new(
         env::var("FIXED_CONTENT_PATH").ok().or_else(|| None),
         env::var("ARTICLE_PATH").ok().or_else(|| None),
-        env::var("TAG_CONFIG_TOML_PATH").ok().or_else(|| None),
-        env::var("CATEGORY_CONFIG_TOML_PATH").ok().or_else(|| None),
+        env::var("CONFIG_TOML_PATH").ok().or_else(|| None),
     )
-}
-
-fn load_config_toml(path: &str, mut config: PathConfig) -> Result<PathConfig, Error> {
-    let toml = fs::read_to_string(path)?;
-    let value: toml::Value = toml::from_str(&toml)?;
-    let new_config = value.get("path_config").unwrap().clone().try_into()?;
-    println!("{:?}", new_config);
-    config.update(new_config);
-    Ok(config)
 }

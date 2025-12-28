@@ -40,7 +40,7 @@ impl CommonConfigMap {
 }
 
 pub fn load_config() -> HashMap<String, String> {
-    let toml_path = "content/config/common.toml";
+    let toml_path = "blog_config.toml";
     let common_config = CommonConfigMap::from_toml_file_key(toml_path, "common")
         .with_context(|| format!("failed to read common config: {}", toml_path));
     let mut map = match common_config {
