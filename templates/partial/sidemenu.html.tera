@@ -1,0 +1,18 @@
+{% if latest_articles and latest_articles | length > 0 %}
+    <aside class="menu">
+        <p class="menu-label">
+            📰 最新記事
+        </p>
+        <ul class="menu-list">
+            {% for latest_article in latest_articles %}
+            <li>
+                <a
+                href="/posts/{{ latest_article.slug }}"
+                >
+                {{ latest_article.title }}
+                </a>
+            </li>
+            {% endfor %}
+        </ul>
+    </aside>
+{% endif %}

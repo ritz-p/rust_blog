@@ -18,19 +18,12 @@ pub async fn index(
     db: &State<DatabaseConnection>,
     query: Option<IndexQuery>,
 ) -> Template {
-    println!("{:?}", query);
     let query = query.unwrap_or(IndexQuery::new());
     let page = Page::new_from_query(&query);
-    println!("{:?}", page);
     let (models, page_info) = get_all_articles(db.inner(), page).await.unwrap();
-
     let base_path = "/";
     let prev_url = PageInfo::get_prev_url(&page_info, base_path, None);
     let next_url = PageInfo::get_next_url(&page_info, base_path, None);
-    println!(
-        "pageinfo={:?} prev={} next={}",
-        page_info, prev_url, next_url
-    );
     let articles: Vec<_> = models
         .into_iter()
         .map(|m| {

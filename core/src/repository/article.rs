@@ -35,6 +35,18 @@ pub async fn get_article_by_slug(
         .await
 }
 
+pub async fn get_latest_articles(
+    db: &DatabaseConnection,
+    limit: u64,
+) -> Result<Vec<article::Model>, DbErr> {
+    let articles = article::Entity::find()
+        .order_by_desc(article::Column::CreatedAt)
+        .limit(limit)
+        .all(db)
+        .await?;
+    Ok(articles)
+}
+
 pub async fn get_articles_by_tag_slug(
     db: &DatabaseConnection,
     page: Page,
