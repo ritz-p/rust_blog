@@ -17,7 +17,6 @@ pub async fn get_all_articles(
     let total = base.clone().count(db).await?;
     let page = page.normalize(50);
     let page_info = PageInfo::new(page, total);
-    println!("{:?}", page_info);
     let offset = (page_info.count - 1) * page_info.per;
     let items = base.limit(page_info.per).offset(offset).all(db).await?;
     Ok((items, page_info))
@@ -30,6 +29,18 @@ pub async fn get_article_by_slug(
         .filter(article::Column::Slug.eq(slug.to_string()))
         .one(db)
         .await
+}
+
+pub async fn get_latest_articles(
+    db: &DatabaseConnection,
+    limit: u64,
+) -> Result<Vec<article::Model>, DbErr> {
+    let articles = article::Entity::find()
+        .order_by_desc(article::Column::CreatedAt)
+        .limit(limit)
+        .all(db)
+        .await?;
+    Ok(articles)
 }
 
 pub async fn get_articles_by_tag_slug(

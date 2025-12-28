@@ -1,5 +1,7 @@
-use crate::entity::category;
-use sea_orm::{ColumnTrait, DatabaseConnection, DbErr, EntityTrait, QueryFilter, QueryOrder};
+use crate::entity::{article, category};
+use sea_orm::{
+    ColumnTrait, DatabaseConnection, DbErr, EntityTrait, ModelTrait, QueryFilter, QueryOrder,
+};
 
 pub async fn get_all_categories(db: &DatabaseConnection) -> Result<Vec<category::Model>, DbErr> {
     category::Entity::find()
@@ -16,4 +18,11 @@ pub async fn get_category_by_slug(
         .filter(category::Column::Slug.eq(slug.to_string()))
         .one(db)
         .await
+}
+
+pub async fn get_categories_by_article(
+    db: &DatabaseConnection,
+    article: &article::Model,
+) -> Result<Vec<category::Model>, DbErr> {
+    article.find_related(category::Entity).all(db).await
 }
