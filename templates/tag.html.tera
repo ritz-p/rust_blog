@@ -35,4 +35,5 @@
 {% else %}
   <p class="has-text-grey">このタグには記事がありません。</p>
 {% endif %}
+{% include "partial/page" %}
 {% endblock content %}
