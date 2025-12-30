@@ -5,6 +5,7 @@ pub mod markdown;
 pub mod tag_toml;
 use crate::{
     entity::{category, tag},
+    entity_extension::{ValidateModel, tag::TagValidator},
     entity_trait::{
         name_slug_entity::{NameSlugEntity, set_name_slug},
         name_slug_model::NameSlugModel,
@@ -18,15 +19,14 @@ use crate::{
     },
     slug_config::SlugConfig,
 };
-use anyhow::{Context, Error};
+use anyhow::Context;
 use blog_component::{seed_article, seed_category, seed_tag};
 use dotenvy::dotenv;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, DatabaseConnection, DbErr, EntityTrait, IntoActiveModel,
     QueryFilter, Value,
 };
-use std::{env, fs};
-use toml;
+use std::env;
 
 pub async fn run_all(db: DatabaseConnection) -> anyhow::Result<()> {
     let config = load_env();
@@ -43,7 +43,7 @@ pub async fn run_all(db: DatabaseConnection) -> anyhow::Result<()> {
     Ok(())
 }
 
-async fn run_article_seed(db: &DatabaseConnection, dir: &str) -> Result<(), DbErr> {
+async fn run_article_seed(db: &DatabaseConnection, dir: &str) -> Result<(), anyhow::Error> {
     for path in markdown_files(dir) {
         println!("{:?}", path);
         let (front_matter, body) = match parse_markdown_to_front_matter(&path) {
@@ -61,7 +61,7 @@ async fn run_article_seed(db: &DatabaseConnection, dir: &str) -> Result<(), DbEr
     Ok(())
 }
 
-async fn run_fixed_content_seed(db: &DatabaseConnection, dir: &str) -> Result<(), DbErr> {
+async fn run_fixed_content_seed(db: &DatabaseConnection, dir: &str) -> Result<(), anyhow::Error> {
     for path in markdown_files(dir) {
         println!("{:?}", path);
         let (front_matter, body) = match parse_markdown_to_fixed_content_matter(&path) {

@@ -3,6 +3,7 @@ extern crate rocket;
 
 mod domain;
 mod entity;
+mod entity_extension;
 mod repository;
 mod route;
 mod utils;
