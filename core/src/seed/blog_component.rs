@@ -1,4 +1,6 @@
 use crate::entity;
+use crate::entity_extension;
+use crate::entity_extension::ValidateModel;
 use crate::utils;
 use chrono::Timelike;
 use chrono::Utc;
@@ -6,6 +8,9 @@ use entity::{
     article::Column as ArticleColumn, article::Entity as ArticleEntity,
     article::Model as ArticleModel, article_category, article_tag, category, tag,
 };
+use entity_extension::article::ArticleValidator;
+use garde::Validate;
+use sea_orm::TryIntoModel;
 use sea_orm::{
     ActiveModelTrait, ActiveValue, ColumnTrait, DatabaseConnection, DbErr, EntityTrait,
     IntoActiveModel, QueryFilter, Set,
@@ -17,7 +22,7 @@ pub async fn seed_article(
     db: &DatabaseConnection,
     front_matter: &FrontMatter,
     body: &str,
-) -> Result<i32, DbErr> {
+) -> Result<i32, anyhow::Error> {
     let model: Option<ArticleModel> = ArticleEntity::find()
         .filter(ArticleColumn::Slug.eq(front_matter.slug.clone()))
         .one(db)
@@ -36,16 +41,37 @@ pub async fn seed_article(
         .excerpt
         .set_if_not_equals(front_matter.excerpt.clone());
     active_model.content.set_if_not_equals(body.to_string());
+
+    let now = Utc::now().with_nanosecond(0).unwrap_or_else(Utc::now);
+    let validator = ArticleValidator {
+        title: front_matter.title.clone(),
+        slug: front_matter.slug.clone(),
+        excerpt: front_matter.excerpt.clone(),
+        content: body.to_string(),
+        created_at: now,
+        updated_at: now,
+    };
+    match validator.validate() {
+        Ok(_) => {}
+        Err(e) => {
+            println!("{:?}", e);
+            return Err(e.into());
+        }
+    }
+
     if active_model.is_changed() {
         if let Some(utc) = Utc::now().with_nanosecond(0) {
             active_model.updated_at = Set(utc);
         }
-        println!("{} updated", front_matter.title);
     }
+
     let saved = active_model.save(db).await?;
     let article_id: i32 = match saved.id {
-        ActiveValue::Set(id) | ActiveValue::Unchanged(id) => id,
-        ActiveValue::NotSet => return Err(DbErr::Custom("article id not set".into())),
+        ActiveValue::Set(id) | ActiveValue::Unchanged(id) => {
+            println!("{} updated", front_matter.title);
+            id
+        }
+        ActiveValue::NotSet => return Err(DbErr::Custom("article id not set".into()).into()),
     };
     Ok(article_id)
 }
