@@ -1,5 +1,4 @@
 use crate::entity;
-use crate::entity_extension::ValidateModel;
 use crate::entity_extension::fixed_content::FixedContentValidator;
 use crate::utils;
 use chrono::Timelike;
@@ -8,7 +7,6 @@ use entity::fixed_content::{
     Column as FixedContentColumn, Entity as FixedContentEntity, Model as FixedContentModel,
 };
 use garde::Validate;
-use sea_orm::TryIntoModel;
 use sea_orm::{
     ActiveModelTrait, ActiveValue, ColumnTrait, DatabaseConnection, DbErr, EntityTrait,
     IntoActiveModel, QueryFilter, Set,
@@ -40,17 +38,17 @@ pub async fn seed_fixed_content(
         .set_if_not_equals(fixed_content_matter.excerpt.clone());
     active_model.content.set_if_not_equals(body.to_string());
 
-    match active_model.clone().try_into_model() {
-        Ok(model) => {
-            let validator = FixedContentValidator::new(model);
-            match validator.validate() {
-                Ok(_) => {}
-                Err(e) => {
-                    println!("{:?}", e);
-                    return Err(e.into());
-                }
-            }
-        }
+    let now = Utc::now().with_nanosecond(0).unwrap_or_else(Utc::now);
+    let validator = FixedContentValidator {
+        title: fixed_content_matter.title.clone(),
+        slug: fixed_content_matter.slug.clone(),
+        excerpt: fixed_content_matter.excerpt.clone(),
+        content: body.to_string(),
+        created_at: now,
+        updated_at: now,
+    };
+    match validator.validate() {
+        Ok(_) => {}
         Err(e) => {
             println!("{:?}", e);
             return Err(e.into());

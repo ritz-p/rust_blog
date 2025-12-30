@@ -42,17 +42,17 @@ pub async fn seed_article(
         .set_if_not_equals(front_matter.excerpt.clone());
     active_model.content.set_if_not_equals(body.to_string());
 
-    match active_model.clone().try_into_model() {
-        Ok(model) => {
-            let validator = ArticleValidator::new(model);
-            match validator.validate() {
-                Ok(_) => {}
-                Err(e) => {
-                    println!("{:?}", e);
-                    return Err(e.into());
-                }
-            }
-        }
+    let now = Utc::now().with_nanosecond(0).unwrap_or_else(Utc::now);
+    let validator = ArticleValidator {
+        title: front_matter.title.clone(),
+        slug: front_matter.slug.clone(),
+        excerpt: front_matter.excerpt.clone(),
+        content: body.to_string(),
+        created_at: now,
+        updated_at: now,
+    };
+    match validator.validate() {
+        Ok(_) => {}
         Err(e) => {
             println!("{:?}", e);
             return Err(e.into());

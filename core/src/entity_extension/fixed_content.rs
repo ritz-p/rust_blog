@@ -17,16 +17,3 @@ pub struct FixedContentValidator {
     #[garde(skip)]
     pub updated_at: DateTimeUtc,
 }
-
-impl ValidateModel<FixedContentModel> for FixedContentValidator {
-    fn new(model: FixedContentModel) -> Self {
-        Self {
-            title: model.title,
-            slug: model.slug,
-            excerpt: model.excerpt,
-            content: model.content,
-            created_at: model.created_at,
-            updated_at: model.updated_at,
-        }
-    }
-}
