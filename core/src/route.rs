@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use rocket::{Ignite, Rocket};
+use rocket::fs::FileServer;
 use rocket_dyn_templates::Template;
 use sea_orm::DatabaseConnection;
 
@@ -39,6 +40,7 @@ pub async fn launch(
                 category_detail
             ],
         )
+        .mount("/image", FileServer::from("content/image"))
         .register("/", catchers![not_found])
         .launch()
         .await;
