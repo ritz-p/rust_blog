@@ -1,6 +1,5 @@
 use crate::entity;
 use crate::entity_extension;
-use crate::entity_extension::ValidateModel;
 use crate::utils;
 use chrono::Timelike;
 use chrono::Utc;
@@ -10,7 +9,6 @@ use entity::{
 };
 use entity_extension::article::ArticleValidator;
 use garde::Validate;
-use sea_orm::TryIntoModel;
 use sea_orm::{
     ActiveModelTrait, ActiveValue, ColumnTrait, DatabaseConnection, DbErr, EntityTrait,
     IntoActiveModel, QueryFilter, Set,
@@ -40,6 +38,9 @@ pub async fn seed_article(
     active_model
         .excerpt
         .set_if_not_equals(front_matter.excerpt.clone());
+    active_model
+        .icatch_path
+        .set_if_not_equals(front_matter.icatch_path.clone());
     active_model.content.set_if_not_equals(body.to_string());
 
     let now = Utc::now().with_nanosecond(0).unwrap_or_else(Utc::now);
@@ -47,6 +48,7 @@ pub async fn seed_article(
         title: front_matter.title.clone(),
         slug: front_matter.slug.clone(),
         excerpt: front_matter.excerpt.clone(),
+        icatch_path: front_matter.icatch_path.clone(),
         content: body.to_string(),
         created_at: now,
         updated_at: now,

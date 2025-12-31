@@ -1,4 +1,3 @@
-use crate::{entity::article::Model as ArticleModel, entity_extension::ValidateModel};
 use garde::Validate;
 use sea_orm::prelude::DateTimeUtc;
 
@@ -10,6 +9,8 @@ pub struct ArticleValidator {
     pub slug: String,
     #[garde(length(utf16, min = 1, max = 100))]
     pub excerpt: Option<String>,
+    #[garde(length(utf16, min = 1, max = 200))]
+    pub icatch_path: Option<String>,
     #[garde(skip)]
     pub content: String,
     #[garde(skip)]

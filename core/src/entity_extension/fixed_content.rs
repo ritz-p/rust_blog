@@ -1,4 +1,3 @@
-use crate::{entity::fixed_content::Model as FixedContentModel, entity_extension::ValidateModel};
 use garde::Validate;
 use sea_orm::prelude::DateTimeUtc;
 

@@ -13,10 +13,6 @@ impl Page {
         Self { count, per }
     }
 
-    pub fn offset(self) -> u64 {
-        (self.count - 1) * self.per
-    }
-
     pub fn new_from_query<T>(query: &T) -> Self
     where
         T: PagingQuery,

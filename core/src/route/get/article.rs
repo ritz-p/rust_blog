@@ -1,16 +1,15 @@
 use crate::{
-    entity::{article, category, tag},
     repository::{
         article::{get_article_by_slug, get_latest_articles},
         category::get_categories_by_article,
         tag::get_tags_by_article,
     },
-    utils::{config::CommonConfig, cut_out_string, markdown::markdown_to_html, utc_to_jst},
+    utils::{config::CommonConfig, markdown::markdown_to_html, utc_to_jst},
     view::{category::CategoryView, tag::TagView},
 };
 use rocket::{State, http::Status};
 use rocket_dyn_templates::{Template, context};
-use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, ModelTrait, QueryFilter};
+use sea_orm::DatabaseConnection;
 use serde_json::json;
 
 #[get("/posts/<slug>")]

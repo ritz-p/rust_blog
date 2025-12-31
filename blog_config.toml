@@ -1,5 +1,6 @@
 [common]
 "site_name" = "Ritz のブログ"
+"default_icatch_path" = "/image/rustacean-orig-noshadow.png"
 
 [categories]
 "Category slug file" = "Category Slug file"

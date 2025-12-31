@@ -26,6 +26,7 @@ pub async fn launch(
         .manage(db)
         .manage(CommonConfig {
             site_name: config_map.get("site_name").cloned(),
+            default_icatch_path: config_map.get("default_icatch_path").cloned(),
         })
         .attach(Template::fairing())
         .mount(

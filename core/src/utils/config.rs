@@ -5,6 +5,7 @@ use std::{collections::HashMap, fs, path::Path};
 #[derive(Debug, Deserialize)]
 pub struct CommonConfig {
     pub site_name: Option<String>,
+    pub default_icatch_path: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -49,6 +50,9 @@ pub fn load_config() -> HashMap<String, String> {
     };
     if !map.contains_key("site_name") {
         map.insert("site_name".to_string(), "My Blog".to_string());
+    }
+    if !map.contains_key("default_icatch_path") {
+        map.insert("default_icatch_path".to_string(), "".to_string());
     }
     map
 }

@@ -1,6 +1,6 @@
 use rocket::{State, futures::TryFutureExt, http::Status};
 use rocket_dyn_templates::{Template, context};
-use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, ModelTrait, QueryFilter};
+use sea_orm::DatabaseConnection;
 use serde_json::json;
 
 use crate::{
