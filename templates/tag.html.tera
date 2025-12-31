@@ -20,14 +20,25 @@
   <div class="block">
     {% for article in articles %}
     <section class="mb-6">
-      <h2 class="title is-4">
-        <a href="/posts/{{ article.slug }}">{{ article.title }}</a>
-      </h2>
-      <p class="is-size-7 has-text-grey mb-2">{{ article.created_at }}</p>
+      <div class="columns is-mobile is-variable is-3">
+        {% if article.icatch_path and article.icatch_path | length > 0 %}
+        <div class="column is-narrow">
+          <figure class="image is-128x128">
+            <img src="{{ article.icatch_path }}" alt="{{ article.title }} icatch" style="object-fit: cover;">
+          </figure>
+        </div>
+        {% endif %}
+        <div class="column">
+          <h2 class="title is-4">
+            <a href="/posts/{{ article.slug }}">{{ article.title }}</a>
+          </h2>
+          <p class="is-size-7 has-text-grey mb-2">{{ article.created_at }}</p>
 
-      {% if article.excerpt %}
-        <p class="mb-3">{{ article.excerpt }}</p>
-      {% endif %}
+          {% if article.excerpt %}
+            <p class="mb-3">{{ article.excerpt }}</p>
+          {% endif %}
+        </div>
+      </div>
       <hr class="mt-4">
     </section>
     {% endfor %}

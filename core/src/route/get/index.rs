@@ -24,6 +24,10 @@ pub async fn index(
     let base_path = "/";
     let prev_url = PageInfo::get_prev_url(&page_info, base_path, None);
     let next_url = PageInfo::get_next_url(&page_info, base_path, None);
+    let default_icatch_path = config
+        .default_icatch_path
+        .clone()
+        .unwrap_or_default();
     let articles: Vec<_> = models
         .into_iter()
         .map(|m| {
@@ -31,10 +35,15 @@ pub async fn index(
                 Some(value) => value.clone(),
                 None => cut_out_string(&m.content, 100),
             };
+            let icatch_path = m
+                .icatch_path
+                .clone()
+                .unwrap_or_else(|| default_icatch_path.clone());
             json!({
                 "title":      m.title,
                 "slug":       m.slug,
                 "excerpt":    excerpt,
+                "icatch_path": icatch_path,
                 "created_at": m.created_at.to_string(),
                 "updated_at": m.updated_at.to_string(),
             })

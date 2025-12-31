@@ -11,7 +11,8 @@ pub fn cut_out_string(base: &str, limit: usize) -> String {
 }
 
 pub fn utc_to_jst(utc: DateTime<Utc>) -> String {
-    let jst_offset = FixedOffset::east_opt(9 * 3600).unwrap_or(FixedOffset::east(0));
+    let jst_offset =
+        FixedOffset::east_opt(9 * 3600).unwrap_or_else(|| FixedOffset::east_opt(0).unwrap());
     utc.with_timezone(&jst_offset)
         .format("%Y-%m-%d %H:%M:%S")
         .to_string()

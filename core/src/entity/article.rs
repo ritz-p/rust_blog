@@ -16,6 +16,7 @@ pub struct Model {
     pub content: String,
     pub created_at: DateTimeUtc,
     pub updated_at: DateTimeUtc,
+    pub icatch_path: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

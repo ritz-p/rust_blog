@@ -6,6 +6,7 @@ mod m20250706_144332_create_category_table;
 mod m20250706_145116_create_article_tag_table;
 mod m20250824_170452_create_article_category_table;
 mod m20251024_190826_create_fixed_content_table;
+mod m20251231_000001_create_article_icatch_path;
 
 pub struct Migrator;
 
@@ -19,6 +20,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20250706_145116_create_article_tag_table::Migration),
             Box::new(m20250824_170452_create_article_category_table::Migration),
             Box::new(m20251024_190826_create_fixed_content_table::Migration),
+            Box::new(m20251231_000001_create_article_icatch_path::Migration),
         ]
     }
 }

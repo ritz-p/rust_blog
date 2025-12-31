@@ -5,7 +5,6 @@ pub mod markdown;
 pub mod tag_toml;
 use crate::{
     entity::{category, tag},
-    entity_extension::{ValidateModel, tag::TagValidator},
     entity_trait::{
         name_slug_entity::{NameSlugEntity, set_name_slug},
         name_slug_model::NameSlugModel,
@@ -23,8 +22,8 @@ use anyhow::Context;
 use blog_component::{seed_article, seed_category, seed_tag};
 use dotenvy::dotenv;
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, DatabaseConnection, DbErr, EntityTrait, IntoActiveModel,
-    QueryFilter, Value,
+    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, IntoActiveModel, QueryFilter,
+    Value,
 };
 use std::env;
 

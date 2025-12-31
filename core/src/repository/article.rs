@@ -1,13 +1,10 @@
-use crate::{
-    domain::page::{Page, PageInfo},
-    entity::article_tag,
-};
+use crate::domain::page::{Page, PageInfo};
 use sea_orm::{
-    ColumnTrait, DatabaseConnection, DbErr, EntityTrait, JoinType, Order, QueryFilter, QueryOrder,
-    QuerySelect, prelude::*,
+    ColumnTrait, DatabaseConnection, DbErr, EntityTrait, QueryFilter, QueryOrder, QuerySelect,
+    prelude::*,
 };
 
-use crate::entity::{article, article_category, category, tag};
+use crate::entity::{article, category, tag};
 
 pub async fn get_all_articles(
     db: &DatabaseConnection,

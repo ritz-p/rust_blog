@@ -9,7 +9,7 @@ use crate::{
         query::{PagingQuery, tag::TagQuery},
     },
     repository::{article::get_articles_by_tag_slug, tag::get_all_tags},
-    utils::config::CommonConfig,
+    utils::{config::CommonConfig, cut_out_string},
 };
 
 #[get("/tags")]
@@ -52,6 +52,10 @@ pub async fn tag_detail(
             let base_path = "/tag/".to_owned() + slug;
             let prev_url = PageInfo::get_prev_url(&page_info, &base_path, Some(&sort_key));
             let next_url = PageInfo::get_next_url(&page_info, &base_path, Some(&sort_key));
+            let default_icatch_path = config
+                .default_icatch_path
+                .clone()
+                .unwrap_or_default();
             Ok(Template::render(
                 "tag",
                 context! {
@@ -59,9 +63,19 @@ pub async fn tag_detail(
                     tag_slug: slug,
                     sort_key: sort_key,
                     articles: articles.iter().map(|article| {
+                        let icatch_path = article
+                            .icatch_path
+                            .clone()
+                            .unwrap_or_else(|| default_icatch_path.clone());
+                        let excerpt = match article.excerpt.as_ref() {
+                            Some(value) => value.clone(),
+                            None => cut_out_string(&article.content, 100),
+                        };
                         json!({
                             "title": article.title.clone(),
                             "slug": article.slug,
+                            "icatch_path": icatch_path,
+                            "excerpt": excerpt,
                             "created_at": article.created_at.to_string(),
                         })
                     }).collect::<Vec<_>>(),
