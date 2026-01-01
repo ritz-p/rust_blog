@@ -1,0 +1,45 @@
+{
+  "name": "rust_blog",
+  "dockerComposeFile": "../docker-compose.yml",
+  "service": "web",
+  "workspaceFolder": "/workspace/rust_blog",
+  "mounts": [
+    "source=${localWorkspaceFolder},target=/workspace/rust_blog,type=bind"
+  ],
+  "containerUser": "vscode",
+  "remoteUser": "vscode",
+  "shutdownAction": "stopCompose",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "rust-lang.rust-analyzer",
+        "dustypomerleau.rust-syntax",
+        "vadimcn.vscode-lldb",
+        "tamasfe.even-better-toml",
+        "mhutchie.git-graph",
+        "bierner.markdown-preview-github-styles",
+        "esbenp.prettier-vscode",
+        "medo64.render-crlf",
+        "humao.rest-client",
+        "karunamurti.tera",
+        "genieai.chatgpt-vscode",
+        "docker.docker",
+        "ramon-zwiers.json-format"
+      ]
+    }
+  },
+  "features": {
+    "ghcr.io/devcontainers/features/common-utils:2": {
+      "installZsh": "true",
+      "username": "vscode",
+      "userUid": "1000",
+      "userGid": "1000",
+      "upgradePackages": "true"
+    },
+    "ghcr.io/devcontainers/features/git:1": {
+      "version": "latest",
+      "ppa": "false"
+    }
+  },
+  "postStartCommand": "git config --local core.filemode false"
+}
