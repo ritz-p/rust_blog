@@ -1,4 +1,4 @@
-{% extends "base" %}
+{% extends "partial/base" %}
 {% block title %}500 - 予期せぬ問題が発生しています{% endblock title %}
 
 {% block content %}

@@ -1,4 +1,4 @@
-{% extends "base" %}
+{% extends "partial/base" %}
 {% import "partial/tags" as tags_macro %}
 {% import "partial/categories" as categories_macro%}
 {% block title %}{{ title }}{% endblock title %}

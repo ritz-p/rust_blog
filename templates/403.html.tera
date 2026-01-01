@@ -1,4 +1,4 @@
-{% extends "base" %}
+{% extends "partial/base" %}
 {% block title %}403 - アクセスを禁止されています{% endblock title %}
 
 {% block content %}

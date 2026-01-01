@@ -32,6 +32,7 @@ pub async fn launch(
         .manage(CommonConfig {
             site_name: config_map.get("site_name").cloned(),
             default_icatch_path: config_map.get("default_icatch_path").cloned(),
+            favicon_path: config_map.get("favicon_path").cloned(),
         })
         .attach(Template::fairing())
         .mount(
@@ -47,6 +48,7 @@ pub async fn launch(
             ],
         )
         .mount("/image", FileServer::from("content/image"))
+        .mount("/icon", FileServer::from("content/icon"))
         .register(
             "/",
             catchers![

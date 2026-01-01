@@ -32,6 +32,7 @@ pub async fn category_list(
         "categories",
         context! {
             site_name: &config.site_name,
+            favicon_path: &config.favicon_path,
             categories
         },
     ))
@@ -58,6 +59,7 @@ pub async fn category_detail(
                 "category",
                 context! {
                     site_name: &config.site_name,
+                    favicon_path: &config.favicon_path,
                     category_slug: slug,
                     sort_key: sort_key,
                     articles: articles.iter().map(|article| {

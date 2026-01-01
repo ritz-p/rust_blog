@@ -1,4 +1,4 @@
-{% extends "base" %}
+{% extends "partial/base" %}
 {% block title %}504 - サーバーがタイムアウトしました{% endblock title %}
 
 {% block content %}

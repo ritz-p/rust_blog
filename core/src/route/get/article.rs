@@ -69,6 +69,7 @@ pub async fn post_detail(
         "article_detail",
         context! {
             site_name: &config.site_name,
+            favicon_path: &config.favicon_path,
             title: article.title,
             content_html: content,
             created_at: created_at,

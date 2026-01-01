@@ -6,6 +6,7 @@ use std::{collections::HashMap, fs, path::Path};
 pub struct CommonConfig {
     pub site_name: Option<String>,
     pub default_icatch_path: Option<String>,
+    pub favicon_path: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -53,6 +54,12 @@ pub fn load_config() -> HashMap<String, String> {
     }
     if !map.contains_key("default_icatch_path") {
         map.insert("default_icatch_path".to_string(), "".to_string());
+    }
+    if !map.contains_key("favicon_path") {
+        map.insert(
+            "favicon_path".to_string(),
+            "/icon/rust-logo-128x128-blk.png".to_string(),
+        );
     }
     map
 }

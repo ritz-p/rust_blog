@@ -1,6 +1,7 @@
 [common]
 "site_name" = "Ritz のブログ"
 "default_icatch_path" = "/image/rustacean-orig-noshadow.png"
+"favicon_path" = "/icon/fox_girl_black_line_white.png"
 
 [categories]
 "Category slug file" = "Category Slug file"
