@@ -11,6 +11,7 @@ RUN apt-get update && \
     sqlite3 mold clang pkg-config git && \
     rm -rf /var/lib/apt/lists/*
 USER vscode
+ENV PATH=/home/vscode/.cargo/bin:$PATH
 RUN rustup default stable
 RUN cargo install sea-orm-cli
 RUN rustup component add rustfmt
