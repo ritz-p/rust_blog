@@ -5,7 +5,7 @@
 <section class="section">
   <div class="has-text-centered">
     <h1 class="title">502</h1>
-    <p class="subtitle has-text-grey">予期せぬ問題が発生しています。</p>
+    <p class="subtitle has-text-grey">502 - 予期せぬ問題が発生しています。</p>
     <a class="button is-light" href="/">← トップへ戻る</a>
   </div>
 </section>
