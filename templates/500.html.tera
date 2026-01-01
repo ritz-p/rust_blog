@@ -1,11 +1,11 @@
 {% extends "base" %}
-{% block title %}404 - ページが見つかりません{% endblock title %}
+{% block title %}500 - 予期せぬ問題が発生しています{% endblock title %}
 
 {% block content %}
 <section class="section">
   <div class="has-text-centered">
-    <h1 class="title">404</h1>
-    <p class="subtitle has-text-grey">お探しのページは見つかりませんでした。</p>
+    <h1 class="title">500</h1>
+    <p class="subtitle has-text-grey">予期せぬ問題が発生しています。</p>
     <a class="button is-light" href="/">← トップへ戻る</a>
   </div>
 </section>
