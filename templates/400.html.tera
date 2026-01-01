@@ -1,4 +1,4 @@
-{% extends "base" %}
+{% extends "partial/base" %}
 {% block title %}400 - リクエストが不正です{% endblock title %}
 
 {% block content %}

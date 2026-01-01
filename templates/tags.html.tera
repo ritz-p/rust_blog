@@ -1,4 +1,4 @@
-{% extends "base" %}
+{% extends "partial/base" %}
 {% block title %}Tags - {{ site_name }}{% endblock title %}
 
 {% block content %}

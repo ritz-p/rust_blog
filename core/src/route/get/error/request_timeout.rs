@@ -1,11 +1,19 @@
+use rocket::{Request, State, http::Status};
 use rocket_dyn_templates::{Template, context};
 
+use crate::utils::config::CommonConfig;
+
 #[catch(408)]
-pub fn request_timeout() -> Template {
+pub fn request_timeout(_status: Status, req: &Request<'_>) -> Template {
+    let favicon_path = req
+        .rocket()
+        .state::<CommonConfig>()
+        .and_then(|config| config.favicon_path.as_deref());
     Template::render(
         "408",
         context! {
-            site_name: "408 Request Timeout"
+            site_name: "408 Request Timeout",
+            favicon_path: favicon_path
         },
     )
 }

@@ -1,4 +1,4 @@
-{% extends "base" %}
+{% extends "partial/base" %}
 {% block title %}503 - サーバーが稼働していません{% endblock title %}
 
 {% block content %}

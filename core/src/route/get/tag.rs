@@ -32,6 +32,7 @@ pub async fn tag_list(
         "tags",
         context! {
             site_name: &config.site_name,
+            favicon_path: &config.favicon_path,
             tags
         },
     ))
@@ -52,14 +53,12 @@ pub async fn tag_detail(
             let base_path = "/tag/".to_owned() + slug;
             let prev_url = PageInfo::get_prev_url(&page_info, &base_path, Some(&sort_key));
             let next_url = PageInfo::get_next_url(&page_info, &base_path, Some(&sort_key));
-            let default_icatch_path = config
-                .default_icatch_path
-                .clone()
-                .unwrap_or_default();
+            let default_icatch_path = config.default_icatch_path.clone().unwrap_or_default();
             Ok(Template::render(
                 "tag",
                 context! {
                     site_name: &config.site_name,
+                    favicon_path: &config.favicon_path,
                     tag_slug: slug,
                     sort_key: sort_key,
                     articles: articles.iter().map(|article| {

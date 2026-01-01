@@ -47,6 +47,7 @@ pub async fn fixed_content_detail(
         "about",
         context! {
             site_name: &config.site_name,
+            favicon_path: &config.favicon_path,
             title: fixed_content_page.title,
             excerpt: excerpt,
             content_html: content,

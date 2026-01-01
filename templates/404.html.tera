@@ -1,4 +1,4 @@
-{% extends "base" %}
+{% extends "partial/base" %}
 {% block title %}404 - ページが見つかりません{% endblock title %}
 
 {% block content %}

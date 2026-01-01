@@ -24,10 +24,7 @@ pub async fn index(
     let base_path = "/";
     let prev_url = PageInfo::get_prev_url(&page_info, base_path, None);
     let next_url = PageInfo::get_next_url(&page_info, base_path, None);
-    let default_icatch_path = config
-        .default_icatch_path
-        .clone()
-        .unwrap_or_default();
+    let default_icatch_path = config.default_icatch_path.clone().unwrap_or_default();
     let articles: Vec<_> = models
         .into_iter()
         .map(|m| {
@@ -54,6 +51,7 @@ pub async fn index(
         "index",
         context! {
             site_name: &config.site_name,
+            favicon_path: &config.favicon_path,
             articles:  articles,
             page: page_info.count,
             per: page_info.per,

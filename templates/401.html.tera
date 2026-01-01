@@ -1,4 +1,4 @@
-{% extends "base" %}
+{% extends "partial/base" %}
 {% block title %}401 - 認証が必要です{% endblock title %}
 
 {% block content %}
