@@ -1,0 +1,9 @@
+pub mod bad_gateway;
+pub mod bad_request;
+pub mod forbidden;
+pub mod gateway_timeout;
+pub mod internal_server_error;
+pub mod not_found;
+pub mod request_timeout;
+pub mod service_unavailable;
+pub mod unauthorized;
