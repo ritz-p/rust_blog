@@ -1,5 +1,5 @@
 {% extends "base" %}
-{% block title %}404 – ページが見つかりません{% endblock title %}
+{% block title %}404 - ページが見つかりません{% endblock title %}
 
 {% block content %}
 <section class="section">

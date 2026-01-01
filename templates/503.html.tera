@@ -1,0 +1,12 @@
+{% extends "base" %}
+{% block title %}503 - サーバーが稼働していません{% endblock title %}
+
+{% block content %}
+<section class="section">
+  <div class="has-text-centered">
+    <h1 class="title">503</h1>
+    <p class="subtitle has-text-grey">503 - サーバーが稼働していません。</p>
+    <a class="button is-light" href="/">← トップへ戻る</a>
+  </div>
+</section>
+{% endblock content %}
