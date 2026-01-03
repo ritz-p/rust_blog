@@ -1,4 +1,6 @@
 use serde::{Deserialize, Serialize};
+pub mod env;
+pub mod seed;
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct PathConfig {
