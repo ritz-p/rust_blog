@@ -40,8 +40,8 @@ mod tests {
     #[test]
     fn test_utc_to_jst_format() {
         use chrono::{TimeZone, Utc};
-        let utc_time = Utc.ymd(2025, 1, 1).and_hms(0, 0, 0);
-        let jst_string = utc_to_jst(utc_time);
+        let utc_time = Utc.with_ymd_and_hms(2025, 1, 1, 0, 0, 0);
+        let jst_string = utc_to_jst(utc_time.unwrap());
         assert!(
             jst_string.starts_with("2025-01-01 09:00:00"),
             "JST time should be 9 hours ahead of UTC"
