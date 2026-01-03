@@ -13,7 +13,7 @@ use crate::{
     },
 };
 use article::{seed_article, seed_category, seed_tag};
-use config::{env::load_env, seeder::seed_from_toml};
+use config::{env::load_env, seed::seed_from_toml};
 use sea_orm::DatabaseConnection;
 
 pub async fn run_all(db: DatabaseConnection) -> anyhow::Result<()> {

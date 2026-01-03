@@ -13,7 +13,7 @@ pub async fn seed_article(
     body: &str,
 ) -> Result<i32, anyhow::Error> {
     let active_model: ActiveModel = prepare(db, front_matter, body).await?;
-    let _ = validate(front_matter, body);
+    validate(front_matter, body)?;
     let article_id = upsert(db, active_model).await?;
     Ok(article_id)
 }
