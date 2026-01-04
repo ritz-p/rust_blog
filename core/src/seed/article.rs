@@ -60,6 +60,48 @@ pub async fn seed_tag(
     Ok(())
 }
 
+pub async fn seed_category(
+    db: &DatabaseConnection,
+    front_matter: &FrontMatter,
+    article_id: i32,
+) -> Result<(), DbErr> {
+    for category_slug in &front_matter.categories {
+        let existing = category::Entity::find()
+            .filter(category::Column::Slug.eq(category_slug.as_str()))
+            .one(db)
+            .await?;
+        let category_id = if let Some(m) = existing {
+            m.id
+        } else {
+            category::ActiveModel {
+                name: Set(category_slug.clone()),
+                slug: Set(category_slug.clone()),
+                ..Default::default()
+            }
+            .insert(db)
+            .await?
+            .id
+        };
+
+        let exists_link = article_category::Entity::find()
+            .filter(article_category::Column::ArticleId.eq(article_id))
+            .filter(article_category::Column::CategoryId.eq(category_id))
+            .one(db)
+            .await?
+            .is_some();
+
+        if !exists_link {
+            article_category::ActiveModel {
+                article_id: Set(article_id),
+                category_id: Set(category_id),
+            }
+            .insert(db)
+            .await?;
+        }
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::seed_article;
@@ -146,46 +188,29 @@ mod tests {
         let result = seed_article(&db, &front_matter, "body").await;
         assert!(result.is_err());
     }
-}
 
-pub async fn seed_category(
-    db: &DatabaseConnection,
-    front_matter: &FrontMatter,
-    article_id: i32,
-) -> Result<(), DbErr> {
-    for category_slug in &front_matter.categories {
-        let existing = category::Entity::find()
-            .filter(category::Column::Slug.eq(category_slug.as_str()))
-            .one(db)
-            .await?;
-        let category_id = if let Some(m) = existing {
-            m.id
-        } else {
-            category::ActiveModel {
-                name: Set(category_slug.clone()),
-                slug: Set(category_slug.clone()),
-                ..Default::default()
-            }
-            .insert(db)
-            .await?
-            .id
-        };
-
-        let exists_link = article_category::Entity::find()
-            .filter(article_category::Column::ArticleId.eq(article_id))
-            .filter(article_category::Column::CategoryId.eq(category_id))
-            .one(db)
-            .await?
-            .is_some();
-
-        if !exists_link {
-            article_category::ActiveModel {
-                article_id: Set(article_id),
-                category_id: Set(category_id),
-            }
-            .insert(db)
-            .await?;
+    #[tokio::test]
+    async fn test_seed_inserts_huge_body() {
+        let front_matter = build_front_matter_from_title_and_slug("New Title", "new-slug");
+        let mut body = "".to_string();
+        let alphabet = "abcdefghijklmnopqrstuvwxyz";
+        for _ in 0..70000 {
+            body += alphabet;
         }
+        println!("{}", body);
+        let returned = build_article(1, "New Title", "new-slug", &body);
+
+        let db = MockDatabase::new(DbBackend::Sqlite)
+            .append_exec_results([MockExecResult {
+                last_insert_id: 1,
+                rows_affected: 1,
+            }])
+            .append_query_results([Vec::<article::Model>::new(), vec![returned.clone()]])
+            .into_connection();
+
+        let article_id = seed_article(&db, &front_matter, &body)
+            .await
+            .expect("seed should insert");
+        assert_eq!(article_id, 1);
     }
-    Ok(())
 }
