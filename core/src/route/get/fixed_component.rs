@@ -5,7 +5,11 @@ use serde_json::json;
 
 use crate::{
     repository::{article::get_latest_articles, fixed_content::get_fixed_content_by_slug},
-    utils::{config::CommonConfig, cut_out_string, markdown::markdown_to_html},
+    utils::{
+        config::CommonConfig,
+        cut_out_string,
+        markdown::{markdown_to_html, markdown_to_text},
+    },
 };
 
 #[get("/<slug>")]
@@ -28,7 +32,7 @@ pub async fn fixed_content_detail(
     let content = markdown_to_html(&fixed_content_page.content);
     let excerpt = match fixed_content_page.excerpt.as_ref() {
         Some(value) => value.clone(),
-        None => cut_out_string(&fixed_content_page.content, 100),
+        None => markdown_to_text(&cut_out_string(&fixed_content_page.content, 100)),
     };
 
     let latest_articles: Vec<_> = get_latest_articles(db, 5)

@@ -9,7 +9,7 @@ use crate::{
         query::{PagingQuery, category::CategoryQuery},
     },
     repository::{article::get_article_by_category_slug, category::get_all_categories},
-    utils::{config::CommonConfig, cut_out_string},
+    utils::{config::CommonConfig, cut_out_string, markdown::markdown_to_text},
 };
 
 #[get("/categories")]
@@ -69,7 +69,7 @@ pub async fn category_detail(
                             .unwrap_or_else(|| default_icatch_path.clone());
                         let excerpt = match article.excerpt.as_ref() {
                             Some(value) => value.clone(),
-                            None => cut_out_string(&article.content, 100),
+                            None => markdown_to_text(&cut_out_string(&article.content, 100)),
                         };
                         json!({
                             "title": article.title.clone(),
