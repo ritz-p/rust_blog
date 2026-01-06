@@ -68,7 +68,7 @@ pub async fn tag_detail(
                             .unwrap_or_else(|| default_icatch_path.clone());
                         let excerpt = match article.excerpt.as_ref() {
                             Some(value) => value.clone(),
-                            None => markdown_to_text(&cut_out_string(&article.content, 100)),
+                            None => cut_out_string(&markdown_to_text(&article.content), 100),
                         };
                         json!({
                             "title": article.title.clone(),

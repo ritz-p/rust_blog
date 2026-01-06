@@ -32,7 +32,7 @@ pub async fn fixed_content_detail(
     let content = markdown_to_html(&fixed_content_page.content);
     let excerpt = match fixed_content_page.excerpt.as_ref() {
         Some(value) => value.clone(),
-        None => markdown_to_text(&cut_out_string(&fixed_content_page.content, 100)),
+        None => cut_out_string(&markdown_to_text(&fixed_content_page.content), 100),
     };
 
     let latest_articles: Vec<_> = get_latest_articles(db, 5)

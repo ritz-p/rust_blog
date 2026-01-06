@@ -30,7 +30,7 @@ pub async fn index(
         .map(|m| {
             let excerpt = match m.excerpt.as_ref() {
                 Some(value) => value.clone(),
-                None => markdown_to_text(&cut_out_string(&m.content, 100)),
+                None => cut_out_string(&markdown_to_text(&m.content), 100),
             };
             let icatch_path = m
                 .icatch_path
