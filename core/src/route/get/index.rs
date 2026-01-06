@@ -9,7 +9,7 @@ use crate::{
         query::{PagingQuery, index::IndexQuery},
     },
     repository::article::get_all_articles,
-    utils::{config::CommonConfig, cut_out_string},
+    utils::{config::CommonConfig, cut_out_string, markdown::markdown_to_text},
 };
 
 #[get("/?<query..>")]
@@ -30,7 +30,7 @@ pub async fn index(
         .map(|m| {
             let excerpt = match m.excerpt.as_ref() {
                 Some(value) => value.clone(),
-                None => cut_out_string(&m.content, 100),
+                None => cut_out_string(&markdown_to_text(&m.content), 100),
             };
             let icatch_path = m
                 .icatch_path
