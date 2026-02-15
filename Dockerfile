@@ -1,7 +1,6 @@
 FROM rust:latest
 
 WORKDIR /workspace/rust_blog
-RUN useradd -m -s /bin/bash -u 1000 vscode && mkdir -p /home/vscode && chown -R 1000:1000 /home/vscode
 ENV CARGO_HOME=/home/vscode/.cargo
 ENV RUSTUP_HOME=/home/vscode/.rustup
 ENV CARGO_TARGET_DIR=/home/vscode/.cargo/target
@@ -19,7 +18,8 @@ ARG USERNAME=vscode
 ARG USER_UID=1000
 ARG USER_GID=1000
 RUN groupadd --gid ${USER_GID} ${USERNAME} && \
-    useradd --uid ${USER_UID} --gid ${USER_GID} -m ${USERNAME}
+    useradd --uid ${USER_UID} --gid ${USER_GID} -m ${USERNAME} && \
+    chown -R ${USER_UID}:${USER_GID} /home/${USERNAME}
 USER ${USERNAME}
 ENV PATH=/home/${USERNAME}/.cargo/bin:$PATH
 RUN rustup default stable
@@ -29,5 +29,5 @@ RUN rustup component add rustfmt
 EXPOSE 8888
 
 ENV RUST_BACKTRACE=1
-RUN echo 'alias seaorm="sea-orm-cli"' >> /etc/bash.bashrc
+RUN echo 'alias seaorm="sea-orm-cli"' >> /home/${USERNAME}/.bashrc
 USER ${USERNAME}
