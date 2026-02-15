@@ -4,6 +4,15 @@ on:
   pull_request:
     branches:
       - "master"
+    paths:
+      - "content/**"
+      - "core/**"
+      - "migration/**"
+      - "templates/**"
+      - ".env"
+      - "Cargo.toml"
+      - "Rocket.toml"
+      - ".cargo/config.toml"
 
 jobs:
   test:
