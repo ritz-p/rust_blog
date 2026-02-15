@@ -4,7 +4,8 @@
   "service": "web",
   "workspaceFolder": "/workspace/rust_blog",
   "mounts": [
-    "source=${localWorkspaceFolder},target=/workspace/rust_blog,type=bind"
+    "source=${localWorkspaceFolder},target=/workspace/rust_blog,type=bind",
+    "source=${localEnv:HOME}/.codex,target=/home/vscode/.codex,type=bind,consistency=cached"
   ],
   "containerUser": "vscode",
   "remoteUser": "vscode",
@@ -24,7 +25,8 @@
         "karunamurti.tera",
         "genieai.chatgpt-vscode",
         "docker.docker",
-        "ramon-zwiers.json-format"
+        "ramon-zwiers.json-format",
+        "openai.chatgpt"
       ]
     }
   },
