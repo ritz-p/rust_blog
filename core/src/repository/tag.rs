@@ -10,6 +10,7 @@ pub async fn get_all_tags(db: &DatabaseConnection) -> Result<Vec<tag::Model>, Db
         .await
 }
 
+#[allow(dead_code)]
 pub async fn get_tag_by_slug(
     db: &DatabaseConnection,
     slug: &str,

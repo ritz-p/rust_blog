@@ -11,9 +11,7 @@ mod repository_tests {
     use chrono::Utc;
     use rocket::tokio;
     use sea_orm::MockExecResult;
-    use sea_orm::{
-        DatabaseBackend, EntityTrait, MockDatabase, Value, entity::prelude::*, entity::*,
-    };
+    use sea_orm::{DatabaseBackend, MockDatabase};
 
     #[tokio::test]
     async fn test_get_all_articles_returns_list() {

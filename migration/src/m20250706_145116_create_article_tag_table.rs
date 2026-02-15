@@ -1,6 +1,6 @@
 use super::m20250706_065150_create_article_table::Article;
 use super::m20250706_143055_create_tag_table::Tag;
-use sea_orm_migration::{prelude::*, schema::*};
+use sea_orm_migration::prelude::*;
 
 #[derive(DeriveMigrationName)]
 pub struct Migration;
