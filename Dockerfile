@@ -15,17 +15,18 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-USER vscode
-ENV PATH=/home/vscode/.cargo/bin:$PATH
-RUN rustup default stable
-RUN cargo install sea-orm-cli
-RUN rustup component add rustfmt
-
 ARG USERNAME=vscode
 ARG USER_UID=1000
 ARG USER_GID=1000
 RUN groupadd --gid ${USER_GID} ${USERNAME} && \
     useradd --uid ${USER_UID} --gid ${USER_GID} -m ${USERNAME}
+USER ${USERNAME}
+ENV PATH=/home/${USERNAME}/.cargo/bin:$PATH
+RUN rustup default stable
+RUN cargo install sea-orm-cli
+RUN rustup component add rustfmt
+
+
 
 EXPOSE 8888
 
