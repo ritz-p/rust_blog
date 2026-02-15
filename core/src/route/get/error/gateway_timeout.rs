@@ -1,4 +1,4 @@
-use rocket::{Request, State, http::Status};
+use rocket::{Request, http::Status};
 use rocket_dyn_templates::{Template, context};
 
 use crate::utils::config::CommonConfig;

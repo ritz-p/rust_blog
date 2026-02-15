@@ -2,6 +2,7 @@ use garde::Validate;
 use sea_orm::prelude::DateTimeUtc;
 
 #[derive(Validate, Debug)]
+#[allow(dead_code)]
 pub struct FixedContentValidator {
     #[garde(length(utf16, min = 1, max = 50))]
     pub title: String,

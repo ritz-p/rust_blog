@@ -1,6 +1,7 @@
 use serde::Deserialize;
 
 #[derive(Deserialize, Debug)]
+#[allow(dead_code)]
 pub struct FrontMatter {
     pub title: String,
     pub slug: String,
@@ -11,6 +12,7 @@ pub struct FrontMatter {
 }
 
 impl FrontMatter {
+    #[allow(dead_code)]
     pub fn new(
         title: String,
         slug: String,

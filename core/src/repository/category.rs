@@ -10,6 +10,7 @@ pub async fn get_all_categories(db: &DatabaseConnection) -> Result<Vec<category:
         .await
 }
 
+#[allow(dead_code)]
 pub async fn get_category_by_slug(
     db: &DatabaseConnection,
     slug: &str,

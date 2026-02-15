@@ -97,3 +97,121 @@ pub async fn tag_detail(
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::tag_detail;
+    use crate::entity::tag;
+    use crate::utils::config::CommonConfig;
+    use rocket::http::Status;
+    use rocket::local::asynchronous::Client;
+    use rocket_dyn_templates::Template;
+    use sea_orm::{
+        ConnectionTrait, Database, DatabaseBackend, DatabaseConnection, DbBackend, MockDatabase,
+        Statement,
+    };
+
+    async fn client_with_db(db: sea_orm::DatabaseConnection) -> Client {
+        let rocket = rocket::custom(rocket::Config::figment().merge(("template_dir", "../templates")))
+            .manage(db)
+            .manage(CommonConfig {
+                site_name: Some("Test Blog".to_string()),
+                default_icatch_path: Some("/default.png".to_string()),
+                favicon_path: Some("/favicon.ico".to_string()),
+            })
+            .attach(Template::fairing())
+            .mount("/", routes![tag_detail]);
+        Client::tracked(rocket).await.expect("failed to build client")
+    }
+
+    async fn prepare_tag_db() -> DatabaseConnection {
+        let db = Database::connect("sqlite::memory:")
+            .await
+            .expect("failed to connect sqlite memory");
+        db.execute(Statement::from_string(
+            DbBackend::Sqlite,
+            "CREATE TABLE tag (id INTEGER PRIMARY KEY, name TEXT NOT NULL, slug TEXT NOT NULL);",
+        ))
+        .await
+        .expect("failed to create tag table");
+        db.execute(Statement::from_string(
+            DbBackend::Sqlite,
+            "CREATE TABLE article (id INTEGER PRIMARY KEY, title TEXT NOT NULL, slug TEXT NOT NULL, excerpt TEXT NULL, content TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, icatch_path TEXT NULL);",
+        ))
+        .await
+        .expect("failed to create article table");
+        db.execute(Statement::from_string(
+            DbBackend::Sqlite,
+            "CREATE TABLE article_tag (id INTEGER PRIMARY KEY, article_id INTEGER NOT NULL, tag_id INTEGER NOT NULL);",
+        ))
+        .await
+        .expect("failed to create article_tag table");
+
+        db.execute(Statement::from_string(
+            DbBackend::Sqlite,
+            "INSERT INTO tag (id, name, slug) VALUES (1, 'Rust', 'rust');",
+        ))
+        .await
+        .expect("failed to insert tag");
+
+        for i in 1..=11 {
+            db.execute(Statement::from_string(
+                DbBackend::Sqlite,
+                format!(
+                    "INSERT INTO article (id, title, slug, excerpt, content, created_at, updated_at, icatch_path) VALUES ({id}, 'Title {id}', 'slug-{id}', NULL, 'This is **markdown** body', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL);",
+                    id = i
+                ),
+            ))
+            .await
+            .expect("failed to insert article");
+            db.execute(Statement::from_string(
+                DbBackend::Sqlite,
+                format!(
+                    "INSERT INTO article_tag (id, article_id, tag_id) VALUES ({id}, {id}, 1);",
+                    id = i
+                ),
+            ))
+            .await
+            .expect("failed to insert article_tag");
+        }
+
+        db
+    }
+
+    #[rocket::async_test]
+    async fn tag_detail_uses_default_sort_key_and_generated_excerpt() {
+        let db = prepare_tag_db().await;
+        let client = client_with_db(db).await;
+
+        let response = client.get("/tag/rust").dispatch().await;
+        assert_eq!(response.status(), Status::Ok);
+        let body = response
+            .into_string()
+            .await
+            .expect("response body should exist");
+        assert!(body.contains("sort_key=created_at"));
+        assert!(body.contains("This is markdown body"));
+    }
+
+    #[rocket::async_test]
+    async fn tag_detail_returns_404_when_tag_does_not_exist() {
+        let db = MockDatabase::new(DatabaseBackend::Sqlite)
+            .append_query_results([Vec::<tag::Model>::new()])
+            .into_connection();
+        let client = client_with_db(db).await;
+
+        let response = client.get("/tag/missing").dispatch().await;
+        assert_eq!(response.status(), Status::NotFound);
+    }
+
+    #[rocket::async_test]
+    async fn tag_detail_returns_500_on_unexpected_db_error() {
+        let db = Database::connect("sqlite::memory:")
+            .await
+            .expect("failed to connect sqlite memory");
+        let client = client_with_db(db).await;
+
+        let response = client.get("/tag/rust").dispatch().await;
+        assert_eq!(response.status(), Status::InternalServerError);
+    }
+}
