@@ -3,6 +3,26 @@
 
 {% block content %}
 <h1 class="title">記事一覧 - {{ site_name }}</h1>
+{% if selected_period %}
+  <p class="subtitle is-6">{{ selected_period }}の記事</p>
+{% endif %}
+
+{% if period_links and period_links | length > 0 %}
+  <div class="mb-5">
+    <p class="is-size-7 has-text-grey mb-2">時期別</p>
+    <div class="tags">
+      <a class="tag {% if not selected_period %}is-info{% else %}is-light{% endif %}" href="/">すべて</a>
+      {% for period in period_links %}
+        <a
+          class="tag {% if period.is_selected %}is-info{% else %}is-light{% endif %}"
+          href="{{ period.href }}"
+        >
+          {{ period.label }}
+        </a>
+      {% endfor %}
+    </div>
+  </div>
+{% endif %}
 
 {% if articles and articles | length > 0 %}
   <div class="block">

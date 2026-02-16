@@ -4,6 +4,8 @@ use crate::domain::query::PagingQuery;
 pub struct IndexQuery {
     pub page: Option<u64>,
     pub per: Option<u64>,
+    pub year: Option<i32>,
+    pub month: Option<u32>,
 }
 
 impl PagingQuery for IndexQuery {
@@ -11,6 +13,8 @@ impl PagingQuery for IndexQuery {
         Self {
             page: None,
             per: None,
+            year: None,
+            month: None,
         }
     }
     fn page(&self) -> Option<u64> {

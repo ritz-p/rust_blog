@@ -33,7 +33,7 @@ mod repository_tests {
             }])
             .append_query_results([Vec::<article::Model>::new(), vec![dummy_article.clone()]])
             .into_connection();
-        let (models, _) = get_all_articles(&db, page)
+        let (models, _) = get_all_articles(&db, page, None)
             .await
             .expect("Query should succeed");
         assert_eq!(models, vec![dummy_article]);
