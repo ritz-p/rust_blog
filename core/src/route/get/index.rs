@@ -5,7 +5,7 @@ use serde_json::json;
 
 use crate::{
     domain::{
-        page::Page,
+        page::{Page, PageInfo},
         query::{PagingQuery, index::IndexQuery},
     },
     repository::article::{ArticlePeriod, get_all_articles, get_article_periods},
@@ -30,13 +30,18 @@ pub async fn index(
 ) -> Template {
     let query = query.unwrap_or(IndexQuery::new());
     let page = Page::new_from_query(&query);
+    let has_period_query = query.year.is_some() || query.month.is_some();
     let selected_period = match (query.year, query.month) {
         (Some(year), Some(month)) => ArticlePeriod::new(year, month),
         _ => None,
     };
-    let (models, page_info) = get_all_articles(db.inner(), page, selected_period)
-        .await
-        .unwrap();
+    let (models, page_info) = if has_period_query && selected_period.is_none() {
+        (Vec::new(), PageInfo::new(page.normalize(50), 0))
+    } else {
+        get_all_articles(db.inner(), page, selected_period)
+            .await
+            .unwrap()
+    };
     let prev_url = if page_info.has_prev {
         build_index_url(page_info.prev_page, page_info.per, selected_period)
     } else {
@@ -48,7 +53,9 @@ pub async fn index(
         String::new()
     };
     let default_icatch_path = config.default_icatch_path.clone().unwrap_or_default();
-    let periods = get_article_periods(db.inner()).await.unwrap_or_default();
+    let periods = get_article_periods(db.inner(), None)
+        .await
+        .unwrap_or_default();
     let period_links: Vec<_> = periods
         .iter()
         .map(|period| {
@@ -182,5 +189,23 @@ mod tests {
         assert!(body.contains("pagination-next"));
         assert!(body.contains("year=2025"));
         assert!(body.contains("month=12"));
+    }
+
+    #[rocket::async_test]
+    async fn index_returns_empty_for_invalid_period_query() {
+        let db = prepare_index_db().await;
+        let client = client_with_db(db).await;
+
+        let response = client.get("/?year=300000&month=1").dispatch().await;
+        assert_eq!(response.status(), Status::Ok);
+        let body = response
+            .into_string()
+            .await
+            .expect("response body should exist");
+
+        assert!(!body.contains("Dec 1"));
+        assert!(!body.contains("Dec 2"));
+        assert!(!body.contains("Nov 1"));
+        assert!(body.contains("まだ記事がありません。"));
     }
 }

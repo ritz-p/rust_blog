@@ -15,21 +15,26 @@ pub struct ArticlePeriod {
 
 impl ArticlePeriod {
     pub fn new(year: i32, month: u32) -> Option<Self> {
-        if (1..=12).contains(&month) {
+        if Self::range_bounds(year, month).is_some() {
             Some(Self { year, month })
         } else {
             None
         }
     }
 
-    fn range(self) -> Option<(DateTime<Utc>, DateTime<Utc>)> {
-        let start_date = NaiveDate::from_ymd_opt(self.year, self.month, 1)?;
-        let (next_year, next_month) = if self.month == 12 {
-            (self.year + 1, 1)
+    fn range_bounds(year: i32, month: u32) -> Option<(NaiveDate, NaiveDate)> {
+        let start_date = NaiveDate::from_ymd_opt(year, month, 1)?;
+        let (next_year, next_month) = if month == 12 {
+            (year.checked_add(1)?, 1)
         } else {
-            (self.year, self.month + 1)
+            (year, month + 1)
         };
         let end_date = NaiveDate::from_ymd_opt(next_year, next_month, 1)?;
+        Some((start_date, end_date))
+    }
+
+    fn range(self) -> Option<(DateTime<Utc>, DateTime<Utc>)> {
+        let (start_date, end_date) = Self::range_bounds(self.year, self.month)?;
         let start =
             DateTime::<Utc>::from_naive_utc_and_offset(start_date.and_hms_opt(0, 0, 0)?, Utc);
         let end = DateTime::<Utc>::from_naive_utc_and_offset(end_date.and_hms_opt(0, 0, 0)?, Utc);
@@ -64,8 +69,20 @@ pub async fn get_all_articles(
     Ok((articles, page_info))
 }
 
-pub async fn get_article_periods(db: &DatabaseConnection) -> Result<Vec<ArticlePeriod>, DbErr> {
-    let created_ats: Vec<DateTime<Utc>> = article::Entity::find()
+pub async fn get_article_periods(
+    db: &DatabaseConnection,
+    period: Option<ArticlePeriod>,
+) -> Result<Vec<ArticlePeriod>, DbErr> {
+    let mut query = article::Entity::find();
+    if let Some(period) = period {
+        if let Some((start, end)) = period.range() {
+            query = query
+                .filter(article::Column::CreatedAt.gte(start))
+                .filter(article::Column::CreatedAt.lt(end));
+        }
+    }
+
+    let created_ats: Vec<DateTime<Utc>> = query
         .select_only()
         .column(article::Column::CreatedAt)
         .order_by_desc(article::Column::CreatedAt)
@@ -215,5 +232,33 @@ pub async fn get_article_by_category_slug(
         Ok((articles, page_info))
     } else {
         Err(DbErr::RecordNotFound("category not found".into()))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ArticlePeriod;
+
+    #[test]
+    fn article_period_new_rejects_invalid_month() {
+        assert!(ArticlePeriod::new(2025, 0).is_none());
+        assert!(ArticlePeriod::new(2025, 13).is_none());
+    }
+
+    #[test]
+    fn article_period_new_rejects_out_of_range_year() {
+        assert!(ArticlePeriod::new(999_999, 1).is_none());
+        assert!(ArticlePeriod::new(i32::MAX, 12).is_none());
+    }
+
+    #[test]
+    fn article_period_new_accepts_valid_year_month() {
+        assert_eq!(
+            ArticlePeriod::new(2025, 12),
+            Some(ArticlePeriod {
+                year: 2025,
+                month: 12
+            })
+        );
     }
 }
