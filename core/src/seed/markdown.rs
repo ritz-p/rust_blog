@@ -54,7 +54,8 @@ mod tests {
             .duration_since(UNIX_EPOCH)
             .expect("system time before UNIX_EPOCH")
             .as_nanos();
-        let dir = std::env::temp_dir().join(format!("seed_markdown_test_{}_{}", std::process::id(), ts));
+        let dir =
+            std::env::temp_dir().join(format!("seed_markdown_test_{}_{}", std::process::id(), ts));
         fs::create_dir_all(&dir).expect("failed to create temp dir");
         dir
     }
@@ -68,11 +69,14 @@ mod tests {
         fs::write(nested.join("b.md"), "# b").expect("failed to write b.md");
         fs::write(dir.join("c.txt"), "not markdown").expect("failed to write c.txt");
 
-        let mut paths = markdown_files(dir.to_str().expect("invalid temp dir"))
-            .collect::<Vec<_>>();
+        let mut paths = markdown_files(dir.to_str().expect("invalid temp dir")).collect::<Vec<_>>();
         paths.sort();
         assert_eq!(paths.len(), 2);
-        assert!(paths.iter().all(|p| p.extension().and_then(|x| x.to_str()) == Some("md")));
+        assert!(
+            paths
+                .iter()
+                .all(|p| p.extension().and_then(|x| x.to_str()) == Some("md"))
+        );
 
         let _ = fs::remove_dir_all(dir);
     }

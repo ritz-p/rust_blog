@@ -101,7 +101,10 @@ map = { site_name = "Blog", favicon_path = "/favicon.ico" }
         );
         let cfg = CommonConfigMap::from_toml_file(&path).expect("failed to parse common config");
         assert_eq!(cfg.map.get("site_name"), Some(&"Blog".to_string()));
-        assert_eq!(cfg.map.get("favicon_path"), Some(&"/favicon.ico".to_string()));
+        assert_eq!(
+            cfg.map.get("favicon_path"),
+            Some(&"/favicon.ico".to_string())
+        );
         let _ = fs::remove_file(path);
     }
 
@@ -120,7 +123,10 @@ article_path = "content/articles"
         let cfg = CommonConfigMap::from_toml_file_key(&path, "common")
             .expect("failed to read common table");
         assert_eq!(cfg.map.get("site_name"), Some(&"Blog".to_string()));
-        assert_eq!(cfg.map.get("favicon_path"), Some(&"/favicon.ico".to_string()));
+        assert_eq!(
+            cfg.map.get("favicon_path"),
+            Some(&"/favicon.ico".to_string())
+        );
         assert_eq!(cfg.map.len(), 2);
         let _ = fs::remove_file(path);
     }

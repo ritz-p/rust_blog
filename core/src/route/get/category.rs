@@ -113,16 +113,19 @@ mod tests {
     };
 
     async fn client_with_db(db: sea_orm::DatabaseConnection) -> Client {
-        let rocket = rocket::custom(rocket::Config::figment().merge(("template_dir", "../templates")))
-            .manage(db)
-            .manage(CommonConfig {
-                site_name: Some("Test Blog".to_string()),
-                default_icatch_path: Some("/default.png".to_string()),
-                favicon_path: Some("/favicon.ico".to_string()),
-            })
-            .attach(Template::fairing())
-            .mount("/", routes![category_detail]);
-        Client::tracked(rocket).await.expect("failed to build client")
+        let rocket =
+            rocket::custom(rocket::Config::figment().merge(("template_dir", "../templates")))
+                .manage(db)
+                .manage(CommonConfig {
+                    site_name: Some("Test Blog".to_string()),
+                    default_icatch_path: Some("/default.png".to_string()),
+                    favicon_path: Some("/favicon.ico".to_string()),
+                })
+                .attach(Template::fairing())
+                .mount("/", routes![category_detail]);
+        Client::tracked(rocket)
+            .await
+            .expect("failed to build client")
     }
 
     async fn prepare_category_db() -> DatabaseConnection {

@@ -4,6 +4,22 @@
 {% block content %}
 <h1 class="title">記事一覧 - {{ site_name }}</h1>
 
+{% if period_links and period_links | length > 0 %}
+  <div class="mb-5">
+    <p class="is-size-7 has-text-grey mb-2">時期別</p>
+    <div class="select is-small">
+      <select aria-label="時期別フィルタ" onchange="if (this.value) window.location.href = this.value;">
+        <option value="/" {% if not selected_period %}selected{% endif %}>すべて</option>
+        {% for period in period_links %}
+          <option value="{{ period.href }}" {% if period.is_selected %}selected{% endif %}>
+            {{ period.label }}
+          </option>
+        {% endfor %}
+      </select>
+    </div>
+  </div>
+{% endif %}
+
 {% if articles and articles | length > 0 %}
   <div class="block">
     {% for article in articles %}
