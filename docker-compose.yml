@@ -2,6 +2,7 @@ services:
   web:
     build: .
     container_name: rust_blog
+    user: "${UID:-1000}:${GID:-1000}"
     volumes:
       - ./:/workspace/rust_blog
     tty: true
