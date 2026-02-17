@@ -10,16 +10,15 @@
 {% if period_links and period_links | length > 0 %}
   <div class="mb-5">
     <p class="is-size-7 has-text-grey mb-2">時期別</p>
-    <div class="tags">
-      <a class="tag {% if not selected_period %}is-info{% else %}is-light{% endif %}" href="/">すべて</a>
-      {% for period in period_links %}
-        <a
-          class="tag {% if period.is_selected %}is-info{% else %}is-light{% endif %}"
-          href="{{ period.href }}"
-        >
-          {{ period.label }}
-        </a>
-      {% endfor %}
+    <div class="select is-small">
+      <select aria-label="時期別フィルタ" onchange="if (this.value) window.location.href = this.value;">
+        <option value="/" {% if not selected_period %}selected{% endif %}>すべて</option>
+        {% for period in period_links %}
+          <option value="{{ period.href }}" {% if period.is_selected %}selected{% endif %}>
+            {{ period.label }}
+          </option>
+        {% endfor %}
+      </select>
     </div>
   </div>
 {% endif %}
