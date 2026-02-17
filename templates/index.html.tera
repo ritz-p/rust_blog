@@ -3,9 +3,6 @@
 
 {% block content %}
 <h1 class="title">記事一覧 - {{ site_name }}</h1>
-{% if selected_period %}
-  <p class="subtitle is-6">{{ selected_period }}の記事</p>
-{% endif %}
 
 {% if period_links and period_links | length > 0 %}
   <div class="mb-5">

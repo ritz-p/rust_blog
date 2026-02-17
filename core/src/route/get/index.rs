@@ -53,7 +53,7 @@ pub async fn index(
         .iter()
         .map(|period| {
             json!({
-                "label": format!("{}年{:02}月", period.year, period.month),
+                "label": format!("{}/{:02}", period.year, period.month),
                 "href": format!("/?year={}&month={}", period.year, period.month),
                 "is_selected": selected_period == Some(*period),
             })
@@ -165,7 +165,6 @@ mod tests {
         assert!(body.contains("Dec 1"));
         assert!(body.contains("Dec 2"));
         assert!(!body.contains("Nov 1"));
-        assert!(body.contains("2025年12月の記事"));
     }
 
     #[rocket::async_test]
