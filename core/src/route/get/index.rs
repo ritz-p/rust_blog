@@ -96,7 +96,7 @@ pub async fn index(
             next_page: page_info.next_page,
             prev_url: prev_url,
             next_url: next_url,
-            selected_period: selected_period.map(|period| format!("{}年{:02}月", period.year, period.month)),
+            selected_period: selected_period.map(|period| format!("{}/{:02}", period.year, period.month)),
             period_links: period_links,
         },
     )
