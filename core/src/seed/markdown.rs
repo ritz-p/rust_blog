@@ -106,6 +106,7 @@ Body **text**
             parse_markdown_to_front_matter(&path).expect("failed to parse front matter");
         assert_eq!(front_matter.title, "Test title");
         assert_eq!(front_matter.slug, "test-slug");
+        assert!(!front_matter.deleted);
         assert_eq!(front_matter.excerpt, Some("short".to_string()));
         assert_eq!(front_matter.tags, vec!["rust".to_string()]);
         assert_eq!(front_matter.categories, vec!["dev".to_string()]);
