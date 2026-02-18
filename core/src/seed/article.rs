@@ -130,6 +130,7 @@ mod tests {
             title.to_string(),
             slug.to_string(),
             false,
+            None,
             Some("excerpt".to_string()),
             None,
             vec![],

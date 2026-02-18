@@ -47,7 +47,8 @@ pub async fn get_all_articles(
     page: Page,
     period: Option<ArticlePeriod>,
 ) -> Result<(Vec<article::Model>, PageInfo), DbErr> {
-    let mut base_query = article::Entity::find();
+    let now = Utc::now();
+    let mut base_query = article::Entity::find().filter(article::Column::CreatedAt.lte(now));
     if let Some(period) = period {
         if let Some((start, end)) = period.range() {
             base_query = base_query
@@ -73,7 +74,8 @@ pub async fn get_article_periods(
     db: &DatabaseConnection,
     period: Option<ArticlePeriod>,
 ) -> Result<Vec<ArticlePeriod>, DbErr> {
-    let mut query = article::Entity::find();
+    let now = Utc::now();
+    let mut query = article::Entity::find().filter(article::Column::CreatedAt.lte(now));
     if let Some(period) = period {
         if let Some((start, end)) = period.range() {
             query = query
@@ -106,8 +108,10 @@ pub async fn get_article_by_slug(
     db: &DatabaseConnection,
     slug: &str,
 ) -> Result<Option<article::Model>, DbErr> {
+    let now = Utc::now();
     article::Entity::find()
         .filter(article::Column::Slug.eq(slug.to_string()))
+        .filter(article::Column::CreatedAt.lte(now))
         .one(db)
         .await
 }
@@ -116,7 +120,9 @@ pub async fn get_latest_articles(
     db: &DatabaseConnection,
     limit: u64,
 ) -> Result<Vec<article::Model>, DbErr> {
+    let now = Utc::now();
     let articles = article::Entity::find()
+        .filter(article::Column::CreatedAt.lte(now))
         .order_by_desc(article::Column::CreatedAt)
         .limit(limit)
         .all(db)
@@ -130,6 +136,7 @@ pub async fn get_articles_by_tag_slug(
     tag_slug: &str,
     sort_key: &str,
 ) -> Result<(Vec<article::Model>, PageInfo), DbErr> {
+    let now = Utc::now();
     if let Some(tag) = tag::Entity::find()
         .filter(tag::Column::Slug.eq(tag_slug))
         .one(db)
@@ -137,6 +144,7 @@ pub async fn get_articles_by_tag_slug(
     {
         let total = tag
             .find_related(article::Entity)
+            .filter(article::Column::CreatedAt.lte(now))
             .distinct()
             .count(db)
             .await?;
@@ -146,6 +154,7 @@ pub async fn get_articles_by_tag_slug(
         let articles = match sort_key {
             "updated_at" => {
                 tag.find_related(article::Entity)
+                    .filter(article::Column::CreatedAt.lte(now))
                     .distinct()
                     .order_by_desc(article::Column::UpdatedAt)
                     .offset(offset)
@@ -155,6 +164,7 @@ pub async fn get_articles_by_tag_slug(
             }
             "created_at" => {
                 tag.find_related(article::Entity)
+                    .filter(article::Column::CreatedAt.lte(now))
                     .distinct()
                     .order_by_desc(article::Column::CreatedAt)
                     .offset(offset)
@@ -164,6 +174,7 @@ pub async fn get_articles_by_tag_slug(
             }
             _ => {
                 tag.find_related(article::Entity)
+                    .filter(article::Column::CreatedAt.lte(now))
                     .distinct()
                     .order_by_desc(article::Column::UpdatedAt)
                     .offset(offset)
@@ -184,6 +195,7 @@ pub async fn get_article_by_category_slug(
     category_slug: &str,
     sort_key: &str,
 ) -> Result<(Vec<article::Model>, PageInfo), DbErr> {
+    let now = Utc::now();
     if let Some(category) = category::Entity::find()
         .filter(category::Column::Slug.eq(category_slug))
         .one(db)
@@ -191,6 +203,7 @@ pub async fn get_article_by_category_slug(
     {
         let total = category
             .find_related(article::Entity)
+            .filter(article::Column::CreatedAt.lte(now))
             .distinct()
             .count(db)
             .await?;
@@ -201,6 +214,7 @@ pub async fn get_article_by_category_slug(
             "updated_at" => {
                 category
                     .find_related(article::Entity)
+                    .filter(article::Column::CreatedAt.lte(now))
                     .distinct()
                     .order_by_desc(article::Column::UpdatedAt)
                     .offset(offset)
@@ -211,6 +225,7 @@ pub async fn get_article_by_category_slug(
             "created_at" => {
                 category
                     .find_related(article::Entity)
+                    .filter(article::Column::CreatedAt.lte(now))
                     .distinct()
                     .order_by_desc(article::Column::CreatedAt)
                     .offset(offset)
@@ -221,6 +236,7 @@ pub async fn get_article_by_category_slug(
             _ => {
                 category
                     .find_related(article::Entity)
+                    .filter(article::Column::CreatedAt.lte(now))
                     .distinct()
                     .order_by_desc(article::Column::UpdatedAt)
                     .offset(offset)

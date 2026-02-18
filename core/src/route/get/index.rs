@@ -9,7 +9,7 @@ use crate::{
         query::{PagingQuery, index::IndexQuery},
     },
     repository::article::{ArticlePeriod, get_all_articles, get_article_periods},
-    utils::{config::CommonConfig, cut_out_string, markdown::markdown_to_text},
+    utils::{config::CommonConfig, cut_out_string, markdown::markdown_to_text, utc_to_jst},
 };
 
 fn build_index_url(page: u64, per: u64, period: Option<ArticlePeriod>) -> String {
@@ -82,8 +82,8 @@ pub async fn index(
                 "slug":       m.slug,
                 "excerpt":    excerpt,
                 "icatch_path": icatch_path,
-                "created_at": m.created_at.to_string(),
-                "updated_at": m.updated_at.to_string(),
+                "created_at": utc_to_jst(m.created_at),
+                "updated_at": utc_to_jst(m.updated_at),
             })
         })
         .collect();
@@ -150,7 +150,8 @@ mod tests {
             "INSERT INTO article (id, title, slug, excerpt, content, created_at, updated_at, icatch_path) VALUES
             (1, 'Dec 1', 'dec-1', NULL, 'body', '2025-12-01T00:00:00Z', '2025-12-01T00:00:00Z', NULL),
             (2, 'Dec 2', 'dec-2', NULL, 'body', '2025-12-15T00:00:00Z', '2025-12-15T00:00:00Z', NULL),
-            (3, 'Nov 1', 'nov-1', NULL, 'body', '2025-11-10T00:00:00Z', '2025-11-10T00:00:00Z', NULL);",
+            (3, 'Nov 1', 'nov-1', NULL, 'body', '2025-11-10T00:00:00Z', '2025-11-10T00:00:00Z', NULL),
+            (4, 'Future', 'future', NULL, 'body', '2099-01-10T00:00:00Z', '2099-01-10T00:00:00Z', NULL);",
         ))
         .await
         .expect("failed to insert articles");
@@ -172,6 +173,7 @@ mod tests {
         assert!(body.contains("Dec 1"));
         assert!(body.contains("Dec 2"));
         assert!(!body.contains("Nov 1"));
+        assert!(!body.contains("Future"));
     }
 
     #[rocket::async_test]
@@ -206,6 +208,7 @@ mod tests {
         assert!(!body.contains("Dec 1"));
         assert!(!body.contains("Dec 2"));
         assert!(!body.contains("Nov 1"));
+        assert!(!body.contains("Future"));
         assert!(body.contains("まだ記事がありません。"));
     }
 }
