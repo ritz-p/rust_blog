@@ -12,7 +12,7 @@ use crate::{
         },
     },
 };
-use article::{seed_article, seed_category, seed_tag};
+use article::{delete_article_by_slug, seed_article, seed_category, seed_tag};
 use config::{env::load_env, seed::seed_from_toml};
 use sea_orm::DatabaseConnection;
 
@@ -41,6 +41,11 @@ async fn run_article_seed(db: &DatabaseConnection, dir: &str) -> Result<(), anyh
                 continue;
             }
         };
+
+        if front_matter.deleted {
+            delete_article_by_slug(db, &front_matter.slug).await?;
+            continue;
+        }
 
         let article_id = seed_article(db, &front_matter, &body).await?;
         seed_tag(db, &front_matter, article_id).await?;

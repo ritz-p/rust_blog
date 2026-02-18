@@ -1,9 +1,11 @@
 pub mod seed;
-use crate::entity::{article::ActiveModel, article_tag};
+use crate::entity::{article, article::ActiveModel, article_tag};
 use crate::entity::{article_category, category, tag};
 use crate::utils;
 use sea_orm::ActiveValue::Set;
-use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, DbErr, EntityTrait, QueryFilter};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, DatabaseConnection, DbErr, EntityTrait, QueryFilter,
+};
 use seed::{prepare, upsert, validate};
 use utils::front_matter::FrontMatter;
 
@@ -16,6 +18,18 @@ pub async fn seed_article(
     validate(front_matter, body)?;
     let article_id = upsert(db, active_model).await?;
     Ok(article_id)
+}
+
+pub async fn delete_article_by_slug(db: &DatabaseConnection, slug: &str) -> Result<(), DbErr> {
+    if slug.trim().is_empty() {
+        return Err(DbErr::Custom("slug is empty".into()));
+    }
+
+    article::Entity::delete_many()
+        .filter(article::Column::Slug.eq(slug))
+        .exec(db)
+        .await?;
+    Ok(())
 }
 
 pub async fn seed_tag(
@@ -104,7 +118,7 @@ pub async fn seed_category(
 
 #[cfg(test)]
 mod tests {
-    use super::seed_article;
+    use super::{delete_article_by_slug, seed_article};
     use crate::entity::article;
     use crate::utils::front_matter::FrontMatter;
     use chrono::{TimeZone, Utc};
@@ -115,6 +129,7 @@ mod tests {
         FrontMatter::new(
             title.to_string(),
             slug.to_string(),
+            false,
             Some("excerpt".to_string()),
             None,
             vec![],
@@ -212,5 +227,25 @@ mod tests {
             .await
             .expect("seed should insert");
         assert_eq!(article_id, 1);
+    }
+
+    #[tokio::test]
+    async fn test_delete_article_by_slug_executes_delete() {
+        let db = MockDatabase::new(DbBackend::Sqlite)
+            .append_exec_results([MockExecResult {
+                last_insert_id: 0,
+                rows_affected: 1,
+            }])
+            .into_connection();
+
+        let result = delete_article_by_slug(&db, "to-delete").await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_delete_article_by_slug_returns_error_when_slug_is_empty() {
+        let db = MockDatabase::new(DbBackend::Sqlite).into_connection();
+        let result = delete_article_by_slug(&db, "   ").await;
+        assert!(result.is_err());
     }
 }

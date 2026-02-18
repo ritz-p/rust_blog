@@ -5,6 +5,8 @@ use serde::Deserialize;
 pub struct FrontMatter {
     pub title: String,
     pub slug: String,
+    #[serde(default)]
+    pub deleted: bool,
     pub excerpt: Option<String>,
     pub icatch_path: Option<String>,
     pub tags: Vec<String>,
@@ -16,6 +18,7 @@ impl FrontMatter {
     pub fn new(
         title: String,
         slug: String,
+        deleted: bool,
         excerpt: Option<String>,
         icatch_path: Option<String>,
         tags: Vec<String>,
@@ -24,6 +27,7 @@ impl FrontMatter {
         Self {
             title,
             slug,
+            deleted,
             excerpt,
             icatch_path,
             tags,
