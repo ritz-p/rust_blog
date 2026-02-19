@@ -1,5 +1,6 @@
 use crate::domain::page::{Page, PageInfo};
-use chrono::{DateTime, Datelike, NaiveDate, Utc};
+use chrono::{DateTime, Datelike, NaiveDate, TimeZone, Utc};
+use chrono_tz::Asia::Tokyo;
 use sea_orm::{
     ColumnTrait, DatabaseConnection, DbErr, EntityTrait, QueryFilter, QueryOrder, QuerySelect,
     prelude::*,
@@ -35,9 +36,14 @@ impl ArticlePeriod {
 
     fn range(self) -> Option<(DateTime<Utc>, DateTime<Utc>)> {
         let (start_date, end_date) = Self::range_bounds(self.year, self.month)?;
-        let start =
-            DateTime::<Utc>::from_naive_utc_and_offset(start_date.and_hms_opt(0, 0, 0)?, Utc);
-        let end = DateTime::<Utc>::from_naive_utc_and_offset(end_date.and_hms_opt(0, 0, 0)?, Utc);
+        let start = Tokyo
+            .from_local_datetime(&start_date.and_hms_opt(0, 0, 0)?)
+            .single()?
+            .with_timezone(&Utc);
+        let end = Tokyo
+            .from_local_datetime(&end_date.and_hms_opt(0, 0, 0)?)
+            .single()?
+            .with_timezone(&Utc);
         Some((start, end))
     }
 }
@@ -47,7 +53,8 @@ pub async fn get_all_articles(
     page: Page,
     period: Option<ArticlePeriod>,
 ) -> Result<(Vec<article::Model>, PageInfo), DbErr> {
-    let mut base_query = article::Entity::find();
+    let now = Utc::now();
+    let mut base_query = article::Entity::find().filter(article::Column::CreatedAt.lte(now));
     if let Some(period) = period {
         if let Some((start, end)) = period.range() {
             base_query = base_query
@@ -73,7 +80,8 @@ pub async fn get_article_periods(
     db: &DatabaseConnection,
     period: Option<ArticlePeriod>,
 ) -> Result<Vec<ArticlePeriod>, DbErr> {
-    let mut query = article::Entity::find();
+    let now = Utc::now();
+    let mut query = article::Entity::find().filter(article::Column::CreatedAt.lte(now));
     if let Some(period) = period {
         if let Some((start, end)) = period.range() {
             query = query
@@ -92,9 +100,10 @@ pub async fn get_article_periods(
 
     let mut periods = Vec::<ArticlePeriod>::new();
     for created_at in created_ats {
+        let created_at_jst = created_at.with_timezone(&Tokyo);
         let period = ArticlePeriod {
-            year: created_at.year(),
-            month: created_at.month(),
+            year: created_at_jst.year(),
+            month: created_at_jst.month(),
         };
         if periods.last().copied() != Some(period) {
             periods.push(period);
@@ -106,8 +115,10 @@ pub async fn get_article_by_slug(
     db: &DatabaseConnection,
     slug: &str,
 ) -> Result<Option<article::Model>, DbErr> {
+    let now = Utc::now();
     article::Entity::find()
         .filter(article::Column::Slug.eq(slug.to_string()))
+        .filter(article::Column::CreatedAt.lte(now))
         .one(db)
         .await
 }
@@ -116,7 +127,9 @@ pub async fn get_latest_articles(
     db: &DatabaseConnection,
     limit: u64,
 ) -> Result<Vec<article::Model>, DbErr> {
+    let now = Utc::now();
     let articles = article::Entity::find()
+        .filter(article::Column::CreatedAt.lte(now))
         .order_by_desc(article::Column::CreatedAt)
         .limit(limit)
         .all(db)
@@ -130,6 +143,7 @@ pub async fn get_articles_by_tag_slug(
     tag_slug: &str,
     sort_key: &str,
 ) -> Result<(Vec<article::Model>, PageInfo), DbErr> {
+    let now = Utc::now();
     if let Some(tag) = tag::Entity::find()
         .filter(tag::Column::Slug.eq(tag_slug))
         .one(db)
@@ -137,6 +151,7 @@ pub async fn get_articles_by_tag_slug(
     {
         let total = tag
             .find_related(article::Entity)
+            .filter(article::Column::CreatedAt.lte(now))
             .distinct()
             .count(db)
             .await?;
@@ -146,6 +161,7 @@ pub async fn get_articles_by_tag_slug(
         let articles = match sort_key {
             "updated_at" => {
                 tag.find_related(article::Entity)
+                    .filter(article::Column::CreatedAt.lte(now))
                     .distinct()
                     .order_by_desc(article::Column::UpdatedAt)
                     .offset(offset)
@@ -155,6 +171,7 @@ pub async fn get_articles_by_tag_slug(
             }
             "created_at" => {
                 tag.find_related(article::Entity)
+                    .filter(article::Column::CreatedAt.lte(now))
                     .distinct()
                     .order_by_desc(article::Column::CreatedAt)
                     .offset(offset)
@@ -164,6 +181,7 @@ pub async fn get_articles_by_tag_slug(
             }
             _ => {
                 tag.find_related(article::Entity)
+                    .filter(article::Column::CreatedAt.lte(now))
                     .distinct()
                     .order_by_desc(article::Column::UpdatedAt)
                     .offset(offset)
@@ -184,6 +202,7 @@ pub async fn get_article_by_category_slug(
     category_slug: &str,
     sort_key: &str,
 ) -> Result<(Vec<article::Model>, PageInfo), DbErr> {
+    let now = Utc::now();
     if let Some(category) = category::Entity::find()
         .filter(category::Column::Slug.eq(category_slug))
         .one(db)
@@ -191,6 +210,7 @@ pub async fn get_article_by_category_slug(
     {
         let total = category
             .find_related(article::Entity)
+            .filter(article::Column::CreatedAt.lte(now))
             .distinct()
             .count(db)
             .await?;
@@ -201,6 +221,7 @@ pub async fn get_article_by_category_slug(
             "updated_at" => {
                 category
                     .find_related(article::Entity)
+                    .filter(article::Column::CreatedAt.lte(now))
                     .distinct()
                     .order_by_desc(article::Column::UpdatedAt)
                     .offset(offset)
@@ -211,6 +232,7 @@ pub async fn get_article_by_category_slug(
             "created_at" => {
                 category
                     .find_related(article::Entity)
+                    .filter(article::Column::CreatedAt.lte(now))
                     .distinct()
                     .order_by_desc(article::Column::CreatedAt)
                     .offset(offset)
@@ -221,6 +243,7 @@ pub async fn get_article_by_category_slug(
             _ => {
                 category
                     .find_related(article::Entity)
+                    .filter(article::Column::CreatedAt.lte(now))
                     .distinct()
                     .order_by_desc(article::Column::UpdatedAt)
                     .offset(offset)
@@ -238,6 +261,7 @@ pub async fn get_article_by_category_slug(
 #[cfg(test)]
 mod tests {
     use super::ArticlePeriod;
+    use chrono::{TimeZone, Utc};
 
     #[test]
     fn article_period_new_rejects_invalid_month() {
@@ -260,5 +284,13 @@ mod tests {
                 month: 12
             })
         );
+    }
+
+    #[test]
+    fn article_period_range_uses_jst_month_boundaries() {
+        let period = ArticlePeriod::new(2026, 2).expect("valid period");
+        let (start, end) = period.range().expect("range should exist");
+        assert_eq!(start, Utc.with_ymd_and_hms(2026, 1, 31, 15, 0, 0).unwrap());
+        assert_eq!(end, Utc.with_ymd_and_hms(2026, 2, 28, 15, 0, 0).unwrap());
     }
 }

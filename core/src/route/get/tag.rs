@@ -9,7 +9,7 @@ use crate::{
         query::{PagingQuery, tag::TagQuery},
     },
     repository::{article::get_articles_by_tag_slug, tag::get_all_tags},
-    utils::{config::CommonConfig, cut_out_string, markdown::markdown_to_text},
+    utils::{config::CommonConfig, cut_out_string, markdown::markdown_to_text, utc_to_jst},
 };
 
 #[get("/tags")]
@@ -75,7 +75,7 @@ pub async fn tag_detail(
                             "slug": article.slug,
                             "icatch_path": icatch_path,
                             "excerpt": excerpt,
-                            "created_at": article.created_at.to_string(),
+                            "created_at": utc_to_jst(article.created_at),
                         })
                     }).collect::<Vec<_>>(),
                     page: page_info.count,

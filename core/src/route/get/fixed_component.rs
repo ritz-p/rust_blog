@@ -1,5 +1,6 @@
 use rocket::{State, futures::TryFutureExt, http::Status};
 use rocket_dyn_templates::{Template, context};
+use rust_blog::utils::utc_to_jst;
 use sea_orm::DatabaseConnection;
 use serde_json::json;
 
@@ -55,8 +56,8 @@ pub async fn fixed_content_detail(
             title: fixed_content_page.title,
             excerpt: excerpt,
             content_html: content,
-            created_at: fixed_content_page.created_at.to_string(),
-            updated_at: fixed_content_page.updated_at.to_string(),
+            created_at: utc_to_jst(fixed_content_page.created_at),
+            updated_at: utc_to_jst(fixed_content_page.updated_at),
             latest_articles: latest_articles,
         },
     ))

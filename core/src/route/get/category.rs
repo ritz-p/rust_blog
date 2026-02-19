@@ -9,7 +9,7 @@ use crate::{
         query::{PagingQuery, category::CategoryQuery},
     },
     repository::{article::get_article_by_category_slug, category::get_all_categories},
-    utils::{config::CommonConfig, cut_out_string, markdown::markdown_to_text},
+    utils::{config::CommonConfig, cut_out_string, markdown::markdown_to_text, utc_to_jst},
 };
 
 #[get("/categories")]
@@ -76,7 +76,7 @@ pub async fn category_detail(
                             "slug": article.slug,
                             "icatch_path": icatch_path,
                             "excerpt": excerpt,
-                            "created_at": article.created_at.to_string(),
+                            "created_at": utc_to_jst(article.created_at),
                         })
                     }).collect::<Vec<_>>(),
                     page: page_info.count,
