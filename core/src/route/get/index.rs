@@ -151,6 +151,7 @@ mod tests {
             (1, 'Dec 1', 'dec-1', NULL, 'body', '2025-12-01T00:00:00Z', '2025-12-01T00:00:00Z', NULL),
             (2, 'Dec 2', 'dec-2', NULL, 'body', '2025-12-15T00:00:00Z', '2025-12-15T00:00:00Z', NULL),
             (3, 'Nov 1', 'nov-1', NULL, 'body', '2025-11-10T00:00:00Z', '2025-11-10T00:00:00Z', NULL),
+            (5, 'Feb JST Boundary', 'feb-jst-boundary', NULL, 'body', '2026-01-31T15:00:00Z', '2026-01-31T15:00:00Z', NULL),
             (4, 'Future', 'future', NULL, 'body', '2099-01-10T00:00:00Z', '2099-01-10T00:00:00Z', NULL);",
         ))
         .await
@@ -191,6 +192,28 @@ mod tests {
         assert!(body.contains("pagination-next"));
         assert!(body.contains("year=2025"));
         assert!(body.contains("month=12"));
+    }
+
+    #[rocket::async_test]
+    async fn index_filters_period_with_jst_month_boundary() {
+        let db = prepare_index_db().await;
+        let client = client_with_db(db).await;
+
+        let feb_response = client.get("/?year=2026&month=2").dispatch().await;
+        assert_eq!(feb_response.status(), Status::Ok);
+        let feb_body = feb_response
+            .into_string()
+            .await
+            .expect("response body should exist");
+        assert!(feb_body.contains("Feb JST Boundary"));
+
+        let jan_response = client.get("/?year=2026&month=1").dispatch().await;
+        assert_eq!(jan_response.status(), Status::Ok);
+        let jan_body = jan_response
+            .into_string()
+            .await
+            .expect("response body should exist");
+        assert!(!jan_body.contains("Feb JST Boundary"));
     }
 
     #[rocket::async_test]
