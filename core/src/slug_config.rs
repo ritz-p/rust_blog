@@ -13,11 +13,6 @@ struct Top {
 }
 
 impl SlugConfig {
-    pub fn from_toml_file(path: impl AsRef<Path>) -> Result<Self> {
-        let s = fs::read_to_string(path)?;
-        let cfg: SlugConfig = toml::from_str(&s)?;
-        Ok(cfg)
-    }
     pub fn from_toml_file_key(path: impl AsRef<Path>, key: &str) -> Result<Self> {
         let s = fs::read_to_string(&path)
             .with_context(|| format!("failed to read {:?}", path.as_ref()))?;
@@ -52,15 +47,6 @@ mod tests {
         ));
         fs::write(&path, contents).expect("failed to write temp toml");
         path
-    }
-
-    #[test]
-    fn from_toml_file_parses_map() {
-        let path = write_temp_toml("map = { rust = \"Rust\", web = \"Web\" }");
-        let cfg = SlugConfig::from_toml_file(&path).expect("failed to parse slug config");
-        assert_eq!(cfg.map.get("rust"), Some(&"Rust".to_string()));
-        assert_eq!(cfg.map.get("web"), Some(&"Web".to_string()));
-        let _ = fs::remove_file(path);
     }
 
     #[test]
