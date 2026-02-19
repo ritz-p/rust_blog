@@ -57,7 +57,7 @@ pub async fn fixed_content_detail(
             excerpt: excerpt,
             content_html: content,
             created_at: utc_to_jst(fixed_content_page.created_at),
-            updated_at: fixed_content_page.updated_at.to_string(),
+            updated_at: utc_to_jst(fixed_content_page.updated_at),
             latest_articles: latest_articles,
         },
     ))
