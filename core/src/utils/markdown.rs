@@ -1,4 +1,5 @@
 pub mod to_text;
+use ammonia::Builder;
 use pulldown_cmark::{Event, Options, Parser, html};
 use to_text::{end_tag, is_strikethrough, start_tag};
 
@@ -14,7 +15,11 @@ pub fn markdown_to_html(input: &str) -> String {
     let mut html_output = String::new();
     html::push_html(&mut html_output, parser);
 
-    html_output
+    sanitize_html(&html_output)
+}
+
+fn sanitize_html(html: &str) -> String {
+    Builder::default().clean(html).to_string()
 }
 
 pub fn markdown_to_text(markdown: &str) -> String {
@@ -50,7 +55,7 @@ pub fn markdown_to_text(markdown: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::markdown_to_text;
+    use super::{markdown_to_html, markdown_to_text};
 
     #[test]
     fn basic_inline_strong() {
@@ -234,5 +239,21 @@ Paragraph 2."#;
 
 Paragraph 2.";
         assert_eq!(markdown_to_text(markdown), expected);
+    }
+
+    #[test]
+    fn strips_script_tag() {
+        let markdown = r#"Hello<script>alert("xss")</script>World"#;
+        let html = markdown_to_html(markdown);
+        assert!(!html.contains("<script>"));
+        assert!(html.contains("Hello"));
+        assert!(html.contains("World"));
+    }
+
+    #[test]
+    fn strips_javascript_link() {
+        let markdown = r#"[click](javascript:alert(1))"#;
+        let html = markdown_to_html(markdown);
+        assert!(!html.contains("javascript:"));
     }
 }

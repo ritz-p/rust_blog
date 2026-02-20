@@ -5,7 +5,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}{{ site_name | default(value="My Blog") }}{% endblock title %}</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+  <link rel="stylesheet" href="/css/bulma.min.css">
+  <link rel="stylesheet" href="/css/site.css">
   <link rel="shortcut icon" href= "{{ favicon_path }}" >
   {% endblock head %}
 </head>
@@ -41,19 +42,7 @@
     </div>
   </footer>
   {% block scripts %}
-  <script>
-    document.addEventListener('DOMContentLoaded', () => {
-      const $burgers = Array.prototype.slice.call(document.querySelectorAll('.navbar-burger'), 0);
-      $burgers.forEach(el => {
-        el.addEventListener('click', () => {
-          const target = el.dataset.target;
-          const $target = document.getElementById(target);
-          el.classList.toggle('is-active');
-          if ($target) $target.classList.toggle('is-active');
-        });
-      });
-    });
-  </script>
+  <script src="/js/nav.js" defer></script>
   {% endblock scripts %}
 </body>
 </html>

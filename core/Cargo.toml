@@ -32,3 +32,4 @@ dotenvy = "0.15.7"
 taplo = { version = "0.14.0", features = ["serde"] }
 chrono-tz = "0.10.4"
 garde = { version = "0.22.1", features = ["full"] }
+ammonia = "4.0.0"

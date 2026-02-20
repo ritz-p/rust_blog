@@ -24,7 +24,7 @@
         {% if article.icatch_path and article.icatch_path | length > 0 %}
         <div class="column is-narrow">
           <figure class="image is-128x128">
-            <img src="{{ article.icatch_path }}" alt="{{ article.title }} icatch" style="object-fit: cover;">
+            <img src="{{ article.icatch_path }}" alt="{{ article.title }} icatch" class="icatch-thumb">
           </figure>
         </div>
         {% endif %}
