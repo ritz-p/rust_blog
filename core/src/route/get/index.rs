@@ -1,4 +1,4 @@
-use rocket::State;
+use rocket::{State, http::Status};
 use rocket_dyn_templates::{Template, context};
 use sea_orm::DatabaseConnection;
 use serde_json::json;
@@ -27,7 +27,7 @@ pub async fn index(
     config: &State<CommonConfig>,
     db: &State<DatabaseConnection>,
     query: Option<IndexQuery>,
-) -> Template {
+) -> Result<Template, Status> {
     let query = query.unwrap_or(IndexQuery::new());
     let page = Page::new_from_query(&query);
     let has_period_query = query.year.is_some() || query.month.is_some();
@@ -40,7 +40,7 @@ pub async fn index(
     } else {
         get_all_articles(db.inner(), page, selected_period)
             .await
-            .unwrap()
+            .map_err(|_| Status::InternalServerError)?
     };
     let prev_url = if page_info.has_prev {
         build_index_url(page_info.prev_page, page_info.per, selected_period)
@@ -88,7 +88,7 @@ pub async fn index(
         })
         .collect();
 
-    Template::render(
+    Ok(Template::render(
         "index",
         context! {
             site_name: &config.site_name,
@@ -106,7 +106,7 @@ pub async fn index(
             selected_period: selected_period.map(|period| format!("{}/{:02}", period.year, period.month)),
             period_links: period_links,
         },
-    )
+    ))
 }
 
 #[cfg(test)]
