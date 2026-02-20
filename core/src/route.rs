@@ -20,7 +20,7 @@ use get::{
     },
     fixed_component::fixed_content_detail,
     index::index,
-    static_asset::{bulma_css, nav_js},
+    static_asset::{bulma_css, nav_js, site_css},
     tag::{tag_detail, tag_list},
 };
 
@@ -70,6 +70,7 @@ pub async fn launch(
                 index,
                 post_detail,
                 bulma_css,
+                site_css,
                 nav_js,
                 tag_list,
                 tag_detail,

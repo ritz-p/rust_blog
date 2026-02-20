@@ -6,6 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}{{ site_name | default(value="My Blog") }}{% endblock title %}</title>
   <link rel="stylesheet" href="/css/bulma.min.css">
+  <link rel="stylesheet" href="/css/site.css">
   <link rel="shortcut icon" href= "{{ favicon_path }}" >
   {% endblock head %}
 </head>
