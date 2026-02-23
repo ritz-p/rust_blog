@@ -26,7 +26,8 @@
         "genieai.chatgpt-vscode",
         "docker.docker",
         "ramon-zwiers.json-format",
-        "openai.chatgpt"
+        "openai.chatgpt",
+        "donjayamanne.githistory"
       ]
     }
   },
