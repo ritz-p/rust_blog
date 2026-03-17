@@ -78,7 +78,7 @@ pub async fn tag_detail(
                             "created_at": utc_to_jst(article.created_at),
                         })
                     }).collect::<Vec<_>>(),
-                    page: page_info.count,
+                    page: page_info.current_page,
                     per: page_info.per,
                     total_pages: page_info.total_pages,
                     has_prev: page_info.has_prev,
