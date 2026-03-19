@@ -25,7 +25,7 @@ mod repository_tests {
             updated_at: Utc::now(),
             icatch_path: None,
         };
-        let page = Page { count: 1, per: 10 };
+        let page = Page { number: 1, per: 10 };
         let db = MockDatabase::new(DatabaseBackend::Sqlite)
             .append_exec_results([MockExecResult {
                 last_insert_id: 0,

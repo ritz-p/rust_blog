@@ -2,15 +2,15 @@ use crate::domain::query::PagingQuery;
 
 #[derive(Debug, Clone, Copy)]
 pub struct Page {
-    pub count: u64,
+    pub number: u64,
     pub per: u64,
 }
 
 impl Page {
     pub fn normalize(self, max: u64) -> Self {
-        let count = self.count.max(1);
+        let number = self.number.max(1);
         let per = self.per.clamp(1, max);
-        Self { count, per }
+        Self { number, per }
     }
 
     pub fn new_from_query<T>(query: &T) -> Self
@@ -18,7 +18,7 @@ impl Page {
         T: PagingQuery,
     {
         Self {
-            count: query.page().unwrap_or(1),
+            number: query.page().unwrap_or(1),
             per: query.per().unwrap_or(10),
         }
     }
@@ -26,7 +26,7 @@ impl Page {
 
 #[derive(Debug, Clone)]
 pub struct PageInfo {
-    pub count: u64,
+    pub current_page: u64,
     pub per: u64,
     pub total_pages: u64,
     pub has_prev: bool,
@@ -38,19 +38,23 @@ pub struct PageInfo {
 impl PageInfo {
     pub fn new(page: Page, total: u64) -> Self {
         let total_pages = ((total + page.per - 1) / page.per).max(1);
-        let count = page.count.clamp(1, total_pages);
+        let current_page = page.number.clamp(1, total_pages);
 
-        let has_prev = count > 1;
-        let has_next = count < total_pages;
+        let has_prev = current_page > 1;
+        let has_next = current_page < total_pages;
 
         Self {
-            count: count,
+            current_page,
             per: page.per,
             total_pages,
             has_prev,
             has_next,
-            prev_page: if has_prev { count - 1 } else { 1 },
-            next_page: if has_next { count + 1 } else { total_pages },
+            prev_page: if has_prev { current_page - 1 } else { 1 },
+            next_page: if has_next {
+                current_page + 1
+            } else {
+                total_pages
+            },
         }
     }
     pub fn get_prev_url(&self, base_path: &str, sort_key: Option<&String>) -> String {
@@ -121,7 +125,7 @@ mod tests {
     fn page_new_from_query_uses_defaults() {
         let query = MockQuery::new();
         let page = Page::new_from_query(&query);
-        assert_eq!(page.count, 1);
+        assert_eq!(page.number, 1);
         assert_eq!(page.per, 10);
     }
 
@@ -132,21 +136,25 @@ mod tests {
             per: Some(25),
         };
         let page = Page::new_from_query(&query);
-        assert_eq!(page.count, 3);
+        assert_eq!(page.number, 3);
         assert_eq!(page.per, 25);
     }
 
     #[test]
     fn page_normalize_clamps_values() {
-        let page = Page { count: 0, per: 100 }.normalize(30);
-        assert_eq!(page.count, 1);
+        let page = Page {
+            number: 0,
+            per: 100,
+        }
+        .normalize(30);
+        assert_eq!(page.number, 1);
         assert_eq!(page.per, 30);
     }
 
     #[test]
     fn page_info_new_sets_bounds_and_navigation_flags() {
-        let info = PageInfo::new(Page { count: 99, per: 10 }, 95);
-        assert_eq!(info.count, 10);
+        let info = PageInfo::new(Page { number: 99, per: 10 }, 95);
+        assert_eq!(info.current_page, 10);
         assert_eq!(info.total_pages, 10);
         assert!(info.has_prev);
         assert!(!info.has_next);
@@ -156,8 +164,8 @@ mod tests {
 
     #[test]
     fn page_info_new_handles_first_page_and_empty_total() {
-        let info = PageInfo::new(Page { count: 1, per: 10 }, 0);
-        assert_eq!(info.count, 1);
+        let info = PageInfo::new(Page { number: 1, per: 10 }, 0);
+        assert_eq!(info.current_page, 1);
         assert_eq!(info.total_pages, 1);
         assert!(!info.has_prev);
         assert!(!info.has_next);
@@ -167,7 +175,7 @@ mod tests {
 
     #[test]
     fn page_info_prev_next_url_include_sort_key() {
-        let info = PageInfo::new(Page { count: 2, per: 10 }, 50);
+        let info = PageInfo::new(Page { number: 2, per: 10 }, 50);
         let sort_key = "updated_at".to_string();
         assert_eq!(
             info.get_prev_url("/tags/rust", Some(&sort_key)),
@@ -181,7 +189,7 @@ mod tests {
 
     #[test]
     fn page_info_prev_next_url_return_empty_when_no_navigation() {
-        let info = PageInfo::new(Page { count: 1, per: 10 }, 5);
+        let info = PageInfo::new(Page { number: 1, per: 10 }, 5);
         assert_eq!(info.get_prev_url("/articles", None), "");
         assert_eq!(info.get_next_url("/articles", None), "");
     }

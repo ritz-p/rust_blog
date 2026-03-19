@@ -25,15 +25,15 @@ pub async fn fixed_content_detail(
         .await?
         .ok_or(Status::NotFound);
 
-    let fixed_content_page = match maybe {
+    let fixed_content = match maybe {
         Ok(model) => model,
         Err(_) => return Err(Status::NotFound),
     };
 
-    let content = markdown_to_html(&fixed_content_page.content);
-    let excerpt = match fixed_content_page.excerpt.as_ref() {
+    let content = markdown_to_html(&fixed_content.content);
+    let excerpt = match fixed_content.excerpt.as_ref() {
         Some(value) => value.clone(),
-        None => cut_out_string(&markdown_to_text(&fixed_content_page.content), 100),
+        None => cut_out_string(&markdown_to_text(&fixed_content.content), 100),
     };
 
     let latest_articles: Vec<_> = get_latest_articles(db, 5)
@@ -53,11 +53,11 @@ pub async fn fixed_content_detail(
         context! {
             site_name: &config.site_name,
             favicon_path: &config.favicon_path,
-            title: fixed_content_page.title,
+            title: fixed_content.title,
             excerpt: excerpt,
             content_html: content,
-            created_at: utc_to_jst(fixed_content_page.created_at),
-            updated_at: utc_to_jst(fixed_content_page.updated_at),
+            created_at: utc_to_jst(fixed_content.created_at),
+            updated_at: utc_to_jst(fixed_content.updated_at),
             latest_articles: latest_articles,
         },
     ))

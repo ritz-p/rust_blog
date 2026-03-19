@@ -63,12 +63,12 @@ pub async fn seed_fixed_content(
     }
 
     let saved = active_model.save(db).await?;
-    let article_id: i32 = match saved.id {
+    let fixed_content_id: i32 = match saved.id {
         ActiveValue::Set(id) | ActiveValue::Unchanged(id) => {
             println!("{} updated", fixed_content_matter.title);
             id
         }
         ActiveValue::NotSet => return Err(DbErr::Custom("fixed content id not set".into()).into()),
     };
-    Ok(article_id)
+    Ok(fixed_content_id)
 }

@@ -13,7 +13,7 @@ use sea_orm::DatabaseConnection;
 use serde_json::json;
 
 #[get("/posts/<slug>")]
-pub async fn post_detail(
+pub async fn article_detail(
     config: &State<CommonConfig>,
     db: &State<DatabaseConnection>,
     slug: &str,
