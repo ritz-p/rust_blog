@@ -94,7 +94,7 @@ pub async fn index(
             site_name: &config.site_name,
             favicon_path: &config.favicon_path,
             articles:  articles,
-            page: page_info.count,
+            page: page_info.current_page,
             per: page_info.per,
             total_pages: page_info.total_pages,
             has_prev: page_info.has_prev,

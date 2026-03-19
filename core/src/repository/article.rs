@@ -66,7 +66,7 @@ pub async fn get_all_articles(
     let total = base_query.clone().count(db).await?;
     let page = page.normalize(50);
     let page_info = PageInfo::new(page, total);
-    let offset = (page_info.count - 1) * page_info.per;
+    let offset = (page_info.current_page - 1) * page_info.per;
     let articles = base_query
         .order_by_desc(article::Column::CreatedAt)
         .offset(offset)
@@ -157,7 +157,7 @@ pub async fn get_articles_by_tag_slug(
             .await?;
         let page = page.normalize(50);
         let page_info = PageInfo::new(page, total);
-        let offset = (page_info.count - 1) * page_info.per;
+        let offset = (page_info.current_page - 1) * page_info.per;
         let articles = match sort_key {
             "updated_at" => {
                 tag.find_related(article::Entity)
@@ -216,7 +216,7 @@ pub async fn get_article_by_category_slug(
             .await?;
         let page = page.normalize(50);
         let page_info = PageInfo::new(page, total);
-        let offset = (page_info.count - 1) * page_info.per;
+        let offset = (page_info.current_page - 1) * page_info.per;
         let articles = match sort_key {
             "updated_at" => {
                 category

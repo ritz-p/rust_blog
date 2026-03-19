@@ -15,10 +15,10 @@ cargo test
 ### ページング (`core/src/domain/page.rs`)
 
 - `Page::new_from_query`
-  - クエリ未指定時のデフォルト値 (`count=1`, `per=10`)
+  - クエリ未指定時のデフォルト値 (`number=1`, `per=10`)
   - クエリ指定時の値反映
 - `Page::normalize`
-  - `count` の最小値補正
+  - `number` の最小値補正
   - `per` の下限・上限クランプ
 - `PageInfo::new`
   - `total_pages` の算出
@@ -70,6 +70,6 @@ cargo test
 
 ## 今後の拡張候補
 
-- `index` / `post_detail` の HTTP レスポンス観点追加
+- `index` / `article_detail` の HTTP レスポンス観点追加
 - `repository/article.rs` の並び順分岐 (`created_at` / `updated_at`) の直接検証
 - `seed/article/seed.rs` の `prepare` / `upsert` 分岐を追加

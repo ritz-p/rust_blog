@@ -10,7 +10,7 @@ use sea_orm::DatabaseConnection;
 mod get;
 
 use get::{
-    article::post_detail,
+    article::article_detail,
     category::{category_detail, category_list},
     error::{
         bad_gateway::bad_gateway, bad_request::bad_request, forbidden::forbidden,
@@ -18,7 +18,7 @@ use get::{
         not_found::not_found, request_timeout::request_timeout,
         service_unavailable::service_unavailable, unauthorized::unauthorized,
     },
-    fixed_component::fixed_content_detail,
+    fixed_content::fixed_content_detail,
     index::index,
     static_asset::{bulma_css, nav_js, site_css},
     tag::{tag_detail, tag_list},
@@ -68,7 +68,7 @@ pub async fn launch(
             routes![
                 fixed_content_detail,
                 index,
-                post_detail,
+                article_detail,
                 bulma_css,
                 site_css,
                 nav_js,
