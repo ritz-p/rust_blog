@@ -1,0 +1,9 @@
+target
+migration/target
+.git
+.gitignore
+.env
+blog.db
+tmp
+dist
+.DS_Store

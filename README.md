@@ -111,6 +111,46 @@ rust_blog/             ← ワークスペースルート
 
 テストで何を検証しているかは `docs/testing.md` にまとめています。
 
+## デプロイメモ
+
+Cloudflare へ載せるときの考え方と選択肢は `docs/cloudflare.md` にまとめています。
+
+### コンテナで最短公開する場合
+
+Cloudflare を DNS / CDN / WAF として使い、アプリ本体は別のコンテナ基盤で動かす構成を取りやすいように、`prod/Dockerfile` を用意しています。
+
+ビルド:
+
+```bash
+docker build -f prod/Dockerfile -t rust-blog:prod .
+```
+
+起動:
+
+```bash
+docker run --rm \
+  -p 8080:8080 \
+  -v $(pwd)/data:/data \
+  -e PORT=8080 \
+  rust-blog:prod
+```
+
+このイメージは起動時に以下を行います。
+
+1. SQLite ファイルを `/data/blog.db` に用意
+2. migration を適用
+3. `rust_blog` を起動
+
+`seed` は実行時には行いません。記事投入や初期データ作成はデプロイ前に済ませておく前提です。
+
+主な環境変数:
+
+- `PORT`: アプリ待受ポート。デフォルトは `8080`
+- `DB_PATH`: SQLite ファイルの配置先。デフォルトは `/data/blog.db`
+- `DATABASE_URL`: 明示指定したい場合に使用
+
+Cloudflare 側では、このコンテナを配置したホストへ DNS を向けて Proxy を有効化します。
+
 ## SeaOrm について
 
 1. テーブル作成
