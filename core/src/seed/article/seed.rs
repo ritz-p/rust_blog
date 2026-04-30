@@ -203,4 +203,20 @@ mod tests {
         let parsed = parse_created_at("2026-02-18").expect("must parse");
         assert_eq!(parsed, Utc.with_ymd_and_hms(2026, 2, 17, 15, 0, 0).unwrap());
     }
+
+    #[test]
+    fn front_matter_deserializes_date_as_created_at() {
+        let fm: FrontMatter = serde_yaml::from_str(
+            r#"
+title: title
+slug: slug
+date: 2026-02-18
+tags: []
+categories: []
+"#,
+        )
+        .expect("front matter should deserialize");
+
+        assert_eq!(fm.created_at, Some("2026-02-18".to_string()));
+    }
 }
