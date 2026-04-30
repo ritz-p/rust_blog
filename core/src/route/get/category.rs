@@ -12,6 +12,10 @@ use crate::{
     utils::{config::CommonConfig, cut_out_string, markdown::markdown_to_text, utc_to_jst},
 };
 
+fn sort_url(slug: &str, sort_key: &str) -> String {
+    format!("/category/{slug}?sort_key={sort_key}")
+}
+
 #[get("/categories")]
 pub async fn category_list(
     config: &State<CommonConfig>,
@@ -62,6 +66,8 @@ pub async fn category_detail(
                     favicon_path: &config.favicon_path,
                     category_slug: slug,
                     sort_key: sort_key,
+                    sort_created_url: sort_url(slug, "created_at"),
+                    sort_updated_url: sort_url(slug, "updated_at"),
                     articles: articles.iter().map(|article| {
                         let icatch_path = article
                             .icatch_path

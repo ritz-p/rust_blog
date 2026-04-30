@@ -9,7 +9,7 @@
     <ul>
       {% for tag in tags %}
       <li class="mb-3">
-        <a class="tag is-light is-medium" href="/tag/{{ tag.slug }}">#{{ tag.name }}</a>
+        <a class="tag is-light is-medium" href="/tag/{{ tag.slug }}/">#{{ tag.name }}</a>
         {% if tag.count is defined %}
           <span class="is-size-7 has-text-grey">（{{ tag.count }}）</span>
         {% endif %}

@@ -10,10 +10,10 @@
 {% if articles and articles | length > 0 %}
   <div class="mb-4">
     並び順:
-    <a href="?sort_key=created_at" class="mr-2">
+    <a href="{{ sort_created_url | default(value='?sort_key=created_at') }}" class="mr-2">
       作成日順
     </a>
-    <a href="?sort_key=updated_at" class="mr-2">
+    <a href="{{ sort_updated_url | default(value='?sort_key=updated_at') }}" class="mr-2">
       更新日順
     </a>
   </div>
@@ -30,7 +30,7 @@
         {% endif %}
         <div class="column">
           <h2 class="title is-4">
-            <a href="/posts/{{ article.slug }}">{{ article.title }}</a>
+            <a href="/posts/{{ article.slug }}/">{{ article.title }}</a>
           </h2>
           <p class="is-size-7 has-text-grey mb-2">{{ article.created_at }}</p>
 
