@@ -18,7 +18,8 @@ COPY migration/src migration/src
 COPY content/image content/image
 COPY content/icon content/icon
 
-RUN cargo build --release -p rust_blog -p migration --bin rust_blog
+RUN cargo build --release -p rust_blog --bin rust_blog && \
+    cargo build --release -p migration --bin migration
 
 FROM debian:bookworm-slim
 
