@@ -30,6 +30,9 @@ use crate::{
 };
 
 const PAGE_SIZE: u64 = 10;
+const BULMA_CSS: &[u8] = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/bulma.min.css"));
+const SITE_CSS: &[u8] = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/site.css"));
+const NAV_JS: &[u8] = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/nav.js"));
 
 pub async fn export_site(
     db: &DatabaseConnection,
@@ -536,12 +539,9 @@ fn reset_output_dir(out_dir: &Path) -> Result<()> {
 }
 
 fn write_static_assets(out_dir: &Path) -> Result<()> {
-    write_asset_file(
-        out_dir.join("css/bulma.min.css"),
-        Path::new("core/assets/bulma.min.css"),
-    )?;
-    write_asset_file(out_dir.join("css/site.css"), Path::new("core/assets/site.css"))?;
-    write_asset_file(out_dir.join("js/nav.js"), Path::new("core/assets/nav.js"))?;
+    write_embedded_asset_file(out_dir.join("css/bulma.min.css"), BULMA_CSS)?;
+    write_embedded_asset_file(out_dir.join("css/site.css"), SITE_CSS)?;
+    write_embedded_asset_file(out_dir.join("js/nav.js"), NAV_JS)?;
     copy_dir_recursive(Path::new("content/image"), &out_dir.join("image"))?;
     copy_dir_recursive(Path::new("content/icon"), &out_dir.join("icon"))?;
     Ok(())
@@ -608,9 +608,7 @@ fn build_redirects_file(out_dir: &Path) -> Result<String> {
     Ok(redirects.join("\n"))
 }
 
-fn write_asset_file(target: PathBuf, source: &Path) -> Result<()> {
-    let contents =
-        fs::read(source).with_context(|| format!("failed to read asset source {:?}", source))?;
+fn write_embedded_asset_file(target: PathBuf, contents: &[u8]) -> Result<()> {
     if let Some(parent) = target.parent() {
         fs::create_dir_all(parent)?;
     }
