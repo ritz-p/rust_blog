@@ -27,8 +27,11 @@ pub async fn category_list(
     let categories = models
         .iter()
         .map(|category| {
+            let slug = category.slug.clone();
             json!({
-                "name": category.name.clone(),"slug": category.slug.clone()
+                "name": category.name.clone(),
+                "slug": slug.clone(),
+                "url": format!("/category/{slug}")
             })
         })
         .collect::<Vec<_>>();
@@ -37,6 +40,9 @@ pub async fn category_list(
         context! {
             site_name: &config.site_name,
             favicon_path: &config.favicon_path,
+            tags_url: "/tags",
+            categories_url: "/categories",
+            about_url: "/about",
             categories
         },
     ))
@@ -64,6 +70,9 @@ pub async fn category_detail(
                 context! {
                     site_name: &config.site_name,
                     favicon_path: &config.favicon_path,
+                    tags_url: "/tags",
+                    categories_url: "/categories",
+                    about_url: "/about",
                     category_slug: slug,
                     sort_key: sort_key,
                     sort_created_url: sort_url(slug, "created_at"),
@@ -77,9 +86,11 @@ pub async fn category_detail(
                             Some(value) => value.clone(),
                             None => cut_out_string(&markdown_to_text(&article.content), 100),
                         };
+                        let slug = article.slug.clone();
                         json!({
                             "title": article.title.clone(),
-                            "slug": article.slug,
+                            "slug": slug.clone(),
+                            "url": format!("/posts/{slug}"),
                             "icatch_path": icatch_path,
                             "excerpt": excerpt,
                             "created_at": utc_to_jst(article.created_at),

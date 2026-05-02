@@ -5,7 +5,6 @@ use crate::{
         tag::get_tags_by_article,
     },
     utils::{config::CommonConfig, markdown::markdown_to_html, utc_to_jst},
-    view::{category::CategoryView, tag::TagView},
 };
 use rocket::{State, http::Status};
 use rocket_dyn_templates::{Template, context};
@@ -35,9 +34,13 @@ pub async fn article_detail(
         .await
         .map_err(|_| Status::InternalServerError)?
         .into_iter()
-        .map(|tag| TagView {
-            name: tag.name,
-            slug: tag.slug,
+        .map(|tag| {
+            let slug = tag.slug;
+            json!({
+                "name": tag.name,
+                "slug": slug.clone(),
+                "url": format!("/tag/{slug}"),
+            })
         })
         .collect();
 
@@ -45,9 +48,13 @@ pub async fn article_detail(
         .await
         .map_err(|_| Status::InternalServerError)?
         .into_iter()
-        .map(|category| CategoryView {
-            name: category.name,
-            slug: category.slug,
+        .map(|category| {
+            let slug = category.slug;
+            json!({
+                "name": category.name,
+                "slug": slug.clone(),
+                "url": format!("/category/{slug}"),
+            })
         })
         .collect();
     let created_at = utc_to_jst(article.created_at);
@@ -58,9 +65,11 @@ pub async fn article_detail(
         .map_err(|_| Status::InternalServerError)?
         .into_iter()
         .map(|model| {
+            let slug = model.slug;
             json!({
                 "title":      model.title,
-                "slug":       model.slug,
+                "slug":       slug.clone(),
+                "url":        format!("/posts/{slug}"),
             })
         })
         .collect();
@@ -70,6 +79,9 @@ pub async fn article_detail(
         context! {
             site_name: &config.site_name,
             favicon_path: &config.favicon_path,
+            tags_url: "/tags",
+            categories_url: "/categories",
+            about_url: "/about",
             title: article.title,
             content_html: content,
             created_at: created_at,

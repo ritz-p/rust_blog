@@ -30,7 +30,7 @@
         {% endif %}
         <div class="column">
           <h2 class="title is-4">
-            <a href="/posts/{{ article.slug }}/">{{ article.title }}</a>
+            <a href="{{ article.url }}">{{ article.title }}</a>
           </h2>
           <p class="is-size-7 has-text-grey mb-2">{{ article.created_at }}</p>
 

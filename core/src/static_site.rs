@@ -123,7 +123,8 @@ async fn export_index_variant(
                     .unwrap_or_else(|| default_icatch_path.clone());
                 json!({
                     "title": m.title,
-                    "slug": m.slug,
+                    "slug": m.slug.clone(),
+                    "url": static_article_url(&m.slug),
                     "excerpt": excerpt,
                     "icatch_path": icatch_path,
                     "created_at": utc_to_jst(m.created_at),
@@ -172,12 +173,18 @@ async fn export_article_pages(
         let tags: Vec<_> = get_tags_by_article(db, &article)
             .await?
             .into_iter()
-            .map(|tag| json!({ "name": tag.name, "slug": tag.slug }))
+            .map(|tag| {
+                let slug = tag.slug;
+                json!({ "name": tag.name, "slug": slug.clone(), "url": static_tag_url(&slug, "created_at", 1) })
+            })
             .collect();
         let categories: Vec<_> = get_categories_by_article(db, &article)
             .await?
             .into_iter()
-            .map(|category| json!({ "name": category.name, "slug": category.slug }))
+            .map(|category| {
+                let slug = category.slug;
+                json!({ "name": category.name, "slug": slug.clone(), "url": static_category_url(&slug, "created_at", 1) })
+            })
             .collect();
 
         let mut ctx = base_context(config);
@@ -240,7 +247,10 @@ async fn export_tag_pages(
     let tags = get_all_tags(db).await?;
     let tag_items: Vec<_> = tags
         .iter()
-        .map(|tag| json!({ "name": tag.name, "slug": tag.slug }))
+        .map(|tag| {
+            let slug = tag.slug.clone();
+            json!({ "name": tag.name, "slug": slug.clone(), "url": static_tag_url(&slug, "created_at", 1) })
+        })
         .collect();
 
     let mut list_ctx = base_context(config);
@@ -299,9 +309,11 @@ async fn export_tag_variant(
                     Some(value) => value.clone(),
                     None => cut_out_string(&markdown_to_text(&article.content), 100),
                 };
+                let slug = article.slug.clone();
                 json!({
                     "title": article.title.clone(),
-                    "slug": article.slug,
+                    "slug": slug.clone(),
+                    "url": static_article_url(&slug),
                     "icatch_path": icatch_path,
                     "excerpt": excerpt,
                     "created_at": utc_to_jst(article.created_at),
@@ -350,7 +362,10 @@ async fn export_category_pages(
     let categories = get_all_categories(db).await?;
     let category_items: Vec<_> = categories
         .iter()
-        .map(|category| json!({ "name": category.name, "slug": category.slug }))
+        .map(|category| {
+            let slug = category.slug.clone();
+            json!({ "name": category.name, "slug": slug.clone(), "url": static_category_url(&slug, "created_at", 1) })
+        })
         .collect();
 
     let mut list_ctx = base_context(config);
@@ -414,9 +429,11 @@ async fn export_category_variant(
                     Some(value) => value.clone(),
                     None => cut_out_string(&markdown_to_text(&article.content), 100),
                 };
+                let slug = article.slug.clone();
                 json!({
                     "title": article.title.clone(),
-                    "slug": article.slug,
+                    "slug": slug.clone(),
+                    "url": static_article_url(&slug),
                     "icatch_path": icatch_path,
                     "excerpt": excerpt,
                     "created_at": utc_to_jst(article.created_at),
@@ -472,9 +489,11 @@ async fn latest_articles_json(db: &DatabaseConnection) -> Result<Vec<serde_json:
         .await?
         .into_iter()
         .map(|model| {
+            let slug = model.slug;
             json!({
                 "title": model.title,
-                "slug": model.slug,
+                "slug": slug.clone(),
+                "url": static_article_url(&slug),
             })
         })
         .collect())
@@ -485,6 +504,9 @@ fn base_context(config: &CommonConfig) -> Context {
     ctx.insert("site_name", &config.site_name);
     ctx.insert("favicon_path", &config.favicon_path);
     ctx.insert("year", &Utc::now().year());
+    ctx.insert("tags_url", "/tags/");
+    ctx.insert("categories_url", "/categories/");
+    ctx.insert("about_url", "/about/");
     ctx
 }
 
@@ -582,26 +604,24 @@ fn build_headers_file() -> String {
 }
 
 fn build_redirects_file(out_dir: &Path) -> Result<String> {
-    let mut redirects = Vec::new();
-    for entry in WalkDir::new(out_dir).min_depth(1) {
-        let entry = entry?;
-        if !entry.file_type().is_dir() {
-            continue;
-        }
-        let index_html = entry.path().join("index.html");
-        if !index_html.exists() {
-            continue;
-        }
-        let relative = entry
-            .path()
-            .strip_prefix(out_dir)
-            .with_context(|| format!("failed to strip prefix for {:?}", entry.path()))?;
-        let rel = relative.to_string_lossy().replace('\\', "/");
-        if rel.is_empty() {
-            continue;
-        }
-        redirects.push(format!("/{rel} /{rel}/ 308"));
-    }
+    let mut redirects = vec![
+        "/page/:page /page/:page/ 308".to_string(),
+        "/archive/:year/:month /archive/:year/:month/ 308".to_string(),
+        "/archive/:year/:month/page/:page /archive/:year/:month/page/:page/ 308".to_string(),
+        "/posts/:slug /posts/:slug/ 308".to_string(),
+        "/tags /tags/ 308".to_string(),
+        "/tag/:slug /tag/:slug/ 308".to_string(),
+        "/tag/:slug/updated /tag/:slug/updated/ 308".to_string(),
+        "/tag/:slug/page/:page /tag/:slug/page/:page/ 308".to_string(),
+        "/tag/:slug/updated/page/:page /tag/:slug/updated/page/:page/ 308".to_string(),
+        "/categories /categories/ 308".to_string(),
+        "/category/:slug /category/:slug/ 308".to_string(),
+        "/category/:slug/updated /category/:slug/updated/ 308".to_string(),
+        "/category/:slug/page/:page /category/:slug/page/:page/ 308".to_string(),
+        "/category/:slug/updated/page/:page /category/:slug/updated/page/:page/ 308".to_string(),
+    ];
+
+    redirects.extend(discover_fixed_content_redirects(out_dir)?);
     redirects.sort();
     redirects.dedup();
     redirects.push(String::new());
@@ -665,6 +685,10 @@ fn static_index_url(page: u64, period: Option<ArticlePeriod>) -> String {
     }
 }
 
+fn static_article_url(slug: &str) -> String {
+    format!("/posts/{slug}/")
+}
+
 fn static_tag_output_path(slug: &str, sort_key: &str, page: u64) -> PathBuf {
     let sort_segment = if sort_key == "updated_at" {
         "updated/"
@@ -716,5 +740,69 @@ fn static_category_url(slug: &str, sort_key: &str, page: u64) -> String {
         format!("/category/{slug}/{sort_segment}")
     } else {
         format!("/category/{slug}/{sort_segment}page/{page}/")
+    }
+}
+
+fn discover_fixed_content_redirects(out_dir: &Path) -> Result<Vec<String>> {
+    let mut redirects = Vec::new();
+    for entry in fs::read_dir(out_dir)? {
+        let entry = entry?;
+        if !entry.file_type()?.is_dir() {
+            continue;
+        }
+        let name = entry.file_name();
+        let name = name.to_string_lossy();
+        if is_reserved_root_dir(&name) {
+            continue;
+        }
+        if entry.path().join("index.html").exists() {
+            redirects.push(format!("/{name} /{name}/ 308"));
+        }
+    }
+    Ok(redirects)
+}
+
+fn is_reserved_root_dir(name: &str) -> bool {
+    matches!(
+        name,
+        "archive" | "category" | "categories" | "css" | "icon" | "image" | "js" | "page"
+            | "posts" | "tag" | "tags"
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::build_redirects_file;
+    use std::{fs, path::PathBuf, time::{SystemTime, UNIX_EPOCH}};
+
+    fn temp_export_dir() -> PathBuf {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time before unix epoch")
+            .as_nanos();
+        std::env::temp_dir().join(format!("rust-blog-static-site-{unique}"))
+    }
+
+    #[test]
+    fn build_redirects_file_uses_pattern_rules_instead_of_per_directory_rules() {
+        let out_dir = temp_export_dir();
+        fs::create_dir_all(out_dir.join("posts/one")).expect("failed to create posts/one");
+        fs::create_dir_all(out_dir.join("posts/two")).expect("failed to create posts/two");
+        fs::create_dir_all(out_dir.join("about")).expect("failed to create about");
+        fs::create_dir_all(out_dir.join("css")).expect("failed to create css");
+        fs::write(out_dir.join("posts/one/index.html"), "").expect("failed to write one");
+        fs::write(out_dir.join("posts/two/index.html"), "").expect("failed to write two");
+        fs::write(out_dir.join("about/index.html"), "").expect("failed to write about");
+
+        let redirects = build_redirects_file(&out_dir).expect("failed to build redirects");
+
+        assert!(redirects.contains("/posts/:slug /posts/:slug/ 308"));
+        assert!(redirects.contains("/about /about/ 308"));
+        assert_eq!(redirects.matches("/posts/:slug /posts/:slug/ 308").count(), 1);
+        assert!(!redirects.contains("/posts/one /posts/one/ 308"));
+        assert!(!redirects.contains("/posts/two /posts/two/ 308"));
+        assert!(!redirects.contains("/css /css/ 308"));
+
+        fs::remove_dir_all(out_dir).expect("failed to remove temp export dir");
     }
 }

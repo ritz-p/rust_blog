@@ -12,13 +12,25 @@ use crate::{
     utils::{config::CommonConfig, cut_out_string, markdown::markdown_to_text, utc_to_jst},
 };
 
-fn build_index_url(page: u64, per: u64, period: Option<ArticlePeriod>) -> String {
-    match period {
-        Some(period) => format!(
+#[derive(Clone, Copy)]
+enum IndexUrlMode {
+    Query,
+    Archive,
+}
+
+fn build_index_url(page: u64, per: u64, period: Option<ArticlePeriod>, mode: IndexUrlMode) -> String {
+    match (mode, period) {
+        (IndexUrlMode::Archive, Some(period)) if page <= 1 => {
+            format!("/archive/{}/{:02}", period.year, period.month)
+        }
+        (IndexUrlMode::Archive, Some(period)) => {
+            format!("/archive/{}/{:02}/page/{page}", period.year, period.month)
+        }
+        (_, Some(period)) => format!(
             "/?page={page}&per={per}&year={}&month={}",
             period.year, period.month
         ),
-        None => format!("/?page={page}&per={per}"),
+        _ => format!("/?page={page}&per={per}"),
     }
 }
 
@@ -28,6 +40,48 @@ pub async fn index(
     db: &State<DatabaseConnection>,
     query: Option<IndexQuery>,
 ) -> Result<Template, Status> {
+    render_index(config, db, query, IndexUrlMode::Query).await
+}
+
+#[get("/archive/<year>/<month>")]
+pub async fn index_archive(
+    config: &State<CommonConfig>,
+    db: &State<DatabaseConnection>,
+    year: i32,
+    month: u32,
+) -> Result<Template, Status> {
+    let query = IndexQuery {
+        page: None,
+        per: None,
+        year: Some(year),
+        month: Some(month),
+    };
+    render_index(config, db, Some(query), IndexUrlMode::Archive).await
+}
+
+#[get("/archive/<year>/<month>/page/<page>")]
+pub async fn index_archive_page(
+    config: &State<CommonConfig>,
+    db: &State<DatabaseConnection>,
+    year: i32,
+    month: u32,
+    page: u64,
+) -> Result<Template, Status> {
+    let query = IndexQuery {
+        page: Some(page),
+        per: None,
+        year: Some(year),
+        month: Some(month),
+    };
+    render_index(config, db, Some(query), IndexUrlMode::Archive).await
+}
+
+async fn render_index(
+    config: &State<CommonConfig>,
+    db: &State<DatabaseConnection>,
+    query: Option<IndexQuery>,
+    mode: IndexUrlMode,
+) -> Result<Template, Status> {
     let query = query.unwrap_or(IndexQuery::new());
     let page = Page::new_from_query(&query);
     let has_period_query = query.year.is_some() || query.month.is_some();
@@ -35,6 +89,9 @@ pub async fn index(
         (Some(year), Some(month)) => ArticlePeriod::new(year, month),
         _ => None,
     };
+    if matches!(mode, IndexUrlMode::Archive) && has_period_query && selected_period.is_none() {
+        return Err(Status::NotFound);
+    }
     let (models, page_info) = if has_period_query && selected_period.is_none() {
         (Vec::new(), PageInfo::new(page.normalize(50), 0))
     } else {
@@ -43,12 +100,12 @@ pub async fn index(
             .map_err(|_| Status::InternalServerError)?
     };
     let prev_url = if page_info.has_prev {
-        build_index_url(page_info.prev_page, page_info.per, selected_period)
+        build_index_url(page_info.prev_page, page_info.per, selected_period, mode)
     } else {
         String::new()
     };
     let next_url = if page_info.has_next {
-        build_index_url(page_info.next_page, page_info.per, selected_period)
+        build_index_url(page_info.next_page, page_info.per, selected_period, mode)
     } else {
         String::new()
     };
@@ -61,7 +118,7 @@ pub async fn index(
         .map(|period| {
             json!({
                 "label": format!("{}/{:02}", period.year, period.month),
-                "href": format!("/?year={}&month={}", period.year, period.month),
+                "href": build_index_url(1, page.per, Some(*period), IndexUrlMode::Archive),
                 "is_selected": selected_period == Some(*period),
             })
         })
@@ -73,13 +130,15 @@ pub async fn index(
                 Some(value) => value.clone(),
                 None => cut_out_string(&markdown_to_text(&m.content), 100),
             };
+            let slug = m.slug;
             let icatch_path = m
                 .icatch_path
                 .clone()
                 .unwrap_or_else(|| default_icatch_path.clone());
             json!({
                 "title":      m.title,
-                "slug":       m.slug,
+                "slug":       slug.clone(),
+                "url":        format!("/posts/{slug}"),
                 "excerpt":    excerpt,
                 "icatch_path": icatch_path,
                 "created_at": utc_to_jst(m.created_at),
@@ -93,6 +152,9 @@ pub async fn index(
         context! {
             site_name: &config.site_name,
             favicon_path: &config.favicon_path,
+            tags_url: "/tags",
+            categories_url: "/categories",
+            about_url: "/about",
             articles:  articles,
             page: page_info.current_page,
             per: page_info.per,
@@ -111,7 +173,7 @@ pub async fn index(
 
 #[cfg(test)]
 mod tests {
-    use super::index;
+    use super::{index, index_archive, index_archive_page};
     use crate::utils::config::CommonConfig;
     use rocket::http::Status;
     use rocket::local::asynchronous::Client;
@@ -128,7 +190,7 @@ mod tests {
                     favicon_path: Some("/favicon.ico".to_string()),
                 })
                 .attach(Template::fairing())
-                .mount("/", routes![index]);
+                .mount("/", routes![index, index_archive, index_archive_page]);
         Client::tracked(rocket)
             .await
             .expect("failed to build client")
@@ -175,6 +237,39 @@ mod tests {
         assert!(body.contains("Dec 2"));
         assert!(!body.contains("Nov 1"));
         assert!(!body.contains("Future"));
+    }
+
+    #[rocket::async_test]
+    async fn index_uses_server_urls_instead_of_static_archive_urls() {
+        let db = prepare_index_db().await;
+        let client = client_with_db(db).await;
+
+        let response = client.get("/").dispatch().await;
+        assert_eq!(response.status(), Status::Ok);
+        let body = response
+            .into_string()
+            .await
+            .expect("response body should exist");
+
+        assert!(body.contains("&#x2F;archive&#x2F;"));
+        assert!(!body.contains("/?year="));
+    }
+
+    #[rocket::async_test]
+    async fn archive_route_filters_articles_by_year_and_month() {
+        let db = prepare_index_db().await;
+        let client = client_with_db(db).await;
+
+        let response = client.get("/archive/2025/12").dispatch().await;
+        assert_eq!(response.status(), Status::Ok);
+        let body = response
+            .into_string()
+            .await
+            .expect("response body should exist");
+
+        assert!(body.contains("Dec 1"));
+        assert!(body.contains("Dec 2"));
+        assert!(!body.contains("Nov 1"));
     }
 
     #[rocket::async_test]
