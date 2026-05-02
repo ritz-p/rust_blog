@@ -35,9 +35,16 @@ jobs:
           cp blog_config.toml "${BUNDLE_DIR}/blog_config.toml"
           cp -R templates/. "${BUNDLE_DIR}/templates/"
 
+      - name: Package export bundle
+        shell: bash
+        run: |
+          cd artifact
+          tar -czf "rust-blog-export-tools-${{ github.ref_name }}-x86_64-unknown-linux-gnu.tar.gz" \
+            "rust-blog-export-tools-${{ github.ref_name }}-x86_64-unknown-linux-gnu"
+
       - name: Upload export bundle
         uses: actions/upload-artifact@v6
         with:
           name: rust-blog-export-tools-${{ github.ref_name }}-x86_64-unknown-linux-gnu
-          path: artifact/rust-blog-export-tools-${{ github.ref_name }}-x86_64-unknown-linux-gnu
+          path: artifact/rust-blog-export-tools-${{ github.ref_name }}-x86_64-unknown-linux-gnu.tar.gz
           if-no-files-found: error
