@@ -37,7 +37,11 @@ impl CommonConfigMap {
 }
 
 pub fn load_config() -> HashMap<String, String> {
-    load_config_from_path("blog_config.toml")
+    load_config_from_file("blog_config.toml")
+}
+
+pub fn load_config_from_file(toml_path: impl AsRef<Path>) -> HashMap<String, String> {
+    load_config_from_path(toml_path.as_ref().to_string_lossy().as_ref())
 }
 
 fn with_defaults(mut map: HashMap<String, String>) -> HashMap<String, String> {

@@ -1,0 +1,50 @@
+name: Export Tool Build
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build-export-tool:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+
+      - name: Build export tools
+        run: |
+          cargo build --release --target x86_64-unknown-linux-gnu -p rust_blog --bin export
+          cargo build --release --target x86_64-unknown-linux-gnu -p migration --bin migration
+
+      - name: Assemble export bundle
+        shell: bash
+        run: |
+          BUNDLE_DIR="artifact/rust-blog-export-tools-${{ github.ref_name }}-x86_64-unknown-linux-gnu"
+          mkdir -p "${BUNDLE_DIR}/templates"
+          cp target/x86_64-unknown-linux-gnu/release/export "${BUNDLE_DIR}/export"
+          cp target/x86_64-unknown-linux-gnu/release/migration "${BUNDLE_DIR}/migration"
+          cp blog_config.toml "${BUNDLE_DIR}/blog_config.toml"
+          cp -R templates/. "${BUNDLE_DIR}/templates/"
+
+      - name: Package export bundle
+        shell: bash
+        run: |
+          cd artifact
+          tar -czf "rust-blog-export-tools-${{ github.ref_name }}-x86_64-unknown-linux-gnu.tar.gz" \
+            "rust-blog-export-tools-${{ github.ref_name }}-x86_64-unknown-linux-gnu"
+
+      - name: Upload export bundle
+        uses: actions/upload-artifact@v6
+        with:
+          name: rust-blog-export-tools-${{ github.ref_name }}-x86_64-unknown-linux-gnu
+          path: artifact/rust-blog-export-tools-${{ github.ref_name }}-x86_64-unknown-linux-gnu.tar.gz
+          if-no-files-found: error
