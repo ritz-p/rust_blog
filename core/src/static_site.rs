@@ -34,21 +34,28 @@ const BULMA_CSS: &[u8] = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/as
 const SITE_CSS: &[u8] = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/site.css"));
 const NAV_JS: &[u8] = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/nav.js"));
 
+#[derive(Debug, Clone)]
+pub struct ExportPaths {
+    pub templates_dir: PathBuf,
+    pub content_dir: PathBuf,
+}
+
 pub async fn export_site(
     db: &DatabaseConnection,
     config_map: &HashMap<String, String>,
     out_dir: impl AsRef<Path>,
+    paths: &ExportPaths,
 ) -> Result<()> {
     let out_dir = out_dir.as_ref();
     reset_output_dir(out_dir)?;
-    write_static_assets(out_dir)?;
+    write_static_assets(out_dir, &paths.content_dir)?;
 
     let config = CommonConfig {
         site_name: config_map.get("site_name").cloned(),
         default_icatch_path: config_map.get("default_icatch_path").cloned(),
         favicon_path: config_map.get("favicon_path").cloned(),
     };
-    let tera = load_templates(Path::new("templates"))?;
+    let tera = load_templates(&paths.templates_dir)?;
 
     export_index_pages(&tera, db, &config, out_dir).await?;
     export_article_pages(&tera, db, &config, out_dir).await?;
@@ -560,12 +567,12 @@ fn reset_output_dir(out_dir: &Path) -> Result<()> {
     Ok(())
 }
 
-fn write_static_assets(out_dir: &Path) -> Result<()> {
+fn write_static_assets(out_dir: &Path, content_dir: &Path) -> Result<()> {
     write_embedded_asset_file(out_dir.join("css/bulma.min.css"), BULMA_CSS)?;
     write_embedded_asset_file(out_dir.join("css/site.css"), SITE_CSS)?;
     write_embedded_asset_file(out_dir.join("js/nav.js"), NAV_JS)?;
-    copy_dir_recursive(Path::new("content/image"), &out_dir.join("image"))?;
-    copy_dir_recursive(Path::new("content/icon"), &out_dir.join("icon"))?;
+    copy_dir_recursive(&content_dir.join("image"), &out_dir.join("image"))?;
+    copy_dir_recursive(&content_dir.join("icon"), &out_dir.join("icon"))?;
     Ok(())
 }
 

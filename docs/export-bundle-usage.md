@@ -52,6 +52,17 @@ your-static-site-repo/
 
 `content/` は bundle に含まれません。必要なら別リポジトリ側で管理します。
 
+## パス解決ルール
+
+`export` は次の環境変数で参照先を上書きできます。
+
+- `RUST_BLOG_CONFIG_PATH`
+- `RUST_BLOG_TEMPLATES_DIR`
+- `RUST_BLOG_CONTENT_DIR`
+
+未指定時は、まず現在の作業ディレクトリを見て、見つからなければ `export` バイナリの配置ディレクトリを見ます。  
+別リポジトリで `content/` を bundle の外に置く場合は、`RUST_BLOG_CONTENT_DIR` を設定してください。
+
 ## 最小手順
 
 1. 対象リリースの CI artifact を取得して展開する
@@ -67,6 +78,7 @@ mkdir -p tools
 tar -xzf rust-blog-export-tools-v0.1.0-x86_64-unknown-linux-gnu.tar.gz -C tools
 cd tools/rust-blog-export-tools-v0.1.0-x86_64-unknown-linux-gnu
 export DATABASE_URL="sqlite://../../blog.db?mode=rwc"
+export RUST_BLOG_CONTENT_DIR="../../content"
 ./migration up
 ./export ../../dist
 ```
@@ -83,6 +95,7 @@ mkdir -p tools
 tar -xzf rust-blog-export-tools-v0.1.0-x86_64-unknown-linux-gnu.tar.gz -C tools
 cd tools/rust-blog-export-tools-v0.1.0-x86_64-unknown-linux-gnu
 export DATABASE_URL="sqlite://../../blog.db?mode=rwc"
+export RUST_BLOG_CONTENT_DIR="../../content"
 ./migration up
 ./export ../../dist
 ```
@@ -128,7 +141,7 @@ export DATABASE_URL="sqlite://../../blog.db?mode=rwc"
 - `export` は `templates/` を実行時に読む
 - `blog_config.toml` も実行時に読む
 - `content/image` と `content/icon` は bundle に含まれない
-- 画像や icon が必要なら、別リポジトリ側で `content/image` と `content/icon` を用意する
+- 画像や icon が必要なら、別リポジトリ側で `content/image` と `content/icon` を用意し、必要に応じて `RUST_BLOG_CONTENT_DIR` を設定する
 
 ## 将来の改善候補
 
