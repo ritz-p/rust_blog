@@ -39,7 +39,9 @@ run_migration() {
 
 case "${1:-server}" in
   server)
-    shift
+    if [ "$#" -gt 0 ]; then
+      shift
+    fi
     run_server "$@"
     ;;
   export)

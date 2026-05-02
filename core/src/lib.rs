@@ -7,4 +7,3 @@ pub mod seed;
 pub mod slug_config;
 pub mod static_site;
 pub mod utils;
-pub mod view;
