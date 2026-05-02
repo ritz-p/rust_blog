@@ -25,6 +25,9 @@ run_server() {
 
 run_export() {
   out_dir="${1:-dist}"
+  echo "==> Running migrations"
+  /app/migration up
+
   echo "==> Exporting static site to ${out_dir}"
   exec /app/export "$out_dir"
 }
