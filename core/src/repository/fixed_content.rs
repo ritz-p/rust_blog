@@ -1,5 +1,14 @@
 use crate::entity::fixed_content;
-use sea_orm::{ColumnTrait, DatabaseConnection, DbErr, EntityTrait, QueryFilter};
+use sea_orm::{ColumnTrait, DatabaseConnection, DbErr, EntityTrait, QueryFilter, QueryOrder};
+
+// Used by the static export pipeline in the library target.
+#[allow(dead_code)]
+pub async fn get_all_fixed_contents(db: &DatabaseConnection) -> Result<Vec<fixed_content::Model>, DbErr> {
+    fixed_content::Entity::find()
+        .order_by_asc(fixed_content::Column::Slug)
+        .all(db)
+        .await
+}
 
 pub async fn get_fixed_content_by_slug(
     db: &DatabaseConnection,

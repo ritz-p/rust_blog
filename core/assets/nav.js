@@ -10,4 +10,16 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   });
+
+  const periodFilter = document.querySelector('[data-period-filter]');
+  if (periodFilter) {
+    periodFilter.addEventListener('change', (event) => {
+      const select = event.currentTarget;
+      const option = select.options[select.selectedIndex];
+      const href = option ? option.dataset.href : '';
+      if (href) {
+        window.location.assign(href);
+      }
+    });
+  }
 });

@@ -41,9 +41,11 @@ pub async fn fixed_content_detail(
         .map_err(|_| Status::InternalServerError)?
         .into_iter()
         .map(|model| {
+            let slug = model.slug;
             json!({
                 "title":      model.title,
-                "slug":       model.slug,
+                "slug":       slug.clone(),
+                "url":        format!("/posts/{slug}"),
             })
         })
         .collect();
@@ -53,6 +55,9 @@ pub async fn fixed_content_detail(
         context! {
             site_name: &config.site_name,
             favicon_path: &config.favicon_path,
+            tags_url: "/tags",
+            categories_url: "/categories",
+            about_url: "/about",
             title: fixed_content.title,
             excerpt: excerpt,
             content_html: content,

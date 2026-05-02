@@ -8,10 +8,10 @@
   <div class="mb-5">
     <p class="is-size-7 has-text-grey mb-2">時期別</p>
     <div class="select is-small">
-      <select aria-label="時期別フィルタ" onchange="if (this.value) window.location.href = this.value;">
-        <option value="/" {% if not selected_period %}selected{% endif %}>すべて</option>
+      <select aria-label="時期別フィルタ" data-period-filter>
+        <option data-href="/" {% if not selected_period %}selected{% endif %}>すべて</option>
         {% for period in period_links %}
-          <option value="{{ period.href }}" {% if period.is_selected %}selected{% endif %}>
+          <option data-href="{{ period.href }}" {% if period.is_selected %}selected{% endif %}>
             {{ period.label }}
           </option>
         {% endfor %}
@@ -34,7 +34,7 @@
         {% endif %}
         <div class="column">
           <h2 class="title is-4">
-            <a href="/posts/{{ article.slug }}">{{ article.title }}</a>
+            <a href="{{ article.url }}">{{ article.title }}</a>
           </h2>
           <p class="is-size-7 has-text-grey mb-3">{{ article.created_at }}</p>
 
@@ -46,7 +46,7 @@
             <div class="is-size-7 has-text-weight-semibold has-text-grey">Categories</div>
             <div class="tags mt-1">
               {% for category in article.categories %}
-                <a class="tag is-info is-light" href="/category/{{ category.slug }}">{{ category.name }}</a>
+                <a class="tag is-info is-light" href="{{ category.url }}">{{ category.name }}</a>
               {% endfor %}
             </div>
           </div>
@@ -57,7 +57,7 @@
             <div class="is-size-7 has-text-weight-semibold has-text-grey">Tags</div>
             <div class="tags mt-1">
               {% for tag in article.tags %}
-                <a class="tag is-light" href="/tag/{{ tag.slug }}">#{{ tag.name }}</a>
+                <a class="tag is-light" href="{{ tag.url }}">#{{ tag.name }}</a>
               {% endfor %}
             </div>
           </div>

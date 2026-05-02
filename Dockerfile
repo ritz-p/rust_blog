@@ -4,6 +4,7 @@ WORKDIR /workspace/rust_blog
 ENV CARGO_HOME=/home/vscode/.cargo
 ENV RUSTUP_HOME=/home/vscode/.rustup
 ENV CARGO_TARGET_DIR=/home/vscode/.cargo/target
+COPY --chmod=755 docker/dev-entrypoint.sh /usr/local/bin/dev-entrypoint.sh
 RUN mkdir -p /home/vscode/.cargo /home/vscode/.cargo/target /home/vscode/.rustup && chown -R 1000:1000 /home/vscode/.cargo /home/vscode/.rustup
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
@@ -31,3 +32,6 @@ EXPOSE 8888
 ENV RUST_BACKTRACE=1
 RUN echo 'alias seaorm="sea-orm-cli"' >> /home/${USERNAME}/.bashrc
 USER ${USERNAME}
+
+ENTRYPOINT ["/usr/local/bin/dev-entrypoint.sh"]
+CMD ["sleep"]

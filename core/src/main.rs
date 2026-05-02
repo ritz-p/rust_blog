@@ -7,7 +7,6 @@ mod entity_extension;
 mod repository;
 mod route;
 mod utils;
-mod view;
 use sea_orm::{Database, DatabaseConnection};
 
 use crate::{route::launch, utils::config::load_config};

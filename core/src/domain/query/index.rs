@@ -1,3 +1,5 @@
+use rocket::FromForm;
+
 use crate::domain::query::PagingQuery;
 
 #[derive(FromForm, Debug, Clone, Copy)]

@@ -1,151 +1,321 @@
 # Cloudflare Deployment Guide
 
-このブログを Cloudflare で動かすときは、まず「どこまでを Cloudflare に任せるか」を決める必要があります。
+このドキュメントは、`Cloudflare のサービスだけで完結して公開する` 前提でまとめています。
 
-現状のアプリは以下の構成です。
+結論から言うと、今の `Rocket + SeaORM + SQLite ファイル` を `prod/Dockerfile` のまま Cloudflare に置く手順ではありません。Cloudflare 完結で本番運用するなら、実際の着地点は次です。
 
-- Rust + Rocket の常駐サーバー
-- SeaORM
-- SQLite
-- Markdown を seed して DB に投入
-
-そのため、Cloudflare Workers / Pages にそのまま載せることはできません。Rocket サーバーを起動し続ける前提の実装だからです。
+- 配信: Cloudflare Workers Static Assets
+- 動的処理: Cloudflare Workers
+- データ: Cloudflare D1
+- 画像などの大きなファイルが増えるなら: Cloudflare R2
 
 ## 結論
 
-このリポジトリに対して現実的な選択肢は次の 3 つです。
+このリポジトリを Cloudflare 完結で出す場合、公開手順は次の 2 段階になります。
 
-### 1. いちばん早い: アプリは別のコンテナ基盤で動かし、Cloudflare は DNS / CDN / WAF に使う
+1. アプリを Cloudflare 向けの構成へ寄せる
+2. Workers + D1 へデプロイする
 
-おすすめ度: 高
+いまのままの Docker イメージをそのまま本番に載せる方式は、Cloudflare 完結の本命ではありません。
 
-向いているケース:
+理由は単純で、今の構成は次を前提にしているからです。
 
-- まずは今のコードをほぼそのまま公開したい
-- Rocket を維持したい
-- SQLite か別 DB をそのまま使いたい
+- Rocket の常駐 HTTP サーバー
+- SQLite ファイルを直接開く運用
+- 起動時 migration
+- Markdown を DB に seed してから配信
 
-構成イメージ:
+Cloudflare 側で素直に運用したいなら、`SQLite ファイル` ではなく `D1` を使う前提へ寄せる必要があります。
 
-- アプリ本体: Fly.io / Render / Railway / VPS / ECS など
-- 公開ドメイン: Cloudflare DNS
-- HTTPS / CDN / WAF: Cloudflare Proxy
+## なぜこの形になるか
 
-この方式なら、このアプリの変更は最小限ですみます。
+### Workers / Static Assets は相性が良い
 
-必要な作業:
+Cloudflare Workers は動的処理を持てて、Static Assets は HTML / CSS / JS / 画像の配信をまとめて扱えます。
 
-1. コンテナで `cargo run -p rust_blog` ではなく release バイナリを起動する
-2. `DATABASE_URL` を本番環境向けに設定する
-3. `blog.db` を永続ボリュームに置く
-4. Cloudflare 側で対象ホスト名を Proxy 有効で向ける
+このブログ用途なら、次の分離がいちばん自然です。
 
-注意点:
+- 記事ページや一覧ページの HTML は Workers が返す
+- 画像や favicon は Static Assets か R2 から返す
+- 記事、タグ、カテゴリなどのデータは D1 に置く
 
-- SQLite を使い続ける場合は、単一インスタンス運用が基本です
-- 複数台構成やスケールアウトには向きません
+### Containers は今回の本命にしない
 
-### 2. Cloudflare らしく運用する: 静的サイトにして Cloudflare Pages へ載せる
+Cloudflare Containers は既存コンテナを動かせますが、2026-05-01 時点では Beta です。さらに、公式 FAQ ではディスクは ephemeral で、sleep 後の再起動時は fresh disk になると案内されています。
 
-おすすめ度: 高
+つまり、今の `SQLite をコンテナ内ファイルとして持つ` 運用は、そのままでは本番の永続データ置き場になりません。
 
-向いているケース:
+そのため、Cloudflare 完結の本筋は `Workers + D1` です。
 
-- ブログが基本的に読み取り専用
-- 更新はビルド時反映でよい
-- 一番安定してシンプルに運用したい
+## このリポジトリで必要な変更
 
-構成イメージ:
+Cloudflare 完結にするには、少なくとも次の変更が必要です。
 
-- Markdown から HTML をビルド
-- 生成した静的ファイルを Cloudflare Pages に配置
-- 画像や CSS / JS も静的配信
+### 1. Rocket 常駐サーバー前提をやめる
 
-このブログは記事ソースが `content/articles/*.md` にあるので、長期的にはこの形がかなり相性がよいです。
+今は `core/src/main.rs` で Rocket を起動していますが、Workers では `fetch(request, env)` で応答する形に寄せる必要があります。
 
-ただし現状は「Markdown -> SQLite に seed -> Rocket が HTML を返す」構成なので、以下のどちらかの対応が必要です。
+対応方針:
 
-- 静的 HTML を吐くビルドコマンドを新しく作る
-- 別の静的サイトジェネレーター構成へ寄せる
+- ルーティングを Workers 側へ移す
+- HTML 生成ロジックは再利用できる形に切り出す
+- HTTP サーバー起動前提のコードを減らす
 
-必要な実装の方向:
+### 2. SQLite ファイル前提をやめる
 
-1. ルーティングごとの HTML を事前生成する export コマンドを作る
-2. `/`, `/posts/<slug>`, `/tags`, `/tag/<slug>`, `/categories`, `/category/<slug>` を出力する
-3. CSS / JS / 画像を `dist/` にまとめる
-4. Cloudflare Pages のビルド成果物を `dist` にする
+今の `DATABASE_URL=sqlite://...` 前提をやめて、D1 を使う設計に寄せます。
 
-### 3. Cloudflare に全部寄せる: Workers + D1 へ作り替える
+対応方針:
 
-おすすめ度: 中
+- SeaORM の利用継続可否を検討する
+- 難しければ D1 へ直接 SQL を投げる層を作る
+- migration は D1 向け SQL として管理する
 
-向いているケース:
+### 3. seed を D1 向けに変える
 
-- Cloudflare に統一したい
-- サーバーレス運用に寄せたい
-- 実装変更コストを受け入れられる
+今の seed は SQLite に対して実行する作りです。Cloudflare 完結にするなら、Markdown から D1 へ投入する流れに変える必要があります。
 
-必要な変更:
+対応方針:
 
-- Rocket をやめて Workers 向け実装に置き換える
-- SQLite ファイル直置きをやめて D1 などへ移行する
-- ルーティング、テンプレート描画、DB アクセスを Workers 前提で再設計する
+- `content/articles/*.md` を読む処理は流用する
+- 出力先を SQLite ファイルではなく D1 にする
+- 初回投入用コマンドを `wrangler d1 execute` または seed 用 Worker / スクリプトに寄せる
 
-これは「デプロイ設定の追加」で済まず、アプリ構成の変更になります。
+### 4. 画像や静的ファイルの置き場を整理する
 
-## このリポジトリに対するおすすめ
+現状 `content/image` や `content/icon` をアプリに同梱しています。Cloudflare 完結なら次のどちらかです。
 
-優先度順では次のどちらかです。
+- 配布物に含めて Static Assets から配信する
+- 運用上分けたいなら R2 に置く
 
-### まず公開したいなら
+## 推奨アーキテクチャ
 
-Cloudflare はフロントに使い、アプリ本体はコンテナ対応のホスティングへ出すのが最短です。
+Cloudflare 完結で現実的なのは次の構成です。
 
-### Cloudflare に綺麗に載せたいなら
+- `Worker`
+  - `/`
+  - `/posts/:slug`
+  - `/tags`
+  - `/tag/:slug`
+  - `/categories`
+  - `/category/:slug`
+- `D1`
+  - articles
+  - tags
+  - categories
+  - relation tables
+- `Static Assets`
+  - CSS
+  - JS
+  - favicon
+  - 固定画像
 
-Rocket アプリのまま無理に Workers へ載せるより、静的出力を追加して Cloudflare Pages に置く方が相性がよいです。
+記事本文が D1 に入り、Worker が HTML を返す構成です。
 
-ブログ用途なら、この方が運用コストもかなり低くなります。
+## 実際の手順
 
-## 具体的な進め方
+### 1. Cloudflare アカウントと Workers Paid plan を用意する
 
-### 最短公開ルート
+今回の前提では次を使う想定です。
 
-1. 本番用 Dockerfile を用意する
-2. `cargo build --release -p rust_blog` でビルドする
-3. `DATABASE_URL=sqlite:///data/blog.db` のように永続領域を使う
-4. デプロイ先で `./target/release/rust_blog` を起動する
-5. Cloudflare DNS でドメインを向ける
-6. Cloudflare Proxy, TLS, Cache Rules を有効化する
+- Workers
+- D1
+- 必要なら R2
 
-### Pages へ寄せるルート
+Containers を検証用途で使うなら Workers Paid plan が必要です。Workers + D1 本体でも、商用運用前提なら Paid plan を前提にした方がよいです。
 
-1. `export` 用の Rust バイナリを追加する
-2. Markdown / SQLite / テンプレートから静的 HTML を出力する
-3. 出力先を `dist/` に統一する
-4. Cloudflare Pages の Build command を export コマンドにする
-5. Output directory を `dist` にする
+### 2. Workers プロジェクトを追加する
 
-## 今のまま Cloudflare Workers に載らない理由
+このリポジトリに Cloudflare 向けのアプリ層を追加します。
 
-- Rocket は常駐 HTTP サーバー前提
-- `main` で DB 接続を張って Rocket を起動している
-- SQLite ファイル運用を前提にしている
-- Cloudflare Pages は静的配信向け
-- Workers はリクエストハンドラ型の実装に寄せる必要がある
+最低限必要なもの:
 
-## 参考にした Cloudflare 公式ドキュメント
+- `wrangler.toml`
+- Worker エントリポイント
+- D1 binding
+- Static Assets の出力先
+
+設定イメージ:
+
+```toml
+name = "rust-blog"
+main = "worker/index.js"
+compatibility_date = "2026-05-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "rust-blog-db"
+database_id = "REPLACE_WITH_REAL_ID"
+
+[assets]
+directory = "./dist"
+binding = "ASSETS"
+```
+
+ここでの `dist` は、静的ファイルの配置先です。HTML をすべて静的化する想定ではなくても、画像や CSS の置き場として使えます。
+
+### 3. D1 データベースを作る
+
+Cloudflare 側で D1 を作成します。
+
+例:
+
+```bash
+wrangler d1 create rust-blog-db
+```
+
+作成後に返る `database_id` を `wrangler.toml` に反映します。
+
+### 4. schema を D1 用に作る
+
+今の migration をそのまま流すのではなく、D1 で実行する SQL を整理します。
+
+手順:
+
+1. 現在のテーブル定義を確認する
+2. D1 向けの `schema.sql` を作る
+3. ローカル D1 かリモート D1 に適用する
+
+適用例:
+
+```bash
+wrangler d1 execute rust-blog-db --file=./cloudflare/schema.sql
+```
+
+### 5. seed 手順を D1 向けに作る
+
+初回データ投入は必須です。ブログは Markdown から記事を読み込む構成なので、次のどちらかに寄せます。
+
+- Rust の seed ロジックを D1 書き込み対応に変える
+- D1 へ投入する JSON / SQL を生成して `wrangler d1 execute` で流し込む
+
+運用として分かりやすいのは次です。
+
+1. Markdown を読む
+2. front matter を解釈する
+3. 記事、タグ、カテゴリを SQL か JSON に落とす
+4. D1 に投入する
+
+### 6. HTML 生成を Worker に寄せる
+
+ページ描画は次のどちらかです。
+
+- Worker が毎回 D1 を読んで HTML を返す
+- 更新時に一部ページを事前生成して Static Assets に寄せる
+
+まずはシンプルに、Worker が D1 を読んで HTML を返す形でよいです。
+
+必要な処理:
+
+- index 一覧取得
+- slug から記事取得
+- tag / category 一覧取得
+- Askama 相当のテンプレート描画方法を決める
+
+Rust のテンプレート資産を残したい場合は、Cloudflare 向け Rust 実装に寄せる追加作業が必要です。最短では Worker 側を TypeScript / JavaScript で切り出す方が単純です。
+
+### 7. 静的ファイルを `dist` に集める
+
+少なくとも次を `dist` に置きます。
+
+- favicon
+- `/image/*`
+- `/icon/*`
+- CSS
+- 必要な JS
+
+Cloudflare Workers Static Assets を使うと、これらは Cloudflare 側でキャッシュ配信されます。
+
+### 8. ローカルで Workers と D1 を確認する
+
+デプロイ前にローカル確認します。
+
+```bash
+wrangler dev
+```
+
+確認項目:
+
+- `/` が表示できる
+- 記事詳細が slug で引ける
+- タグ、カテゴリの一覧が取れる
+- 画像や favicon が読める
+
+### 9. Cloudflare にデプロイする
+
+デプロイは `wrangler deploy` を使います。
+
+```bash
+wrangler deploy
+```
+
+Static Assets も Worker も同時に Cloudflare へ反映されます。
+
+### 10. カスタムドメインをつなぐ
+
+Cloudflare 側で Workers の route か custom domain を設定します。
+
+例:
+
+- `example.com/*`
+- `www.example.com/*`
+
+同じ Cloudflare アカウント内で完結するため、DNS, TLS, CDN, WAF もそのまま Cloudflare 上で管理できます。
+
+### 11. 本番確認をする
+
+確認項目:
+
+- `/` が 200
+- `/posts/<slug>` が 200
+- タグ、カテゴリ一覧が引ける
+- 画像が 404 にならない
+- D1 へ期待通りデータが入っている
+- Cloudflare のキャッシュやルーティングが意図通り
+
+## 更新手順
+
+記事更新の流れは次です。
+
+1. `content/articles` を更新する
+2. seed を再実行して D1 を更新する
+3. 必要なら静的ファイルを再ビルドする
+4. `wrangler deploy` で再反映する
+
+画像だけ差し替えるなら Static Assets 側だけの更新で済む場合もあります。
+
+## Containers を使う案
+
+Cloudflare 完結という意味では、Containers を使って既存 Docker イメージを Cloudflare 上で動かす案もあります。
+
+ただし、2026-05-01 時点では次の理由でこのブログの本番構成としては弱いです。
+
+- Beta
+- ディスクが永続ではない
+- SQLite ファイルをそのまま本番データにしづらい
+
+そのため、このリポジトリでは Containers は次の用途までに留めるのが妥当です。
+
+- 一時的な移行検証
+- 既存 Rocket 実装の動作確認
+- 本番移行前の段階的検証
+
+## このリポジトリに対する実務上のすすめ方
+
+Cloudflare 完結を本当に目指すなら、順番は次です。
+
+1. D1 schema を作る
+2. Markdown seed を D1 向けに作り替える
+3. Worker ルーティングを実装する
+4. Static Assets 配信へ寄せる
+5. `wrangler deploy` で本番化する
+
+つまり、`デプロイ手順の変更` だけではなく、`Cloudflare 向けの実装変更` が先に必要です。
+
+## 参考
 
 - Workers overview: <https://developers.cloudflare.com/workers/>
-- Pages overview: <https://developers.cloudflare.com/pages/>
+- Static Assets: <https://developers.cloudflare.com/workers/static-assets/>
 - D1 overview: <https://developers.cloudflare.com/d1/>
 - Containers overview: <https://developers.cloudflare.com/containers/>
-
-## 次にやるとよいこと
-
-このリポジトリなら、次のどちらかを選ぶのがおすすめです。
-
-- すぐ公開したい: 本番用 Dockerfile とデプロイ設定を追加する
-- Cloudflare にきれいに載せたい: 静的 export 機能を追加する
-
-後者を選ぶなら、このブログ向けに `dist/` を生成する export コマンドまで実装できます。
+- Containers FAQ: <https://developers.cloudflare.com/containers/beta-info/>

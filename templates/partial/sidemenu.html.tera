@@ -7,7 +7,7 @@
             {% for latest_article in latest_articles %}
             <li>
                 <a
-                href="/posts/{{ latest_article.slug }}"
+                href="{{ latest_article.url }}"
                 >
                 {{ latest_article.title }}
                 </a>

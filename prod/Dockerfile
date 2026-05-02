@@ -19,6 +19,7 @@ COPY content/image content/image
 COPY content/icon content/icon
 
 RUN cargo build --release -p rust_blog --bin rust_blog && \
+    cargo build --release -p rust_blog --bin export && \
     cargo build --release -p migration --bin migration
 
 FROM debian:bookworm-slim
@@ -26,10 +27,11 @@ FROM debian:bookworm-slim
 WORKDIR /app
 
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends sqlite3 ca-certificates && \
+    apt-get install -y --no-install-recommends sqlite3 ca-certificates bash && \
     rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /app/target/release/rust_blog /app/rust_blog
+COPY --from=builder /app/target/release/export /app/export
 COPY --from=builder /app/target/release/migration /app/migration
 COPY --from=builder /app/templates /app/templates
 COPY --from=builder /app/content /app/content
@@ -47,3 +49,4 @@ ENV DB_PATH=/data/blog.db
 EXPOSE 8080
 
 ENTRYPOINT ["/app/entrypoint.sh"]
+CMD ["server"]

@@ -12,6 +12,10 @@ use crate::{
     utils::{config::CommonConfig, cut_out_string, markdown::markdown_to_text, utc_to_jst},
 };
 
+fn sort_url(slug: &str, sort_key: &str) -> String {
+    format!("/tag/{slug}?sort_key={sort_key}")
+}
+
 #[get("/tags")]
 pub async fn tag_list(
     config: &State<CommonConfig>,
@@ -23,8 +27,11 @@ pub async fn tag_list(
     let tags = models
         .iter()
         .map(|tag| {
+            let slug = tag.slug.clone();
             json!({
-                "name": tag.name.clone(),"slug": tag.slug.clone()
+                "name": tag.name.clone(),
+                "slug": slug.clone(),
+                "url": format!("/tag/{slug}")
             })
         })
         .collect::<Vec<_>>();
@@ -33,6 +40,9 @@ pub async fn tag_list(
         context! {
             site_name: &config.site_name,
             favicon_path: &config.favicon_path,
+            tags_url: "/tags",
+            categories_url: "/categories",
+            about_url: "/about",
             tags
         },
     ))
@@ -59,8 +69,13 @@ pub async fn tag_detail(
                 context! {
                     site_name: &config.site_name,
                     favicon_path: &config.favicon_path,
+                    tags_url: "/tags",
+                    categories_url: "/categories",
+                    about_url: "/about",
                     tag_slug: slug,
                     sort_key: sort_key,
+                    sort_created_url: sort_url(slug, "created_at"),
+                    sort_updated_url: sort_url(slug, "updated_at"),
                     articles: articles.iter().map(|article| {
                         let icatch_path = article
                             .icatch_path
@@ -70,9 +85,11 @@ pub async fn tag_detail(
                             Some(value) => value.clone(),
                             None => cut_out_string(&markdown_to_text(&article.content), 100),
                         };
+                        let slug = article.slug.clone();
                         json!({
                             "title": article.title.clone(),
-                            "slug": article.slug,
+                            "slug": slug.clone(),
+                            "url": format!("/posts/{slug}"),
                             "icatch_path": icatch_path,
                             "excerpt": excerpt,
                             "created_at": utc_to_jst(article.created_at),
