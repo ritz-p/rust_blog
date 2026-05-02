@@ -53,6 +53,7 @@ pub async fn export_site(
     export_tag_pages(&tera, db, &config, out_dir).await?;
     export_category_pages(&tera, db, &config, out_dir).await?;
     export_error_page(&tera, &config, out_dir, "404", "404.html")?;
+    write_cloudflare_support_files(out_dir)?;
 
     Ok(())
 }
@@ -544,6 +545,67 @@ fn write_static_assets(out_dir: &Path) -> Result<()> {
     copy_dir_recursive(Path::new("content/image"), &out_dir.join("image"))?;
     copy_dir_recursive(Path::new("content/icon"), &out_dir.join("icon"))?;
     Ok(())
+}
+
+fn write_cloudflare_support_files(out_dir: &Path) -> Result<()> {
+    fs::write(out_dir.join("_headers"), build_headers_file())
+        .with_context(|| format!("failed to write {:?}", out_dir.join("_headers")))?;
+    fs::write(out_dir.join("_redirects"), build_redirects_file(out_dir)?)
+        .with_context(|| format!("failed to write {:?}", out_dir.join("_redirects")))?;
+    Ok(())
+}
+
+fn build_headers_file() -> String {
+    [
+        "/*",
+        "  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' https: data:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'",
+        "  Referrer-Policy: strict-origin-when-cross-origin",
+        "  X-Content-Type-Options: nosniff",
+        "  X-Frame-Options: DENY",
+        "  Permissions-Policy: geolocation=(), microphone=(), camera=()",
+        "  Strict-Transport-Security: max-age=31536000; includeSubDomains",
+        "",
+        "/css/*",
+        "  Cache-Control: public, max-age=31556952, immutable",
+        "",
+        "/js/*",
+        "  Cache-Control: public, max-age=31556952, immutable",
+        "",
+        "/image/*",
+        "  Cache-Control: public, max-age=31556952, immutable",
+        "",
+        "/icon/*",
+        "  Cache-Control: public, max-age=31556952, immutable",
+        "",
+    ]
+    .join("\n")
+}
+
+fn build_redirects_file(out_dir: &Path) -> Result<String> {
+    let mut redirects = Vec::new();
+    for entry in WalkDir::new(out_dir).min_depth(1) {
+        let entry = entry?;
+        if !entry.file_type().is_dir() {
+            continue;
+        }
+        let index_html = entry.path().join("index.html");
+        if !index_html.exists() {
+            continue;
+        }
+        let relative = entry
+            .path()
+            .strip_prefix(out_dir)
+            .with_context(|| format!("failed to strip prefix for {:?}", entry.path()))?;
+        let rel = relative.to_string_lossy().replace('\\', "/");
+        if rel.is_empty() {
+            continue;
+        }
+        redirects.push(format!("/{rel} /{rel}/ 308"));
+    }
+    redirects.sort();
+    redirects.dedup();
+    redirects.push(String::new());
+    Ok(redirects.join("\n"))
 }
 
 fn write_asset_file(target: PathBuf, source: &Path) -> Result<()> {
