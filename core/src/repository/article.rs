@@ -123,6 +123,8 @@ pub async fn get_article_by_slug(
         .await
 }
 
+// Used by the static export pipeline in the library target.
+#[allow(dead_code)]
 pub async fn get_all_published_articles(
     db: &DatabaseConnection,
 ) -> Result<Vec<article::Model>, DbErr> {
