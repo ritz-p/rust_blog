@@ -32,7 +32,6 @@ jobs:
           mkdir -p "${BUNDLE_DIR}/templates"
           cp target/x86_64-unknown-linux-gnu/release/export "${BUNDLE_DIR}/export"
           cp target/x86_64-unknown-linux-gnu/release/migration "${BUNDLE_DIR}/migration"
-          cp blog_config.toml "${BUNDLE_DIR}/blog_config.toml"
           cp -R templates/. "${BUNDLE_DIR}/templates/"
 
       - name: Package export bundle
