@@ -4,6 +4,7 @@ use chrono_tz::Asia::Tokyo;
 use sea_orm::{
     ColumnTrait, DatabaseConnection, DbErr, EntityTrait, QueryFilter, QueryOrder, QuerySelect,
     prelude::*,
+    sea_query::{Expr, SimpleExpr},
 };
 
 use crate::entity::{article, category, tag};
@@ -46,6 +47,16 @@ impl ArticlePeriod {
             .with_timezone(&Utc);
         Some((start, end))
     }
+
+    fn sqlite_datetime_range_filter(self) -> Option<SimpleExpr> {
+        let (start, end) = self.range()?;
+        let start = start.format("%Y-%m-%d %H:%M:%S").to_string();
+        let end = end.format("%Y-%m-%d %H:%M:%S").to_string();
+        Some(Expr::cust_with_values(
+            "datetime(created_at) >= datetime(?) AND datetime(created_at) < datetime(?)",
+            [start, end],
+        ))
+    }
 }
 
 pub async fn get_all_articles(
@@ -56,10 +67,8 @@ pub async fn get_all_articles(
     let now = Utc::now();
     let mut base_query = article::Entity::find().filter(article::Column::CreatedAt.lte(now));
     if let Some(period) = period {
-        if let Some((start, end)) = period.range() {
-            base_query = base_query
-                .filter(article::Column::CreatedAt.gte(start))
-                .filter(article::Column::CreatedAt.lt(end));
+        if let Some(filter) = period.sqlite_datetime_range_filter() {
+            base_query = base_query.filter(filter);
         }
     }
 
@@ -83,10 +92,8 @@ pub async fn get_article_periods(
     let now = Utc::now();
     let mut query = article::Entity::find().filter(article::Column::CreatedAt.lte(now));
     if let Some(period) = period {
-        if let Some((start, end)) = period.range() {
-            query = query
-                .filter(article::Column::CreatedAt.gte(start))
-                .filter(article::Column::CreatedAt.lt(end));
+        if let Some(filter) = period.sqlite_datetime_range_filter() {
+            query = query.filter(filter);
         }
     }
 

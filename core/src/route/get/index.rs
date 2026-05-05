@@ -18,7 +18,12 @@ enum IndexUrlMode {
     Archive,
 }
 
-fn build_index_url(page: u64, per: u64, period: Option<ArticlePeriod>, mode: IndexUrlMode) -> String {
+fn build_index_url(
+    page: u64,
+    per: u64,
+    period: Option<ArticlePeriod>,
+    mode: IndexUrlMode,
+) -> String {
     match (mode, period) {
         (IndexUrlMode::Archive, Some(period)) if page <= 1 => {
             format!("/archive/{}/{:02}", period.year, period.month)
@@ -214,6 +219,7 @@ mod tests {
             (2, 'Dec 2', 'dec-2', NULL, 'body', '2025-12-15T00:00:00Z', '2025-12-15T00:00:00Z', NULL),
             (3, 'Nov 1', 'nov-1', NULL, 'body', '2025-11-10T00:00:00Z', '2025-11-10T00:00:00Z', NULL),
             (5, 'Feb JST Boundary', 'feb-jst-boundary', NULL, 'body', '2026-01-31T15:00:00Z', '2026-01-31T15:00:00Z', NULL),
+            (6, 'Jan Legacy Text Date', 'jan-legacy-text-date', NULL, 'body', '2025-12-31 16:46:43', '2025-12-31 16:46:43', NULL),
             (4, 'Future', 'future', NULL, 'body', '2099-01-10T00:00:00Z', '2099-01-10T00:00:00Z', NULL);",
         ))
         .await
@@ -309,6 +315,7 @@ mod tests {
             .await
             .expect("response body should exist");
         assert!(!jan_body.contains("Feb JST Boundary"));
+        assert!(jan_body.contains("Jan Legacy Text Date"));
     }
 
     #[rocket::async_test]
