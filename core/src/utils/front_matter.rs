@@ -7,7 +7,7 @@ pub struct FrontMatter {
     pub slug: String,
     #[serde(default)]
     pub deleted: bool,
-    #[serde(alias = "date")]
+    #[serde(default, alias = "date")]
     pub created_at: Option<String>,
     pub excerpt: Option<String>,
     pub icatch_path: Option<String>,

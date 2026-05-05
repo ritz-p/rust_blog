@@ -144,6 +144,33 @@ Body **text**
     }
 
     #[test]
+    fn parse_markdown_to_front_matter_allows_missing_date_and_created_at() {
+        let dir = create_temp_dir();
+        let path = dir.join("article.md");
+        fs::write(
+            &path,
+            r#"---
+title: "Test title"
+slug: "test-slug"
+tags:
+  - rust
+categories:
+  - dev
+---
+Body **text**
+"#,
+        )
+        .expect("failed to write markdown file");
+
+        let (front_matter, body) =
+            parse_markdown_to_front_matter(&path).expect("failed to parse front matter");
+        assert_eq!(front_matter.created_at, None);
+        assert_eq!(body, "Body **text**\n");
+
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
     fn parse_markdown_to_fixed_content_matter_parses_yaml_and_body() {
         let dir = create_temp_dir();
         let path = dir.join("about.md");
