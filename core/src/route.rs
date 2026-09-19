@@ -80,8 +80,24 @@ pub async fn launch(
                 category_detail
             ],
         )
-        .mount("/image", FileServer::from("content/image"))
-        .mount("/icon", FileServer::from("content/icon"))
+        .mount(
+            "/image",
+            FileServer::from(
+                config_map
+                    .get("image_dir")
+                    .map(String::as_str)
+                    .unwrap_or("content/image"),
+            ),
+        )
+        .mount(
+            "/icon",
+            FileServer::from(
+                config_map
+                    .get("icon_dir")
+                    .map(String::as_str)
+                    .unwrap_or("content/icon"),
+            ),
+        )
         .register(
             "/",
             catchers![

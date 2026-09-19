@@ -48,7 +48,7 @@ pub async fn export_site(
 ) -> Result<()> {
     let out_dir = out_dir.as_ref();
     reset_output_dir(out_dir)?;
-    write_static_assets(out_dir, &paths.content_dir)?;
+    write_static_assets(out_dir, &paths.content_dir, config_map)?;
 
     let config = CommonConfig {
         site_name: config_map.get("site_name").cloned(),
@@ -567,12 +567,21 @@ fn reset_output_dir(out_dir: &Path) -> Result<()> {
     Ok(())
 }
 
-fn write_static_assets(out_dir: &Path, content_dir: &Path) -> Result<()> {
+fn write_static_assets(
+    out_dir: &Path,
+    content_dir: &Path,
+    config_map: &HashMap<String, String>,
+) -> Result<()> {
     write_embedded_asset_file(out_dir.join("css/bulma.min.css"), BULMA_CSS)?;
     write_embedded_asset_file(out_dir.join("css/site.css"), SITE_CSS)?;
     write_embedded_asset_file(out_dir.join("js/nav.js"), NAV_JS)?;
-    copy_dir_recursive(&content_dir.join("image"), &out_dir.join("image"))?;
-    copy_dir_recursive(&content_dir.join("icon"), &out_dir.join("icon"))?;
+    for (key, directory) in [("image_dir", "image"), ("icon_dir", "icon")] {
+        let source = config_map
+            .get(key)
+            .map(PathBuf::from)
+            .unwrap_or_else(|| content_dir.join(directory));
+        copy_dir_recursive(&source, &out_dir.join(directory))?;
+    }
     Ok(())
 }
 
@@ -790,6 +799,36 @@ mod tests {
         std::env::temp_dir().join(format!("rust-blog-static-site-{unique}"))
     }
 
+    #[test]
+    fn assets_use_configured_directories_and_fall_back_to_content_dir() {
+        let root = temp_export_dir();
+        let content = root.join("content");
+        let custom = root.join("custom");
+        for directory in [content.join("image"), content.join("icon"), custom.clone()] {
+            fs::create_dir_all(&directory).unwrap();
+        }
+        fs::write(content.join("image/default.png"), b"default image").unwrap();
+        fs::write(content.join("icon/default.png"), b"default icon").unwrap();
+        fs::write(custom.join("custom.png"), b"custom asset").unwrap();
+        let config_path = root.join("blog_config.toml");
+        fs::write(&config_path, format!(
+            "[common]\nimage_dir = '{}'\nicon_dir = '{}'\n",
+            custom.display(), custom.display(),
+        )).unwrap();
+        let config = crate::utils::config::load_config_from_file(&config_path);
+        let out = root.join("configured");
+        super::write_static_assets(&out, &content, &config).unwrap();
+        for directory in ["image", "icon"] {
+            assert_eq!(fs::read(out.join(directory).join("custom.png")).unwrap(), b"custom asset");
+            assert!(!out.join(directory).join("default.png").exists());
+        }
+        let fallback = root.join("fallback");
+        super::write_static_assets(&fallback, &content, &Default::default()).unwrap();
+        assert_eq!(fs::read(fallback.join("image/default.png")).unwrap(), b"default image");
+        assert_eq!(fs::read(fallback.join("icon/default.png")).unwrap(), b"default icon");
+        fs::remove_dir_all(root).unwrap();
+    }
+
     #[rocket::async_test]
     async fn article_export_preserves_highlighted_rust_and_writes_matching_css() {
         use super::{SITE_CSS, export_article_pages, load_templates, write_static_assets};
@@ -830,7 +869,7 @@ mod tests {
         };
         let templates = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../templates");
         let tera = load_templates(&templates).expect("failed to load templates");
-        write_static_assets(&output.0, &output.0.join("empty-content"))
+        write_static_assets(&output.0, &output.0.join("empty-content"), &Default::default())
             .expect("failed to export assets");
         export_article_pages(&tera, &db, &config, &output.0)
             .await
