@@ -790,6 +790,109 @@ mod tests {
         std::env::temp_dir().join(format!("rust-blog-static-site-{unique}"))
     }
 
+    #[rocket::async_test]
+    async fn article_export_preserves_highlighted_rust_and_writes_matching_css() {
+        use super::{SITE_CSS, export_article_pages, load_templates, write_static_assets};
+        use crate::{
+            entity::{article, category, tag},
+            utils::config::CommonConfig,
+        };
+        use chrono::Utc;
+        use sea_orm::{DatabaseBackend, MockDatabase};
+
+        struct TempExport(PathBuf);
+        impl Drop for TempExport {
+            fn drop(&mut self) {
+                let _ = fs::remove_dir_all(&self.0);
+            }
+        }
+        let output = TempExport(temp_export_dir());
+        let article = article::Model {
+            id: 1,
+            title: "Highlighted Rust".to_owned(),
+            slug: "highlighted-rust".to_owned(),
+            excerpt: None,
+            content: "```rust\nfn main() {\n\tlet s = \"<script> & hello\"; // comment\n\tprintln!(\"Hello,World\");\n\tlet n = 42;\n}\n```\n"
+                .to_owned(),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            icatch_path: None,
+        };
+        let db = MockDatabase::new(DatabaseBackend::Sqlite)
+            .append_query_results([vec![article.clone()], vec![article]])
+            .append_query_results([Vec::<tag::Model>::new()])
+            .append_query_results([Vec::<category::Model>::new()])
+            .into_connection();
+        let config = CommonConfig {
+            site_name: Some("Test Blog".to_owned()),
+            default_icatch_path: None,
+            favicon_path: None,
+        };
+        let templates = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../templates");
+        let tera = load_templates(&templates).expect("failed to load templates");
+        write_static_assets(&output.0, &output.0.join("empty-content"))
+            .expect("failed to export assets");
+        export_article_pages(&tera, &db, &config, &output.0)
+            .await
+            .expect("failed to export article");
+        let html = fs::read_to_string(output.0.join("posts/highlighted-rust/index.html"))
+            .expect("missing exported article");
+        assert!(html.contains("href=\"/posts/highlighted-rust/\""));
+        assert!(html.contains("href=\"/css/site.css\""));
+        let content = html
+            .split("<div class=\"content is-medium\">")
+            .nth(1)
+            .expect("missing article content")
+            .split("</div>")
+            .next()
+            .unwrap();
+        assert!(content.contains("<pre><code><span"), "{content}");
+        assert!(content.contains("</code></pre>"));
+        assert!(content.contains("&lt;script&gt; &amp; hello"), "{content}");
+        assert!(!content.contains("<script>"));
+        assert!(!content.contains("&lt;span"));
+        assert!(!content.contains("style="));
+        let css = fs::read(output.0.join("css/site.css")).expect("missing exported CSS");
+        assert_eq!(css, SITE_CSS);
+        let css = String::from_utf8(css).expect("CSS is not UTF-8");
+        assert!(
+            content.split("class=\"").skip(1).all(|attribute| {
+                attribute
+                    .split('"')
+                    .next()
+                    .unwrap()
+                    .split_whitespace()
+                    .all(|class| class.starts_with("syntax-"))
+            }),
+            "{content}"
+        );
+        assert!(content.contains("syntax-section"), "{content}");
+        assert!(content.contains("syntax-numeric"), "{content}");
+        for scope in [
+            "syntax-keyword",
+            "syntax-string",
+            "syntax-comment",
+            "syntax-constant",
+            "syntax-support",
+        ] {
+            assert!(
+                content.split("class=\"").skip(1).any(|attribute| {
+                    attribute
+                        .split('"')
+                        .next()
+                        .unwrap()
+                        .split_whitespace()
+                        .any(|class| class == scope)
+                }),
+                "missing {scope}: {content}"
+            );
+            assert!(
+                css.contains(&format!(".content pre code .{scope}")),
+                "missing CSS for {scope}"
+            );
+        }
+    }
+
     #[test]
     fn build_redirects_file_uses_pattern_rules_instead_of_per_directory_rules() {
         let out_dir = temp_export_dir();

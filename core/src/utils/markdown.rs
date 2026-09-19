@@ -1,7 +1,16 @@
 pub mod to_text;
 use ammonia::Builder;
-use pulldown_cmark::{Event, Options, Parser, html};
+use pulldown_cmark::{CodeBlockKind, Event, Options, Parser, Tag, html};
+use std::sync::LazyLock;
+use syntect::{
+    html::{ClassStyle, ClassedHTMLGenerator},
+    parsing::{SyntaxReference, SyntaxSet},
+    util::LinesWithEndings,
+};
+
 use to_text::{end_tag, is_strikethrough, start_tag};
+
+static SYNTAX_SET: LazyLock<SyntaxSet> = LazyLock::new(SyntaxSet::load_defaults_newlines);
 
 pub fn markdown_to_html(input: &str) -> String {
     let mut options = Options::empty();
@@ -10,16 +19,66 @@ pub fn markdown_to_html(input: &str) -> String {
     options.insert(Options::ENABLE_STRIKETHROUGH);
     options.insert(Options::ENABLE_TASKLISTS);
 
-    let parser = Parser::new_ext(input, options);
+    let mut parser = Parser::new_ext(input, options);
+    let mut events = Vec::new();
+    while let Some(event) = parser.next() {
+        if let Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced(info))) = &event {
+            let syntax = info
+                .split_whitespace()
+                .next()
+                .and_then(|language| SYNTAX_SET.find_syntax_by_token(language));
+            if let Some(syntax) = syntax {
+                let mut code = String::new();
+                for event in parser.by_ref() {
+                    match event {
+                        Event::Text(text) => code.push_str(&text),
+                        Event::End(Tag::CodeBlock(_)) => break,
+                        _ => (),
+                    }
+                }
+                if let Some(highlighted) = highlight_code(&code, syntax) {
+                    events.push(Event::Html(highlighted.into()));
+                } else {
+                    events.push(event.clone());
+                    events.push(Event::Text(code.into()));
+                    events.push(Event::End(Tag::CodeBlock(CodeBlockKind::Fenced(
+                        info.clone(),
+                    ))));
+                }
+                continue;
+            }
+        }
+        events.push(event);
+    }
 
     let mut html_output = String::new();
-    html::push_html(&mut html_output, parser);
+    html::push_html(&mut html_output, events.into_iter());
 
     sanitize_html(&html_output)
 }
 
+fn highlight_code(code: &str, syntax: &SyntaxReference) -> Option<String> {
+    let mut generator = ClassedHTMLGenerator::new_with_class_style(
+        syntax,
+        &SYNTAX_SET,
+        ClassStyle::SpacedPrefixed { prefix: "syntax-" },
+    );
+    for line in LinesWithEndings::from(code) {
+        generator
+            .parse_html_for_line_which_includes_newline(line)
+            .ok()?;
+    }
+    Some(format!(
+        "<pre><code>{}</code></pre>\n",
+        generator.finalize()
+    ))
+}
+
 fn sanitize_html(html: &str) -> String {
-    Builder::default().clean(html).to_string()
+    Builder::default()
+        .add_tag_attributes("span", &["class"])
+        .clean(html)
+        .to_string()
 }
 
 pub fn markdown_to_text(markdown: &str) -> String {
@@ -56,6 +115,139 @@ pub fn markdown_to_text(markdown: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::{markdown_to_html, markdown_to_text};
+
+    fn without_spans(html: &str) -> String {
+        ammonia::Builder::default()
+            .rm_tags(&["span"])
+            .clean(html)
+            .to_string()
+    }
+
+    #[test]
+    fn highlights_known_languages_and_aliases() {
+        for (language, code) in [
+            ("rust", "fn main() { let s = \"hello\"; } // comment\n"),
+            ("rs", "fn main() { let s = \"hello\"; } // comment\n"),
+            (
+                "javascript",
+                "function greet() { return \"hello\"; } // comment\n",
+            ),
+            ("js", "function greet() { return \"hello\"; } // comment\n"),
+        ] {
+            let html = markdown_to_html(&format!("```{language}\n{code}```\n"));
+            assert!(html.starts_with("<pre><code><span"), "{language}: {html}");
+            for scope in ["syntax-keyword", "syntax-string", "syntax-comment"] {
+                assert!(
+                    html.split('"')
+                        .skip(1)
+                        .step_by(2)
+                        .any(|classes| { classes.split_whitespace().any(|class| class == scope) }),
+                    "missing {scope} for {language}: {html}"
+                );
+            }
+            assert!(!html.contains("style="));
+            assert_eq!(
+                without_spans(&html),
+                markdown_to_html(&format!("```\n{code}```\n"))
+            );
+        }
+    }
+
+    #[test]
+    fn syntax_classes_are_namespaced_to_avoid_bulma_collisions() {
+        let code = "println!(\"Hello,World\");\nlet n = 42;\n";
+        let html = markdown_to_html(&format!("```rust\n{code}```\n"));
+
+        let classes: Vec<_> = html
+            .split("class=\"")
+            .skip(1)
+            .flat_map(|attribute| attribute.split('"').next().unwrap().split_whitespace())
+            .collect();
+        assert!(!classes.is_empty());
+        assert!(
+            classes.iter().all(|class| class.starts_with("syntax-")),
+            "{html}"
+        );
+        // Bulma's .section otherwise adds padding to the macro's parentheses.
+        assert!(
+            html.contains("class=\"syntax-punctuation syntax-section syntax-group syntax-begin syntax-rust\">("),
+            "{html}"
+        );
+        assert!(
+            html.contains(
+                "class=\"syntax-punctuation syntax-section syntax-group syntax-end syntax-rust\">)"
+            ),
+            "{html}"
+        );
+        assert!(
+            html.contains("class=\"syntax-constant syntax-numeric syntax-integer syntax-decimal syntax-rust\">42</span>"),
+            "{html}"
+        );
+        assert_eq!(
+            without_spans(&html),
+            markdown_to_html(&format!("```\n{code}```\n"))
+        );
+    }
+
+    #[test]
+    fn highlights_multiple_blocks_independently() {
+        let rust = "```rust extra-info\n/* open comment\n```\n";
+        let js = "```js\nconst value = \"hello\";\n```\n";
+        assert_eq!(
+            markdown_to_html(&format!("{rust}\nBetween.\n\n{js}")),
+            format!(
+                "{}<p>Between.</p>\n{}",
+                markdown_to_html(rust),
+                markdown_to_html(js)
+            )
+        );
+    }
+
+    #[test]
+    fn leaves_plain_code_blocks_unchanged() {
+        for markdown in [
+            "```not-a-language\n<x> & value\n```\n",
+            "```\n<x> & value\n```\n",
+            "    <x> & value\n",
+        ] {
+            assert_eq!(
+                markdown_to_html(markdown),
+                "<pre><code>&lt;x&gt; &amp; value\n</code></pre>\n"
+            );
+        }
+    }
+
+    #[test]
+    fn highlighting_preserves_whitespace_and_escapes_html() {
+        let code =
+            "fn main() {\n\tlet s = \"<script>alert('x')</script> & <img onerror=bad>\";  \n\n}\n";
+        let html = markdown_to_html(&format!("```rust\n{code}```\n"));
+        assert!(!html.contains("<script"));
+        assert!(!html.contains("<img"));
+        assert_eq!(
+            without_spans(&html),
+            markdown_to_html(&format!("```\n{code}```\n"))
+        );
+    }
+
+    #[test]
+    fn inline_html_code_is_unchanged() {
+        assert_eq!(
+            markdown_to_html("Use `let x = <value> & 1;`."),
+            "<p>Use <code>let x = &lt;value&gt; &amp; 1;</code>.</p>\n"
+        );
+    }
+
+    #[test]
+    fn allows_span_classes_but_strips_unsafe_attributes() {
+        let html = markdown_to_html(
+            r#"<span class="keyword" style="color:red" onclick="alert(1)">safe</span><img src="x" onerror="alert(1)"><a href="javascript:alert(1)">link</a>"#,
+        );
+        assert!(html.contains(r#"<span class="keyword">safe</span>"#));
+        for unsafe_attribute in ["style=", "onclick=", "onerror=", "javascript:"] {
+            assert!(!html.contains(unsafe_attribute), "{html}");
+        }
+    }
 
     #[test]
     fn basic_inline_strong() {

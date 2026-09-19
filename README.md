@@ -70,6 +70,23 @@ rust_blog/             ← ワークスペースルート
 
    - `seed.rs` が `content/articles/*.md` を読み込み DB に投入します。
 
+### Markdown のコードブロック
+
+コードフェンスの直後に `rust`、`javascript`、`python`、`bash` などの言語名を指定すると、構文ハイライトが適用されます。
+
+````markdown
+```rust
+fn main() {
+    println!("Hello, world!");
+}
+```
+````
+
+- ハイライトは HTML 生成時に行うため、JavaScript や外部 CDN は不要です。
+- サーバー表示と静的 export の両方で適用されます。既存の静的サイトには export の再実行が必要です。
+- 言語指定なし・未対応言語・インデント形式のコードブロックは、通常のテキスト表示になります。
+- 長い行は折り返さず、コードブロック内で横スクロールできます。
+
 ## アプリケーションの起動
 
 1. rust_blog を起動：
