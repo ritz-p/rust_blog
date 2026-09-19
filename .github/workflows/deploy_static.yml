@@ -11,6 +11,14 @@ on:
 permissions:
   contents: read
 
+env:
+  ARTICLE_PATH: content/articles
+  FIXED_CONTENT_PATH: content/fixed_contents
+  RUST_BLOG_CONFIG_PATH: blog_config.toml
+  RUST_BLOG_CONTENT_DIR: content
+  RUST_BLOG_TEMPLATES_DIR: templates
+  EXPORT_OUTPUT_DIR: dist
+
 concurrency:
   group: cloudflare-static
   cancel-in-progress: false
@@ -25,13 +33,17 @@ jobs:
         run: docker compose up -d web
 
       - name: Export all Markdown articles
-        run: docker compose exec -T --user root web sh docker/export-articles.sh
+        run: |
+          docker compose exec -T --user root \
+            -e ARTICLE_PATH -e FIXED_CONTENT_PATH -e RUST_BLOG_CONFIG_PATH \
+            -e RUST_BLOG_CONTENT_DIR -e RUST_BLOG_TEMPLATES_DIR -e EXPORT_OUTPUT_DIR \
+            web sh docker/export-articles.sh
 
       - name: Upload static site
         uses: actions/upload-artifact@v7
         with:
           name: static-site
-          path: dist/
+          path: ${{ env.EXPORT_OUTPUT_DIR }}
           if-no-files-found: error
 
       - name: Stop containers
@@ -48,11 +60,11 @@ jobs:
       - uses: actions/download-artifact@v7
         with:
           name: static-site
-          path: dist
+          path: ${{ env.EXPORT_OUTPUT_DIR }}
 
       - name: Deploy to Cloudflare Workers Static Assets
         uses: cloudflare/wrangler-action@v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: deploy
+          command: deploy --assets ${{ env.EXPORT_OUTPUT_DIR }}

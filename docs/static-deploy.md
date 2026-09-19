@@ -20,6 +20,17 @@ export は出力ディレクトリを作り直すため、実行後は上記の�
 
 ## GitHub Actions で生成
 
+入力パスと出力先は `.github/workflows/deploy_static.yml` の `env` で設定します。
+これらを `docker compose exec -e` でコンテナへ渡します。
+`docker/export-articles.sh` はリポジトリ直下から実行し、環境変数を読み込みます。
+ローカルで未指定の場合は既存の標準配置を使います。
+
+サーバーと export の設定ファイルは `RUST_BLOG_CONFIG_PATH` で指定できます。
+サーバーの既定値は `blog_config.toml` です。一括 export では seed にも同じ設定を渡します。
+`[common]` の `image_dir` / `icon_dir` はサーバーの配信元と export のコピー元に共通です。
+指定時は `RUST_BLOG_CONTENT_DIR` より優先し、相対パスは作業ディレクトリ基準です。
+未指定時の export は従来どおりコンテンツディレクトリ配下の `image` / `icon` を使います。
+
 変更を GitHub のデフォルトブランチへ反映した後、Actions の
 **Export articles and deploy** → **Run workflow** を実行します。
 `deploy` がオフなら Cloudflare の認証なしで export だけ実行できます。
