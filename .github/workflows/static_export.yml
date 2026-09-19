@@ -12,13 +12,13 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
       - name: Cache Cargo
-        uses: actions-rust-lang/setup-rust-toolchain@v1
+        uses: actions-rust-lang/setup-rust-toolchain@v2
 
       - name: Build export tools
         run: |
@@ -42,7 +42,7 @@ jobs:
             "rust-blog-export-tools-${{ github.ref_name }}-x86_64-unknown-linux-gnu"
 
       - name: Upload export bundle
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: rust-blog-export-tools-${{ github.ref_name }}-x86_64-unknown-linux-gnu
           path: artifact/rust-blog-export-tools-${{ github.ref_name }}-x86_64-unknown-linux-gnu.tar.gz
