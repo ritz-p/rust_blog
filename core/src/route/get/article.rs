@@ -116,7 +116,7 @@ mod tests {
             title: "Highlighted Rust".to_owned(),
             slug: "highlighted-rust".to_owned(),
             excerpt: None,
-            content: "```rust\nfn main() {\n\tlet s = \"<script> & hello\"; // comment\n\tprintln!(\"Hello,World\");\n\tlet n = 42;\n}\n```\n"
+            content: "```rust\nfn main() {\n\tlet s = \"<script> & hello\"; // comment\n\tprintln!(\"Hello,World\");\n\tlet n = 42;\n}\n```\n\n```kotlin\nfun main() { println(\"hello\") } // comment\n```\n\n```bash\n# comment\nif true; then echo \"hello\"; fi\n```\n"
                 .to_owned(),
             created_at: Utc::now(),
             updated_at: Utc::now(),
@@ -184,6 +184,8 @@ mod tests {
         );
         assert!(content.contains("syntax-section"), "{content}");
         assert!(content.contains("syntax-numeric"), "{content}");
+        assert!(content.contains("syntax-kotlin"), "{content}");
+        assert!(content.contains("syntax-shell"), "{content}");
         for scope in [
             "syntax-keyword",
             "syntax-string",

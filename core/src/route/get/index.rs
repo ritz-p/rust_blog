@@ -228,6 +228,45 @@ mod tests {
     }
 
     #[rocket::async_test]
+    async fn index_paginates_at_ten_and_eleven_articles() {
+        for total in [10, 11] {
+            let db = prepare_index_db().await;
+            db.execute(Statement::from_string(DbBackend::Sqlite, "DELETE FROM article"))
+                .await.unwrap();
+            for id in 1..=total {
+                db.execute(Statement::from_sql_and_values(
+                    DbBackend::Sqlite,
+                    "INSERT INTO article (id, title, slug, content, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+                    vec![id.into(), format!("Boundary article {id:02}").into(), format!("boundary-{id:02}").into(), "body".into(), format!("2025-12-{id:02}T00:00:00Z").into(), format!("2025-12-{id:02}T00:00:00Z").into()],
+                )).await.unwrap();
+            }
+            let client = client_with_db(db).await;
+            let response = client.get("/").dispatch().await;
+            assert_eq!(response.status(), Status::Ok);
+            let html = response.into_string().await.unwrap();
+            assert_eq!(html.matches("<h2 class=\"title is-4\">").count(), 10);
+            assert!(html.contains("class=\"pagination-previous\" disabled"));
+            if total == 10 {
+                assert!(html.contains("Page 1 / 1"));
+                assert!(html.contains("class=\"pagination-next\" disabled"));
+                assert!(html.contains("Boundary article 01"));
+            } else {
+                assert!(html.contains("Page 1 / 2"));
+                assert!(html.contains("class=\"pagination-next\" href="));
+                assert!(!html.contains("Boundary article 01"));
+                let response = client.get("/?page=2&per=10").dispatch().await;
+                assert_eq!(response.status(), Status::Ok);
+                let html = response.into_string().await.unwrap();
+                assert_eq!(html.matches("<h2 class=\"title is-4\">").count(), 1);
+                assert!(html.contains("Boundary article 01"));
+                assert!(html.contains("Page 2 / 2"));
+                assert!(html.contains("class=\"pagination-next\" disabled"));
+                assert!(html.contains("class=\"pagination-previous\" href="));
+            }
+        }
+    }
+
+    #[rocket::async_test]
     async fn index_filters_articles_by_year_and_month() {
         let db = prepare_index_db().await;
         let client = client_with_db(db).await;

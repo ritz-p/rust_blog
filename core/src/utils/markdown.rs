@@ -11,6 +11,7 @@ use syntect::{
 use to_text::{end_tag, is_strikethrough, start_tag};
 
 static SYNTAX_SET: LazyLock<SyntaxSet> = LazyLock::new(SyntaxSet::load_defaults_newlines);
+static EXTRA_SYNTAX_SET: LazyLock<SyntaxSet> = LazyLock::new(two_face::syntax::extra_newlines);
 
 pub fn markdown_to_html(input: &str) -> String {
     let mut options = Options::empty();
@@ -26,8 +27,21 @@ pub fn markdown_to_html(input: &str) -> String {
             let syntax = info
                 .split_whitespace()
                 .next()
-                .and_then(|language| SYNTAX_SET.find_syntax_by_token(language));
-            if let Some(syntax) = syntax {
+                .and_then(|language| {
+                    let language = match language {
+                        "bash" => "sh",
+                        _ => language,
+                    };
+                    SYNTAX_SET
+                        .find_syntax_by_token(language)
+                        .map(|syntax| (syntax, &*SYNTAX_SET))
+                        .or_else(|| {
+                            EXTRA_SYNTAX_SET
+                                .find_syntax_by_token(language)
+                                .map(|syntax| (syntax, &*EXTRA_SYNTAX_SET))
+                        })
+                });
+            if let Some((syntax, syntax_set)) = syntax {
                 let mut code = String::new();
                 for event in parser.by_ref() {
                     match event {
@@ -36,7 +50,7 @@ pub fn markdown_to_html(input: &str) -> String {
                         _ => (),
                     }
                 }
-                if let Some(highlighted) = highlight_code(&code, syntax) {
+                if let Some(highlighted) = highlight_code(&code, syntax, syntax_set) {
                     events.push(Event::Html(highlighted.into()));
                 } else {
                     events.push(event.clone());
@@ -57,10 +71,10 @@ pub fn markdown_to_html(input: &str) -> String {
     sanitize_html(&html_output)
 }
 
-fn highlight_code(code: &str, syntax: &SyntaxReference) -> Option<String> {
+fn highlight_code(code: &str, syntax: &SyntaxReference, syntax_set: &SyntaxSet) -> Option<String> {
     let mut generator = ClassedHTMLGenerator::new_with_class_style(
         syntax,
-        &SYNTAX_SET,
+        syntax_set,
         ClassStyle::SpacedPrefixed { prefix: "syntax-" },
     );
     for line in LinesWithEndings::from(code) {
@@ -150,6 +164,24 @@ mod tests {
                 without_spans(&html),
                 markdown_to_html(&format!("```\n{code}```\n"))
             );
+        }
+    }
+
+    #[test]
+    fn highlights_kotlin_and_bash_with_aliases() {
+        for (languages, code) in [
+            (&["kotlin", "kt", "kts"][..], "fun main() { val text = \"<hello> & world\"; println(text) } // comment\n"),
+            (&["bash", "sh"][..], "# comment\nif true; then echo \"<hello> & world\"; fi\n"),
+        ] {
+            let expected = markdown_to_html(&format!("```\n{code}```\n"));
+            for language in languages {
+                let html = markdown_to_html(&format!("```{language}\n{code}```\n"));
+                for scope in ["syntax-string", "syntax-comment"] {
+                    assert!(html.contains(scope), "missing {scope} for {language}: {html}");
+                }
+                assert!(html.contains("syntax-keyword") || html.contains("syntax-storage"), "{language}: {html}");
+                assert_eq!(without_spans(&html), expected, "{language}");
+            }
         }
     }
 
