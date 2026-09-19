@@ -37,8 +37,8 @@ pub async fn seed_tag(
     front_matter: &FrontMatter,
     article_id: i32,
 ) -> Result<(), DbErr> {
-    for tag_slug in &front_matter.tags {
-        let tag_slug = tag_slug.to_lowercase();
+    for tag_name in &front_matter.tags {
+        let tag_slug = tag_name.to_lowercase();
         let existing = tag::Entity::find()
             .filter(tag::Column::Slug.eq(tag_slug.as_str()))
             .one(db)
@@ -47,7 +47,7 @@ pub async fn seed_tag(
             m.id
         } else {
             tag::ActiveModel {
-                name: Set(tag_slug.clone()),
+                name: Set(tag_name.clone()),
                 slug: Set(tag_slug.clone()),
                 ..Default::default()
             }
@@ -80,8 +80,8 @@ pub async fn seed_category(
     front_matter: &FrontMatter,
     article_id: i32,
 ) -> Result<(), DbErr> {
-    for category_slug in &front_matter.categories {
-        let category_slug = category_slug.to_lowercase();
+    for category_name in &front_matter.categories {
+        let category_slug = category_name.to_lowercase();
         let existing = category::Entity::find()
             .filter(category::Column::Slug.eq(category_slug.as_str()))
             .one(db)
@@ -90,7 +90,7 @@ pub async fn seed_category(
             m.id
         } else {
             category::ActiveModel {
-                name: Set(category_slug.clone()),
+                name: Set(category_name.clone()),
                 slug: Set(category_slug.clone()),
                 ..Default::default()
             }
@@ -126,6 +126,45 @@ mod tests {
     use chrono::{TimeZone, Utc};
     use rocket::tokio;
     use sea_orm::{DbBackend, DbErr, MockDatabase, MockExecResult};
+
+    #[rocket::async_test]
+    async fn taxonomy_seed_preserves_first_display_name_and_reuses_normalized_slug() {
+        use sea_orm::{ConnectionTrait, Database, Statement};
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        for (table, relation, column) in [
+            ("tag", "article_tag", "tag_id"),
+            ("category", "article_category", "category_id"),
+        ] {
+            for sql in [
+                format!("CREATE TABLE {table} (id INTEGER PRIMARY KEY, name TEXT NOT NULL UNIQUE, slug TEXT NOT NULL UNIQUE)"),
+                format!("CREATE TABLE {relation} (article_id INTEGER, {column} INTEGER REFERENCES {table}(id), PRIMARY KEY(article_id, {column}))"),
+            ] {
+                db.execute(Statement::from_string(DbBackend::Sqlite, sql)).await.unwrap();
+            }
+        }
+        let mut matter = build_front_matter_from_title_and_slug("Test", "test");
+        matter.tags = vec!["C#".into(), "c#".into()];
+        matter.categories = vec!["WebDev".into(), "webdev".into()];
+        super::seed_tag(&db, &matter, 1).await.unwrap();
+        super::seed_category(&db, &matter, 1).await.unwrap();
+        matter.tags.reverse();
+        matter.categories.reverse();
+        super::seed_tag(&db, &matter, 1).await.unwrap();
+        super::seed_category(&db, &matter, 1).await.unwrap();
+        for (table, relation, name, slug) in [
+            ("tag", "article_tag", "C#", "c#"),
+            ("category", "article_category", "WebDev", "webdev"),
+        ] {
+            let rows = db.query_all(Statement::from_string(DbBackend::Sqlite,
+                format!("SELECT name, slug FROM {table}"))).await.unwrap();
+            assert_eq!(rows.len(), 1);
+            assert_eq!(rows[0].try_get::<String>("", "name").unwrap(), name);
+            assert_eq!(rows[0].try_get::<String>("", "slug").unwrap(), slug);
+            let links = db.query_all(Statement::from_string(DbBackend::Sqlite,
+                format!("SELECT * FROM {relation}"))).await.unwrap();
+            assert_eq!(links.len(), 1);
+        }
+    }
 
     fn build_front_matter_from_title_and_slug(title: &str, slug: &str) -> FrontMatter {
         FrontMatter::new(
