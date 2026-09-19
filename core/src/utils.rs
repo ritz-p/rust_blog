@@ -5,6 +5,20 @@ pub mod fixed_content_matter;
 pub mod front_matter;
 pub mod markdown;
 
+/// Encode a slug as a URL path segment; filesystem names remain unencoded.
+pub fn url_segment(value: &str) -> String {
+    use std::fmt::Write;
+    let mut result = String::new();
+    for byte in value.bytes() {
+        if byte.is_ascii_alphanumeric() || b"-._~".contains(&byte) {
+            result.push(byte as char);
+        } else {
+            write!(result, "%{byte:02X}").unwrap();
+        }
+    }
+    result
+}
+
 pub fn cut_out_string(base: &str, limit: usize) -> String {
     let l = base.len().min(limit);
     base.chars().take(l).collect()

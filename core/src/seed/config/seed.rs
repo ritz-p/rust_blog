@@ -28,7 +28,10 @@ where
     let cfg = SlugConfig::from_toml_file_key(toml_path, entity_name)
         .with_context(|| format!("failed to read slug config: {}", toml_path))?;
 
-    for (name, slug) in cfg.map {
+    let mut entries: Vec<_> = cfg.map.into_iter().collect();
+    entries.sort();
+    for (name, slug) in entries {
+        let slug = slug.to_lowercase();
         match T::find()
             .filter(T::col_slug().eq(slug.as_str()))
             .one(db)

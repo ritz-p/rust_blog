@@ -99,26 +99,38 @@ pub fn markdown_to_text(markdown: &str) -> String {
     let mut options = Options::empty();
     options.insert(Options::ENABLE_STRIKETHROUGH);
 
-    let parser = Parser::new_ext(&markdown, options);
+    let mut broken_link = |link: pulldown_cmark::BrokenLink<'_>| {
+        let reference = link.reference.as_ref();
+        if reference.starts_with("https://") || reference.starts_with("http://") {
+            Some((reference.to_owned().into(), "".into()))
+        } else {
+            None
+        }
+    };
+    let parser = Parser::new_with_broken_link_callback(markdown, options, Some(&mut broken_link));
     let mut tags_stack = Vec::new();
     let mut buffer = String::new();
 
     for event in parser {
         match event {
             Event::Start(tag) => {
-                start_tag(&tag, &mut buffer, &mut tags_stack);
+                if !tags_stack.iter().any(is_strikethrough) {
+                    start_tag(&tag, &mut buffer, &mut tags_stack);
+                }
                 tags_stack.push(tag);
             }
             Event::End(tag) => {
                 tags_stack.pop();
-                end_tag(&tag, &mut buffer, &tags_stack);
+                if !tags_stack.iter().any(is_strikethrough) {
+                    end_tag(&tag, &mut buffer, &tags_stack);
+                }
             }
             Event::Text(content) => {
                 if !tags_stack.iter().any(is_strikethrough) {
                     buffer.push_str(&content)
                 }
             }
-            Event::Code(content) => buffer.push_str(&content),
+            Event::Code(content) if !tags_stack.iter().any(is_strikethrough) => buffer.push_str(&content),
             Event::SoftBreak => buffer.push(' '),
             _ => (),
         }
@@ -398,13 +410,17 @@ End paragraph.";
         assert_eq!(markdown_to_text(markdown), expected)
     }
 
-    // TODO Fix
-    #[ignore]
     #[test]
     fn link_with_itself() {
         let markdown = "Go to [https://www.google.com].";
         let expected = "Go to https://www.google.com.";
         assert_eq!(markdown_to_text(markdown), expected)
+    }
+
+    #[test]
+    fn deleted_nested_content_is_not_an_excerpt() {
+        assert_eq!(markdown_to_text("before ~~**text** `code` [link](https://example.com \"title\")~~ after"), "before  after");
+        assert_eq!(markdown_to_text("[ordinary words] and `[https://example.com]`"), "[ordinary words] and [https://example.com]");
     }
 
     #[test]

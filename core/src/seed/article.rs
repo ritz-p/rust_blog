@@ -38,6 +38,7 @@ pub async fn seed_tag(
     article_id: i32,
 ) -> Result<(), DbErr> {
     for tag_slug in &front_matter.tags {
+        let tag_slug = tag_slug.to_lowercase();
         let existing = tag::Entity::find()
             .filter(tag::Column::Slug.eq(tag_slug.as_str()))
             .one(db)
@@ -80,6 +81,7 @@ pub async fn seed_category(
     article_id: i32,
 ) -> Result<(), DbErr> {
     for category_slug in &front_matter.categories {
+        let category_slug = category_slug.to_lowercase();
         let existing = category::Entity::find()
             .filter(category::Column::Slug.eq(category_slug.as_str()))
             .one(db)
