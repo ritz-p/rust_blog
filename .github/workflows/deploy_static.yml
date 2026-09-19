@@ -1,0 +1,58 @@
+name: Export articles and deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      deploy:
+        description: Deploy the exported site to Cloudflare
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cloudflare-static
+  cancel-in-progress: false
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Start development container
+        run: docker compose up -d web
+
+      - name: Export all Markdown articles
+        run: docker compose exec -T --user root web sh docker/export-articles.sh
+
+      - name: Upload static site
+        uses: actions/upload-artifact@v6
+        with:
+          name: static-site
+          path: dist/
+          if-no-files-found: error
+
+      - name: Stop containers
+        if: always()
+        run: docker compose down
+
+  deploy:
+    if: ${{ inputs.deploy }}
+    needs: export
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/download-artifact@v6
+        with:
+          name: static-site
+          path: dist
+
+      - name: Deploy to Cloudflare Workers Static Assets
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy
