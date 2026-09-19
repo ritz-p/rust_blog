@@ -130,6 +130,9 @@ fn main() {
 
 ## デプロイメモ
 
+テスト記事をまとめて静的 export し、GitHub Actions から Cloudflare に公開する手順は
+[静的デプロイ手順](docs/static-deploy.md) を参照してください。
+
 Cloudflare へ載せるときの考え方と選択肢は `docs/cloudflare.md` にまとめています。
 
 ### コンテナで最短公開する場合
