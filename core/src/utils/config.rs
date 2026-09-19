@@ -37,7 +37,9 @@ impl CommonConfigMap {
 }
 
 pub fn load_config() -> HashMap<String, String> {
-    load_config_from_file("blog_config.toml")
+    let path = std::env::var("RUST_BLOG_CONFIG_PATH")
+        .unwrap_or_else(|_| "blog_config.toml".to_string());
+    load_config_from_file(path)
 }
 
 pub fn load_config_from_file(toml_path: impl AsRef<Path>) -> HashMap<String, String> {
