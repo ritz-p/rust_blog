@@ -25,7 +25,7 @@ RUN groupadd --gid ${USER_GID} ${USERNAME} && \
 USER ${USERNAME}
 ENV PATH=/home/${USERNAME}/.cargo/bin:$PATH
 RUN rustup show active-toolchain
-RUN cargo install sea-orm-cli
+RUN cargo install sea-orm-cli --version 1.1.19 --locked
 RUN rustup component add rustfmt clippy
 
 EXPOSE 8888
