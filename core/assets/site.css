@@ -5,15 +5,33 @@
   display: block;
 }
 
-/* Allow long code lines to scroll inside the article's flex column. */
-.columns > .column {
+.section,
+.footer {
+  overflow-wrap: anywhere;
+}
+
+.columns > .column,
+.columns > .menu {
   min-width: 0;
+}
+
+.columns > .menu {
+  flex: 1;
+}
+
+.tag:not(body) {
+  max-width: 100%;
+  height: auto;
+  min-height: 2em;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .content table {
   display: block;
   max-width: 100%;
   overflow-x: auto;
+  overflow-wrap: normal;
 }
 
 .content pre {
