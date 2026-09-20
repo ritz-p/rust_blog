@@ -47,7 +47,6 @@ your-static-site-repo/
 ├─ content/
 │  ├─ icon/
 │  └─ image/
-├─ blog.db
 ├─ blog_config.toml
 └─ dist/
 ```
@@ -68,7 +67,7 @@ your-static-site-repo/
 ## 最小手順
 
 1. 対象リリースの CI artifact を取得して展開する
-2. `DATABASE_URL` を設定する
+2. export 専用の一時ディレクトリを作り、新規 DB を指す `DATABASE_URL` を設定する
 3. `migration up` を実行する
 4. `seed` で Markdown を DB へ投入する
 5. `export dist` を実行する
@@ -76,10 +75,14 @@ your-static-site-repo/
 例:
 
 ```bash
+(
+set -eu
 mkdir -p tools
 tar -xzf rust-blog-export-tools-v0.1.0-x86_64-unknown-linux-gnu.tar.gz -C tools
 cd tools/rust-blog-export-tools-v0.1.0-x86_64-unknown-linux-gnu
-export DATABASE_URL="sqlite://../../blog.db?mode=rwc"
+export_db_dir=$(mktemp -d /tmp/rust-blog-export.XXXXXX)
+trap 'rm -f "$export_db_dir/blog.db" "$export_db_dir/blog.db-shm" "$export_db_dir/blog.db-wal" "$export_db_dir/blog.db-journal"; rmdir "$export_db_dir"' EXIT
+export DATABASE_URL="sqlite://$export_db_dir/blog.db?mode=rwc"
 export RUST_BLOG_CONTENT_DIR="../../content"
 export ARTICLE_PATH="../../content/articles"
 export FIXED_CONTENT_PATH="../../content/fixed_contents"
@@ -89,20 +92,26 @@ export RUST_BLOG_REQUIRE_CREATED_AT=1
 ./migration up
 ./seed
 ./export ../../dist
+)
 ```
 
 ## SQLite を使う場合
 
-SQLite を使うなら、別リポジトリ側で `blog.db` を管理します。
+SQLite は毎回新しい一時 DB を使い、終了時に削除します。
+既存の `blog.db` を再利用すると、Markdown を削除した記事や固定ページが DB に残り、再公開されるためです。
+`touch blog.db` では既存データは消えません。以下の手順は既存の開発用 DB に触れません。
 
 例:
 
 ```bash
-touch blog.db
+(
+set -eu
 mkdir -p tools
 tar -xzf rust-blog-export-tools-v0.1.0-x86_64-unknown-linux-gnu.tar.gz -C tools
 cd tools/rust-blog-export-tools-v0.1.0-x86_64-unknown-linux-gnu
-export DATABASE_URL="sqlite://../../blog.db?mode=rwc"
+export_db_dir=$(mktemp -d /tmp/rust-blog-export.XXXXXX)
+trap 'rm -f "$export_db_dir/blog.db" "$export_db_dir/blog.db-shm" "$export_db_dir/blog.db-wal" "$export_db_dir/blog.db-journal"; rmdir "$export_db_dir"' EXIT
+export DATABASE_URL="sqlite://$export_db_dir/blog.db?mode=rwc"
 export RUST_BLOG_CONTENT_DIR="../../content"
 export ARTICLE_PATH="../../content/articles"
 export FIXED_CONTENT_PATH="../../content/fixed_contents"
@@ -112,15 +121,20 @@ export RUST_BLOG_REQUIRE_CREATED_AT=1
 ./migration up
 ./seed
 ./export ../../dist
+)
 ```
 
 ## DB への記事投入について
 
 バンドルの `seed` を使用します。古いバンドルには含まれていないため、再ビルドしてください。
-別リポジトリのルートから、次のように同じ DB に migration・seed・export を順に実行します。
+別リポジトリのルートから、次のように新規の一時 DB に migration・seed・export を順に実行します。
 
 ```bash
-export DATABASE_URL="sqlite://$PWD/blog.db?mode=rwc"
+(
+set -eu
+export_db_dir=$(mktemp -d /tmp/rust-blog-export.XXXXXX)
+trap 'rm -f "$export_db_dir/blog.db" "$export_db_dir/blog.db-shm" "$export_db_dir/blog.db-wal" "$export_db_dir/blog.db-journal"; rmdir "$export_db_dir"' EXIT
+export DATABASE_URL="sqlite://$export_db_dir/blog.db?mode=rwc"
 export ARTICLE_PATH="content/articles"
 export FIXED_CONTENT_PATH="content/fixed_contents"
 export CONFIG_TOML_PATH="blog_config.toml"
@@ -130,9 +144,11 @@ export RUST_BLOG_REQUIRE_CREATED_AT=1
 ./tools/rust-blog-export-tools-v0.1.0-x86_64-unknown-linux-gnu/migration up
 ./tools/rust-blog-export-tools-v0.1.0-x86_64-unknown-linux-gnu/seed
 ./tools/rust-blog-export-tools-v0.1.0-x86_64-unknown-linux-gnu/export dist
+)
 ```
 
-`export` 自体は Markdown を取り込みません。毎回空の DB を用意すれば、入力ディレクトリから除外した記事も公開されません。
+`export` 自体は Markdown を取り込みません。上記の全実行例は毎回空の DB から生成するため、入力ディレクトリから除外した記事・固定ページは出力されません。
+括弧内のサブシェルで実行することで、終了時に一時 DB を片付け、呼び出し元の作業ディレクトリや環境変数も維持します。
 
 ## 出力先
 
