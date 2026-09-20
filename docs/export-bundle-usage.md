@@ -33,12 +33,12 @@ artifact には次が含まれます。
 
 ## 推奨ディレクトリ構成
 
-別リポジトリで、artifact 展開先を例えば `tools/rust-blog-export/` に置きます。
+別リポジトリで、artifact を `tools/` に展開します。以下は `v0.1.0` の例です。
 
 ```text
 your-static-site-repo/
 ├─ tools/
-│  └─ rust-blog-export/
+│  └─ rust-blog-export-tools-v0.1.0-x86_64-unknown-linux-gnu/
 │     ├─ export
 │     ├─ migration
 │     ├─ seed
@@ -85,6 +85,7 @@ export ARTICLE_PATH="../../content/articles"
 export FIXED_CONTENT_PATH="../../content/fixed_contents"
 export CONFIG_TOML_PATH="../../blog_config.toml"
 export RUST_BLOG_CONFIG_PATH="$CONFIG_TOML_PATH"
+export RUST_BLOG_REQUIRE_CREATED_AT=1
 ./migration up
 ./seed
 ./export ../../dist
@@ -107,6 +108,7 @@ export ARTICLE_PATH="../../content/articles"
 export FIXED_CONTENT_PATH="../../content/fixed_contents"
 export CONFIG_TOML_PATH="../../blog_config.toml"
 export RUST_BLOG_CONFIG_PATH="$CONFIG_TOML_PATH"
+export RUST_BLOG_REQUIRE_CREATED_AT=1
 ./migration up
 ./seed
 ./export ../../dist
@@ -125,9 +127,9 @@ export CONFIG_TOML_PATH="blog_config.toml"
 export RUST_BLOG_CONFIG_PATH="$CONFIG_TOML_PATH"
 export RUST_BLOG_CONTENT_DIR="content"
 export RUST_BLOG_REQUIRE_CREATED_AT=1
-./tools/rust-blog-export/migration up
-./tools/rust-blog-export/seed
-./tools/rust-blog-export/export dist
+./tools/rust-blog-export-tools-v0.1.0-x86_64-unknown-linux-gnu/migration up
+./tools/rust-blog-export-tools-v0.1.0-x86_64-unknown-linux-gnu/seed
+./tools/rust-blog-export-tools-v0.1.0-x86_64-unknown-linux-gnu/export dist
 ```
 
 `export` 自体は Markdown を取り込みません。毎回空の DB を用意すれば、入力ディレクトリから除外した記事も公開されません。
