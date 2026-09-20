@@ -143,7 +143,10 @@ mod tests {
         let client = Client::tracked(rocket)
             .await
             .expect("failed to build client");
-        let response = client.get("/posts/highlighted-rust%23intro").dispatch().await;
+        let response = client
+            .get("/posts/highlighted-rust%23intro")
+            .dispatch()
+            .await;
         assert_eq!(response.status(), Status::Ok);
         assert_eq!(response.content_type(), Some(ContentType::HTML));
         let html = response.into_string().await.expect("missing article body");

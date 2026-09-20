@@ -33,15 +33,12 @@ pub fn end_tag(tag: &Tag, buffer: &mut String, tags_stack: &[Tag]) {
     match tag {
         Tag::Paragraph | Tag::Heading(_, _, _) => buffer.push('\n'),
         Tag::CodeBlock(_) => {
-            if buffer.chars().last() != Some('\n') {
+            if !buffer.ends_with('\n') {
                 buffer.push('\n');
             }
         }
         Tag::List(_) => {
-            let is_sublist = tags_stack.iter().any(|tag| match tag {
-                Tag::List(_) => true,
-                _ => false,
-            });
+            let is_sublist = tags_stack.iter().any(|tag| matches!(tag, Tag::List(_)));
             if !is_sublist {
                 buffer.push('\n')
             }
@@ -51,8 +48,5 @@ pub fn end_tag(tag: &Tag, buffer: &mut String, tags_stack: &[Tag]) {
 }
 
 pub fn is_strikethrough(tag: &Tag) -> bool {
-    match tag {
-        Tag::Strikethrough => true,
-        _ => false,
-    }
+    matches!(tag, Tag::Strikethrough)
 }

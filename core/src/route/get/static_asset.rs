@@ -1,9 +1,6 @@
 use rocket::http::ContentType;
 
-const BULMA_CSS: &str = include_str!(concat!(
-    env!("CARGO_MANIFEST_DIR"),
-    "/assets/bulma.min.css"
-));
+const BULMA_CSS: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/bulma.min.css"));
 const SITE_CSS: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/site.css"));
 const NAV_JS: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/nav.js"));
 

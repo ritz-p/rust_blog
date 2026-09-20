@@ -4,8 +4,8 @@ use std::env;
 pub fn load_env() -> PathConfig {
     let _ = dotenv();
     PathConfig::new(
-        env::var("FIXED_CONTENT_PATH").ok().or_else(|| None),
-        env::var("ARTICLE_PATH").ok().or_else(|| None),
-        env::var("CONFIG_TOML_PATH").ok().or_else(|| None),
+        env::var("FIXED_CONTENT_PATH").ok(),
+        env::var("ARTICLE_PATH").ok(),
+        env::var("CONFIG_TOML_PATH").ok(),
     )
 }

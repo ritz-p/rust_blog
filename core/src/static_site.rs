@@ -15,22 +15,25 @@ use crate::{
     domain::page::Page,
     repository::{
         article::{
-            ArticlePeriod, get_all_articles, get_all_published_articles, get_article_periods,
-            get_articles_by_tag_slug, get_article_by_category_slug, get_latest_articles,
+            ArticlePeriod, get_all_articles, get_all_published_articles,
+            get_article_by_category_slug, get_article_periods, get_articles_by_tag_slug,
+            get_latest_articles,
         },
         category::{get_all_categories, get_categories_by_article},
         fixed_content::get_all_fixed_contents,
         tag::{get_all_tags, get_tags_by_article},
     },
     utils::{
-        config::CommonConfig, cut_out_string,
+        config::CommonConfig,
+        cut_out_string,
         markdown::{markdown_to_html, markdown_to_text},
         utc_to_jst,
     },
 };
 
 const PAGE_SIZE: u64 = 10;
-const BULMA_CSS: &[u8] = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/bulma.min.css"));
+const BULMA_CSS: &[u8] =
+    include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/bulma.min.css"));
 const SITE_CSS: &[u8] = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/site.css"));
 const NAV_JS: &[u8] = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/nav.js"));
 
@@ -354,7 +357,11 @@ async fn export_tag_variant(
             tera,
             "tag",
             &ctx,
-            &out_dir.join(static_tag_output_path(slug, sort_key, page_info.current_page)),
+            &out_dir.join(static_tag_output_path(
+                slug,
+                sort_key,
+                page_info.current_page,
+            )),
         )?;
     }
     Ok(())
@@ -451,8 +458,14 @@ async fn export_category_variant(
         let mut ctx = base_context(config);
         ctx.insert("category_slug", &slug);
         ctx.insert("sort_key", &sort_key);
-        ctx.insert("sort_created_url", &static_category_url(slug, "created_at", 1));
-        ctx.insert("sort_updated_url", &static_category_url(slug, "updated_at", 1));
+        ctx.insert(
+            "sort_created_url",
+            &static_category_url(slug, "created_at", 1),
+        );
+        ctx.insert(
+            "sort_updated_url",
+            &static_category_url(slug, "updated_at", 1),
+        );
         ctx.insert("articles", &article_items);
         ctx.insert("page", &page_info.current_page);
         ctx.insert("per", &page_info.per);
@@ -474,7 +487,11 @@ async fn export_category_variant(
             tera,
             "category",
             &ctx,
-            &out_dir.join(static_category_output_path(slug, sort_key, page_info.current_page)),
+            &out_dir.join(static_category_output_path(
+                slug,
+                sort_key,
+                page_info.current_page,
+            )),
         )?;
     }
     Ok(())
@@ -682,9 +699,10 @@ fn static_index_output_path(page: u64, period: Option<ArticlePeriod>) -> PathBuf
     match period {
         None if page <= 1 => PathBuf::from("index.html"),
         None => PathBuf::from(format!("page/{page}/index.html")),
-        Some(period) if page <= 1 => {
-            PathBuf::from(format!("archive/{}/{:02}/index.html", period.year, period.month))
-        }
+        Some(period) if page <= 1 => PathBuf::from(format!(
+            "archive/{}/{:02}/index.html",
+            period.year, period.month
+        )),
         Some(period) => PathBuf::from(format!(
             "archive/{}/{:02}/page/{page}/index.html",
             period.year, period.month
@@ -785,15 +803,28 @@ fn discover_fixed_content_redirects(out_dir: &Path) -> Result<Vec<String>> {
 fn is_reserved_root_dir(name: &str) -> bool {
     matches!(
         name,
-        "archive" | "category" | "categories" | "css" | "icon" | "image" | "js" | "page"
-            | "posts" | "tag" | "tags"
+        "archive"
+            | "category"
+            | "categories"
+            | "css"
+            | "icon"
+            | "image"
+            | "js"
+            | "page"
+            | "posts"
+            | "tag"
+            | "tags"
     )
 }
 
 #[cfg(test)]
 mod tests {
     use super::build_redirects_file;
-    use std::{fs, path::PathBuf, time::{SystemTime, UNIX_EPOCH}};
+    use std::{
+        fs,
+        path::PathBuf,
+        time::{SystemTime, UNIX_EPOCH},
+    };
 
     fn temp_export_dir() -> PathBuf {
         let unique = SystemTime::now()
@@ -805,10 +836,22 @@ mod tests {
 
     #[test]
     fn special_slugs_are_encoded_in_urls_but_not_output_paths() {
-        assert_eq!(super::static_article_url("C# 100%"), "/posts/C%23%20100%25/");
-        assert_eq!(super::static_tag_url("c#", "updated_at", 2), "/tag/c%23/updated/page/2/");
-        assert_eq!(super::static_category_url("c#", "created_at", 1), "/category/c%23/");
-        assert_eq!(super::static_tag_output_path("c#", "created_at", 1), PathBuf::from("tag/c#/index.html"));
+        assert_eq!(
+            super::static_article_url("C# 100%"),
+            "/posts/C%23%20100%25/"
+        );
+        assert_eq!(
+            super::static_tag_url("c#", "updated_at", 2),
+            "/tag/c%23/updated/page/2/"
+        );
+        assert_eq!(
+            super::static_category_url("c#", "created_at", 1),
+            "/category/c%23/"
+        );
+        assert_eq!(
+            super::static_tag_output_path("c#", "created_at", 1),
+            PathBuf::from("tag/c#/index.html")
+        );
     }
 
     #[test]
@@ -823,21 +866,35 @@ mod tests {
         fs::write(content.join("icon/default.png"), b"default icon").unwrap();
         fs::write(custom.join("custom.png"), b"custom asset").unwrap();
         let config_path = root.join("blog_config.toml");
-        fs::write(&config_path, format!(
-            "[common]\nimage_dir = '{}'\nicon_dir = '{}'\n",
-            custom.display(), custom.display(),
-        )).unwrap();
+        fs::write(
+            &config_path,
+            format!(
+                "[common]\nimage_dir = '{}'\nicon_dir = '{}'\n",
+                custom.display(),
+                custom.display(),
+            ),
+        )
+        .unwrap();
         let config = crate::utils::config::load_config_from_file(&config_path);
         let out = root.join("configured");
         super::write_static_assets(&out, &content, &config).unwrap();
         for directory in ["image", "icon"] {
-            assert_eq!(fs::read(out.join(directory).join("custom.png")).unwrap(), b"custom asset");
+            assert_eq!(
+                fs::read(out.join(directory).join("custom.png")).unwrap(),
+                b"custom asset"
+            );
             assert!(!out.join(directory).join("default.png").exists());
         }
         let fallback = root.join("fallback");
         super::write_static_assets(&fallback, &content, &Default::default()).unwrap();
-        assert_eq!(fs::read(fallback.join("image/default.png")).unwrap(), b"default image");
-        assert_eq!(fs::read(fallback.join("icon/default.png")).unwrap(), b"default icon");
+        assert_eq!(
+            fs::read(fallback.join("image/default.png")).unwrap(),
+            b"default image"
+        );
+        assert_eq!(
+            fs::read(fallback.join("icon/default.png")).unwrap(),
+            b"default icon"
+        );
         fs::remove_dir_all(root).unwrap();
     }
 
@@ -881,8 +938,12 @@ mod tests {
         };
         let templates = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../templates");
         let tera = load_templates(&templates).expect("failed to load templates");
-        write_static_assets(&output.0, &output.0.join("empty-content"), &Default::default())
-            .expect("failed to export assets");
+        write_static_assets(
+            &output.0,
+            &output.0.join("empty-content"),
+            &Default::default(),
+        )
+        .expect("failed to export assets");
         export_article_pages(&tera, &db, &config, &output.0)
             .await
             .expect("failed to export article");
@@ -961,7 +1022,10 @@ mod tests {
 
         assert!(redirects.contains("/posts/:slug /posts/:slug/ 308"));
         assert!(redirects.contains("/about /about/ 308"));
-        assert_eq!(redirects.matches("/posts/:slug /posts/:slug/ 308").count(), 1);
+        assert_eq!(
+            redirects.matches("/posts/:slug /posts/:slug/ 308").count(),
+            1
+        );
         assert!(!redirects.contains("/posts/one /posts/one/ 308"));
         assert!(!redirects.contains("/posts/two /posts/two/ 308"));
         assert!(!redirects.contains("/css /css/ 308"));

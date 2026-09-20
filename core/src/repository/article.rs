@@ -66,10 +66,10 @@ pub async fn get_all_articles(
 ) -> Result<(Vec<article::Model>, PageInfo), DbErr> {
     let now = Utc::now();
     let mut base_query = article::Entity::find().filter(article::Column::CreatedAt.lte(now));
-    if let Some(period) = period {
-        if let Some(filter) = period.sqlite_datetime_range_filter() {
-            base_query = base_query.filter(filter);
-        }
+    if let Some(period) = period
+        && let Some(filter) = period.sqlite_datetime_range_filter()
+    {
+        base_query = base_query.filter(filter);
     }
 
     let total = base_query.clone().count(db).await?;
@@ -91,10 +91,10 @@ pub async fn get_article_periods(
 ) -> Result<Vec<ArticlePeriod>, DbErr> {
     let now = Utc::now();
     let mut query = article::Entity::find().filter(article::Column::CreatedAt.lte(now));
-    if let Some(period) = period {
-        if let Some(filter) = period.sqlite_datetime_range_filter() {
-            query = query.filter(filter);
-        }
+    if let Some(period) = period
+        && let Some(filter) = period.sqlite_datetime_range_filter()
+    {
+        query = query.filter(filter);
     }
 
     let created_ats: Vec<DateTime<Utc>> = query

@@ -25,7 +25,7 @@ USER ${USERNAME}
 ENV PATH=/home/${USERNAME}/.cargo/bin:$PATH
 RUN rustup default stable
 RUN cargo install sea-orm-cli
-RUN rustup component add rustfmt
+RUN rustup component add rustfmt clippy
 
 EXPOSE 8888
 

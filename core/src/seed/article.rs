@@ -3,9 +3,7 @@ use crate::entity::{article, article::ActiveModel, article_tag};
 use crate::entity::{article_category, category, tag};
 use crate::utils;
 use sea_orm::ActiveValue::Set;
-use sea_orm::{
-    ActiveModelTrait, ColumnTrait, DatabaseConnection, DbErr, EntityTrait, QueryFilter,
-};
+use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, DbErr, EntityTrait, QueryFilter};
 use seed::{prepare, upsert, validate};
 use utils::front_matter::FrontMatter;
 
@@ -136,10 +134,16 @@ mod tests {
             ("category", "article_category", "category_id"),
         ] {
             for sql in [
-                format!("CREATE TABLE {table} (id INTEGER PRIMARY KEY, name TEXT NOT NULL UNIQUE, slug TEXT NOT NULL UNIQUE)"),
-                format!("CREATE TABLE {relation} (article_id INTEGER, {column} INTEGER REFERENCES {table}(id), PRIMARY KEY(article_id, {column}))"),
+                format!(
+                    "CREATE TABLE {table} (id INTEGER PRIMARY KEY, name TEXT NOT NULL UNIQUE, slug TEXT NOT NULL UNIQUE)"
+                ),
+                format!(
+                    "CREATE TABLE {relation} (article_id INTEGER, {column} INTEGER REFERENCES {table}(id), PRIMARY KEY(article_id, {column}))"
+                ),
             ] {
-                db.execute(Statement::from_string(DbBackend::Sqlite, sql)).await.unwrap();
+                db.execute(Statement::from_string(DbBackend::Sqlite, sql))
+                    .await
+                    .unwrap();
             }
         }
         let mut matter = build_front_matter_from_title_and_slug("Test", "test");
@@ -155,13 +159,23 @@ mod tests {
             ("tag", "article_tag", "C#", "c#"),
             ("category", "article_category", "WebDev", "webdev"),
         ] {
-            let rows = db.query_all(Statement::from_string(DbBackend::Sqlite,
-                format!("SELECT name, slug FROM {table}"))).await.unwrap();
+            let rows = db
+                .query_all(Statement::from_string(
+                    DbBackend::Sqlite,
+                    format!("SELECT name, slug FROM {table}"),
+                ))
+                .await
+                .unwrap();
             assert_eq!(rows.len(), 1);
             assert_eq!(rows[0].try_get::<String>("", "name").unwrap(), name);
             assert_eq!(rows[0].try_get::<String>("", "slug").unwrap(), slug);
-            let links = db.query_all(Statement::from_string(DbBackend::Sqlite,
-                format!("SELECT * FROM {relation}"))).await.unwrap();
+            let links = db
+                .query_all(Statement::from_string(
+                    DbBackend::Sqlite,
+                    format!("SELECT * FROM {relation}"),
+                ))
+                .await
+                .unwrap();
             assert_eq!(links.len(), 1);
         }
     }

@@ -231,8 +231,12 @@ mod tests {
     async fn index_paginates_at_ten_and_eleven_articles() {
         for total in [10, 11] {
             let db = prepare_index_db().await;
-            db.execute(Statement::from_string(DbBackend::Sqlite, "DELETE FROM article"))
-                .await.unwrap();
+            db.execute(Statement::from_string(
+                DbBackend::Sqlite,
+                "DELETE FROM article",
+            ))
+            .await
+            .unwrap();
             for id in 1..=total {
                 db.execute(Statement::from_sql_and_values(
                     DbBackend::Sqlite,

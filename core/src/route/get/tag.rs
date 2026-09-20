@@ -13,7 +13,10 @@ use crate::{
 };
 
 fn sort_url(slug: &str, sort_key: &str) -> String {
-    format!("/tag/{}?sort_key={sort_key}", crate::utils::url_segment(slug))
+    format!(
+        "/tag/{}?sort_key={sort_key}",
+        crate::utils::url_segment(slug)
+    )
 }
 
 #[get("/tags")]
@@ -58,7 +61,7 @@ pub async fn tag_detail(
     let query = query.unwrap_or(TagQuery::new());
     let page = Page::new_from_query(&query);
     let sort_key = query.sort_key.unwrap_or_else(|| "created_at".to_string());
-    match get_articles_by_tag_slug(&db, page, slug, &sort_key).await {
+    match get_articles_by_tag_slug(db, page, slug, &sort_key).await {
         Ok((articles, page_info)) => {
             let base_path = "/tag/".to_owned() + &crate::utils::url_segment(slug);
             let prev_url = PageInfo::get_prev_url(&page_info, &base_path, Some(&sort_key));

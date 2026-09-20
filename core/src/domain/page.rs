@@ -37,7 +37,7 @@ pub struct PageInfo {
 
 impl PageInfo {
     pub fn new(page: Page, total: u64) -> Self {
-        let total_pages = ((total + page.per - 1) / page.per).max(1);
+        let total_pages = total.div_ceil(page.per).max(1);
         let current_page = page.number.clamp(1, total_pages);
 
         let has_prev = current_page > 1;
@@ -65,7 +65,7 @@ impl PageInfo {
                 self.prev_page,
                 self.per,
                 if let Some(key) = sort_key {
-                    "&sort_key=".to_owned() + &key
+                    "&sort_key=".to_owned() + key
                 } else {
                     "".to_owned()
                 }
@@ -82,7 +82,7 @@ impl PageInfo {
                 self.next_page,
                 self.per,
                 if let Some(key) = sort_key {
-                    "&sort_key=".to_owned() + &key
+                    "&sort_key=".to_owned() + key
                 } else {
                     "".to_owned()
                 }
@@ -153,7 +153,13 @@ mod tests {
 
     #[test]
     fn page_info_new_sets_bounds_and_navigation_flags() {
-        let info = PageInfo::new(Page { number: 99, per: 10 }, 95);
+        let info = PageInfo::new(
+            Page {
+                number: 99,
+                per: 10,
+            },
+            95,
+        );
         assert_eq!(info.current_page, 10);
         assert_eq!(info.total_pages, 10);
         assert!(info.has_prev);

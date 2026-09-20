@@ -39,10 +39,16 @@ impl Fairing for SecurityHeaders {
 
     async fn on_response<'r>(&self, _req: &'r Request<'_>, res: &mut Response<'r>) {
         res.set_header(Header::new("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' https: data:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'"));
-        res.set_header(Header::new("Referrer-Policy", "strict-origin-when-cross-origin"));
+        res.set_header(Header::new(
+            "Referrer-Policy",
+            "strict-origin-when-cross-origin",
+        ));
         res.set_header(Header::new("X-Content-Type-Options", "nosniff"));
         res.set_header(Header::new("X-Frame-Options", "DENY"));
-        res.set_header(Header::new("Permissions-Policy", "geolocation=(), microphone=(), camera=()"));
+        res.set_header(Header::new(
+            "Permissions-Policy",
+            "geolocation=(), microphone=(), camera=()",
+        ));
         res.set_header(Header::new(
             "Strict-Transport-Security",
             "max-age=31536000; includeSubDomains",
@@ -54,7 +60,7 @@ pub async fn launch(
     db: DatabaseConnection,
     config_map: HashMap<String, String>,
 ) -> Result<Rocket<Ignite>, rocket::Error> {
-    return rocket::build()
+    rocket::build()
         .manage(db)
         .manage(CommonConfig {
             site_name: config_map.get("site_name").cloned(),
@@ -113,5 +119,5 @@ pub async fn launch(
             ],
         )
         .launch()
-        .await;
+        .await
 }

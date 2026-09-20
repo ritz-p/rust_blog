@@ -3,7 +3,9 @@ use sea_orm::{ColumnTrait, DatabaseConnection, DbErr, EntityTrait, QueryFilter, 
 
 // Used by the static export pipeline in the library target.
 #[allow(dead_code)]
-pub async fn get_all_fixed_contents(db: &DatabaseConnection) -> Result<Vec<fixed_content::Model>, DbErr> {
+pub async fn get_all_fixed_contents(
+    db: &DatabaseConnection,
+) -> Result<Vec<fixed_content::Model>, DbErr> {
     fixed_content::Entity::find()
         .order_by_asc(fixed_content::Column::Slug)
         .all(db)

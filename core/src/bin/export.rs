@@ -51,7 +51,10 @@ async fn main() -> anyhow::Result<()> {
     );
     let templates_dir = resolve_dir(
         "RUST_BLOG_TEMPLATES_DIR",
-        &[current_dir.join("templates"), executable_dir.join("templates")],
+        &[
+            current_dir.join("templates"),
+            executable_dir.join("templates"),
+        ],
     );
     let content_dir = resolve_dir(
         "RUST_BLOG_CONTENT_DIR",
