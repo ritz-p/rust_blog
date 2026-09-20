@@ -2,6 +2,7 @@ pub mod article;
 pub mod config;
 pub mod fixed_content;
 pub mod markdown;
+mod taxonomy;
 use crate::{
     entity::category::Entity as CategoryEntity,
     entity::tag::Entity as TagEntity,
@@ -17,6 +18,7 @@ use config::{env::load_env, seed::seed_from_toml};
 use sea_orm::DatabaseConnection;
 
 pub async fn run_all(db: DatabaseConnection) -> anyhow::Result<()> {
+    taxonomy::normalize(&db).await?;
     let config = load_env();
     println!("{:?}", config);
     run_fixed_content_seed(&db, &config.fixed_content_path).await?;

@@ -121,7 +121,7 @@ async fn export_index_variant(
             .into_iter()
             .map(|m| {
                 let excerpt = match m.excerpt.as_ref() {
-                    Some(value) => value.clone(),
+                    Some(value) => crate::utils::markdown::markdown_to_text(value),
                     None => cut_out_string(&markdown_to_text(&m.content), 100),
                 };
                 let icatch_path = m
@@ -223,7 +223,7 @@ async fn export_fixed_content_pages(
     let fixed_contents = get_all_fixed_contents(db).await?;
     for fixed_content in fixed_contents {
         let excerpt = match fixed_content.excerpt.as_ref() {
-            Some(value) => value.clone(),
+            Some(value) => crate::utils::markdown::markdown_to_text(value),
             None => cut_out_string(&markdown_to_text(&fixed_content.content), 100),
         };
 
@@ -313,7 +313,7 @@ async fn export_tag_variant(
                     .clone()
                     .unwrap_or_else(|| default_icatch_path.clone());
                 let excerpt = match article.excerpt.as_ref() {
-                    Some(value) => value.clone(),
+                    Some(value) => crate::utils::markdown::markdown_to_text(value),
                     None => cut_out_string(&markdown_to_text(&article.content), 100),
                 };
                 let slug = article.slug.clone();
@@ -433,7 +433,7 @@ async fn export_category_variant(
                     .clone()
                     .unwrap_or_else(|| default_icatch_path.clone());
                 let excerpt = match article.excerpt.as_ref() {
-                    Some(value) => value.clone(),
+                    Some(value) => crate::utils::markdown::markdown_to_text(value),
                     None => cut_out_string(&markdown_to_text(&article.content), 100),
                 };
                 let slug = article.slug.clone();
@@ -702,6 +702,7 @@ fn static_index_url(page: u64, period: Option<ArticlePeriod>) -> String {
 }
 
 fn static_article_url(slug: &str) -> String {
+    let slug = crate::utils::url_segment(slug);
     format!("/posts/{slug}/")
 }
 
@@ -719,6 +720,7 @@ fn static_tag_output_path(slug: &str, sort_key: &str, page: u64) -> PathBuf {
 }
 
 fn static_tag_url(slug: &str, sort_key: &str, page: u64) -> String {
+    let slug = crate::utils::url_segment(slug);
     let sort_segment = if sort_key == "updated_at" {
         "updated/"
     } else {
@@ -747,6 +749,7 @@ fn static_category_output_path(slug: &str, sort_key: &str, page: u64) -> PathBuf
 }
 
 fn static_category_url(slug: &str, sort_key: &str, page: u64) -> String {
+    let slug = crate::utils::url_segment(slug);
     let sort_segment = if sort_key == "updated_at" {
         "updated/"
     } else {
@@ -772,6 +775,7 @@ fn discover_fixed_content_redirects(out_dir: &Path) -> Result<Vec<String>> {
             continue;
         }
         if entry.path().join("index.html").exists() {
+            let name = crate::utils::url_segment(&name);
             redirects.push(format!("/{name} /{name}/ 308"));
         }
     }
@@ -797,6 +801,14 @@ mod tests {
             .expect("system time before unix epoch")
             .as_nanos();
         std::env::temp_dir().join(format!("rust-blog-static-site-{unique}"))
+    }
+
+    #[test]
+    fn special_slugs_are_encoded_in_urls_but_not_output_paths() {
+        assert_eq!(super::static_article_url("C# 100%"), "/posts/C%23%20100%25/");
+        assert_eq!(super::static_tag_url("c#", "updated_at", 2), "/tag/c%23/updated/page/2/");
+        assert_eq!(super::static_category_url("c#", "created_at", 1), "/category/c%23/");
+        assert_eq!(super::static_tag_output_path("c#", "created_at", 1), PathBuf::from("tag/c#/index.html"));
     }
 
     #[test]

@@ -32,7 +32,7 @@ pub async fn fixed_content_detail(
 
     let content = markdown_to_html(&fixed_content.content);
     let excerpt = match fixed_content.excerpt.as_ref() {
-        Some(value) => value.clone(),
+        Some(value) => crate::utils::markdown::markdown_to_text(value),
         None => cut_out_string(&markdown_to_text(&fixed_content.content), 100),
     };
 
@@ -45,7 +45,7 @@ pub async fn fixed_content_detail(
             json!({
                 "title":      model.title,
                 "slug":       slug.clone(),
-                "url":        format!("/posts/{slug}"),
+                "url":        format!("/posts/{}", crate::utils::url_segment(&slug)),
             })
         })
         .collect();

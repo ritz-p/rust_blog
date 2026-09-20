@@ -10,6 +10,12 @@
   min-width: 0;
 }
 
+.content table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
 .content pre {
   background: #f6f8fa;
   color: #24292f;
