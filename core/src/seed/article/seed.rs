@@ -95,14 +95,14 @@ fn parse_created_at(raw: &str) -> Result<DateTime<Utc>, DbErr> {
         return Ok(dt.with_timezone(&Utc));
     }
 
-    if let Ok(date) = NaiveDate::parse_from_str(raw, "%Y-%m-%d") {
-        if let Some(naive_dt) = date.and_hms_opt(0, 0, 0) {
-            let dt = Tokyo
-                .from_local_datetime(&naive_dt)
-                .single()
-                .ok_or_else(|| DbErr::Custom(format!("invalid JST local datetime: {raw}")))?;
-            return Ok(dt.with_timezone(&Utc));
-        }
+    if let Ok(date) = NaiveDate::parse_from_str(raw, "%Y-%m-%d")
+        && let Some(naive_dt) = date.and_hms_opt(0, 0, 0)
+    {
+        let dt = Tokyo
+            .from_local_datetime(&naive_dt)
+            .single()
+            .ok_or_else(|| DbErr::Custom(format!("invalid JST local datetime: {raw}")))?;
+        return Ok(dt.with_timezone(&Utc));
     }
 
     Err(DbErr::Custom(format!(
@@ -126,28 +126,28 @@ pub fn validate(front_matter: &FrontMatter, body: &str) -> Result<(), Report> {
         Ok(_) => Ok(()),
         Err(e) => {
             println!("{:?}", e);
-            return Err(e.into());
+            Err(e)
         }
     }
 }
 
 pub async fn upsert(db: &DatabaseConnection, mut active_model: ActiveModel) -> Result<i32, DbErr> {
-    if active_model.is_changed() {
-        if let Some(utc) = Utc::now().with_nanosecond(0) {
-            active_model.updated_at = Set(utc);
-        }
+    if active_model.is_changed()
+        && let Some(utc) = Utc::now().with_nanosecond(0)
+    {
+        active_model.updated_at = Set(utc);
     }
     let saved: ActiveModel = active_model.save(db).await?;
     match saved.id {
         ActiveValue::Set(id) | ActiveValue::Unchanged(id) => Ok(id),
-        ActiveValue::NotSet => return Err(DbErr::Custom("article id not set".into()).into()),
+        ActiveValue::NotSet => Err(DbErr::Custom("article id not set".into())),
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::resolve_created_at;
     use super::parse_created_at;
+    use super::resolve_created_at;
     use crate::utils::front_matter::FrontMatter;
     use chrono::{TimeZone, Utc};
 

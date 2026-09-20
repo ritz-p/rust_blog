@@ -17,6 +17,10 @@ pub struct FrontMatter {
 
 impl FrontMatter {
     #[allow(dead_code)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Constructor mirrors the front matter fields"
+    )]
     pub fn new(
         title: String,
         slug: String,

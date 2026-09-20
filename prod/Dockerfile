@@ -1,4 +1,4 @@
-FROM rust:latest AS builder
+FROM rust:1.93.1-bookworm AS builder
 
 WORKDIR /app
 
@@ -7,6 +7,7 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 COPY Cargo.toml Cargo.lock ./
+COPY rust-toolchain.toml ./
 COPY core/Cargo.toml core/Cargo.toml
 COPY migration/Cargo.toml migration/Cargo.toml
 COPY Rocket.toml Rocket.toml

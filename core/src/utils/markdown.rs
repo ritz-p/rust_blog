@@ -24,23 +24,20 @@ pub fn markdown_to_html(input: &str) -> String {
     let mut events = Vec::new();
     while let Some(event) = parser.next() {
         if let Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced(info))) = &event {
-            let syntax = info
-                .split_whitespace()
-                .next()
-                .and_then(|language| {
-                    let language = match language {
-                        "bash" => "sh",
-                        _ => language,
-                    };
-                    SYNTAX_SET
-                        .find_syntax_by_token(language)
-                        .map(|syntax| (syntax, &*SYNTAX_SET))
-                        .or_else(|| {
-                            EXTRA_SYNTAX_SET
-                                .find_syntax_by_token(language)
-                                .map(|syntax| (syntax, &*EXTRA_SYNTAX_SET))
-                        })
-                });
+            let syntax = info.split_whitespace().next().and_then(|language| {
+                let language = match language {
+                    "bash" => "sh",
+                    _ => language,
+                };
+                SYNTAX_SET
+                    .find_syntax_by_token(language)
+                    .map(|syntax| (syntax, &*SYNTAX_SET))
+                    .or_else(|| {
+                        EXTRA_SYNTAX_SET
+                            .find_syntax_by_token(language)
+                            .map(|syntax| (syntax, &*EXTRA_SYNTAX_SET))
+                    })
+            });
             if let Some((syntax, syntax_set)) = syntax {
                 let mut code = String::new();
                 for event in parser.by_ref() {
@@ -130,7 +127,9 @@ pub fn markdown_to_text(markdown: &str) -> String {
                     buffer.push_str(&content)
                 }
             }
-            Event::Code(content) if !tags_stack.iter().any(is_strikethrough) => buffer.push_str(&content),
+            Event::Code(content) if !tags_stack.iter().any(is_strikethrough) => {
+                buffer.push_str(&content)
+            }
             Event::SoftBreak => buffer.push(' '),
             _ => (),
         }
@@ -182,16 +181,28 @@ mod tests {
     #[test]
     fn highlights_kotlin_and_bash_with_aliases() {
         for (languages, code) in [
-            (&["kotlin", "kt", "kts"][..], "fun main() { val text = \"<hello> & world\"; println(text) } // comment\n"),
-            (&["bash", "sh"][..], "# comment\nif true; then echo \"<hello> & world\"; fi\n"),
+            (
+                &["kotlin", "kt", "kts"][..],
+                "fun main() { val text = \"<hello> & world\"; println(text) } // comment\n",
+            ),
+            (
+                &["bash", "sh"][..],
+                "# comment\nif true; then echo \"<hello> & world\"; fi\n",
+            ),
         ] {
             let expected = markdown_to_html(&format!("```\n{code}```\n"));
             for language in languages {
                 let html = markdown_to_html(&format!("```{language}\n{code}```\n"));
                 for scope in ["syntax-string", "syntax-comment"] {
-                    assert!(html.contains(scope), "missing {scope} for {language}: {html}");
+                    assert!(
+                        html.contains(scope),
+                        "missing {scope} for {language}: {html}"
+                    );
                 }
-                assert!(html.contains("syntax-keyword") || html.contains("syntax-storage"), "{language}: {html}");
+                assert!(
+                    html.contains("syntax-keyword") || html.contains("syntax-storage"),
+                    "{language}: {html}"
+                );
                 assert_eq!(without_spans(&html), expected, "{language}");
             }
         }
@@ -414,9 +425,15 @@ End paragraph.";
     fn plain_text_ignores_link_and_image_titles() {
         for (markdown, expected) in [
             (r#"[label](https://example.com "tooltip")"#, "label"),
-            (r#"[**bold** `code`](https://example.com "tooltip")"#, "bold code"),
+            (
+                r#"[**bold** `code`](https://example.com "tooltip")"#,
+                "bold code",
+            ),
             (r#"![alt text](image.png "tooltip")"#, "alt text"),
-            ("[label][ref]\n\n[ref]: https://example.com \"tooltip\"", "label"),
+            (
+                "[label][ref]\n\n[ref]: https://example.com \"tooltip\"",
+                "label",
+            ),
             (r#"[](https://example.com "tooltip")"#, ""),
         ] {
             assert_eq!(markdown_to_text(markdown), expected, "{markdown}");
@@ -432,8 +449,16 @@ End paragraph.";
 
     #[test]
     fn deleted_nested_content_is_not_an_excerpt() {
-        assert_eq!(markdown_to_text("before ~~**text** `code` [link](https://example.com \"title\")~~ after"), "before  after");
-        assert_eq!(markdown_to_text("[ordinary words] and `[https://example.com]`"), "[ordinary words] and [https://example.com]");
+        assert_eq!(
+            markdown_to_text(
+                "before ~~**text** `code` [link](https://example.com \"title\")~~ after"
+            ),
+            "before  after"
+        );
+        assert_eq!(
+            markdown_to_text("[ordinary words] and `[https://example.com]`"),
+            "[ordinary words] and [https://example.com]"
+        );
     }
 
     #[test]

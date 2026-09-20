@@ -13,7 +13,10 @@ use crate::{
 };
 
 fn sort_url(slug: &str, sort_key: &str) -> String {
-    format!("/category/{}?sort_key={sort_key}", crate::utils::url_segment(slug))
+    format!(
+        "/category/{}?sort_key={sort_key}",
+        crate::utils::url_segment(slug)
+    )
 }
 
 #[get("/categories")]
