@@ -93,6 +93,7 @@ export FIXED_CONTENT_PATH="content/fixed_contents"
 export CONFIG_TOML_PATH="blog_config.toml"
 export RUST_BLOG_CONFIG_PATH="$CONFIG_TOML_PATH"
 export RUST_BLOG_REQUIRE_CREATED_AT=1
+export RUST_BLOG_TEMPLATES_DIR="tools/rust-blog-export-tools-v0.1.0-x86_64-unknown-linux-gnu/templates"
 ./tools/rust-blog-export-tools-v0.1.0-x86_64-unknown-linux-gnu/migration up
 ./tools/rust-blog-export-tools-v0.1.0-x86_64-unknown-linux-gnu/seed
 ./tools/rust-blog-export-tools-v0.1.0-x86_64-unknown-linux-gnu/export dist
@@ -121,6 +122,7 @@ export FIXED_CONTENT_PATH="content/fixed_contents"
 export CONFIG_TOML_PATH="blog_config.toml"
 export RUST_BLOG_CONFIG_PATH="$CONFIG_TOML_PATH"
 export RUST_BLOG_REQUIRE_CREATED_AT=1
+export RUST_BLOG_TEMPLATES_DIR="tools/rust-blog-export-tools-v0.1.0-x86_64-unknown-linux-gnu/templates"
 ./tools/rust-blog-export-tools-v0.1.0-x86_64-unknown-linux-gnu/migration up
 ./tools/rust-blog-export-tools-v0.1.0-x86_64-unknown-linux-gnu/seed
 ./tools/rust-blog-export-tools-v0.1.0-x86_64-unknown-linux-gnu/export dist
@@ -144,6 +146,7 @@ export CONFIG_TOML_PATH="blog_config.toml"
 export RUST_BLOG_CONFIG_PATH="$CONFIG_TOML_PATH"
 export RUST_BLOG_CONTENT_DIR="content"
 export RUST_BLOG_REQUIRE_CREATED_AT=1
+export RUST_BLOG_TEMPLATES_DIR="tools/rust-blog-export-tools-v0.1.0-x86_64-unknown-linux-gnu/templates"
 ./tools/rust-blog-export-tools-v0.1.0-x86_64-unknown-linux-gnu/migration up
 ./tools/rust-blog-export-tools-v0.1.0-x86_64-unknown-linux-gnu/seed
 ./tools/rust-blog-export-tools-v0.1.0-x86_64-unknown-linux-gnu/export dist
