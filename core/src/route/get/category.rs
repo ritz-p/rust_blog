@@ -13,7 +13,7 @@ use crate::{
 };
 
 fn sort_url(slug: &str, sort_key: &str) -> String {
-    format!("/category/{slug}?sort_key={sort_key}")
+    format!("/category/{}?sort_key={sort_key}", crate::utils::url_segment(slug))
 }
 
 #[get("/categories")]
@@ -31,7 +31,7 @@ pub async fn category_list(
             json!({
                 "name": category.name.clone(),
                 "slug": slug.clone(),
-                "url": format!("/category/{slug}")
+                "url": format!("/category/{}", crate::utils::url_segment(&slug))
             })
         })
         .collect::<Vec<_>>();
@@ -60,7 +60,7 @@ pub async fn category_detail(
     let sort_key = query.sort_key.unwrap_or_else(|| "created_at".to_string());
     match get_article_by_category_slug(db.inner(), page, slug, &sort_key).await {
         Ok((articles, page_info)) => {
-            let base_path = "/category/".to_owned() + slug;
+            let base_path = "/category/".to_owned() + &crate::utils::url_segment(slug);
             let prev_url = PageInfo::get_prev_url(&page_info, &base_path, Some(&sort_key));
             let next_url = PageInfo::get_next_url(&page_info, &base_path, Some(&sort_key));
             let default_icatch_path = config.default_icatch_path.clone().unwrap_or_default();
@@ -83,14 +83,14 @@ pub async fn category_detail(
                             .clone()
                             .unwrap_or_else(|| default_icatch_path.clone());
                         let excerpt = match article.excerpt.as_ref() {
-                            Some(value) => value.clone(),
+                            Some(value) => crate::utils::markdown::markdown_to_text(value),
                             None => cut_out_string(&markdown_to_text(&article.content), 100),
                         };
                         let slug = article.slug.clone();
                         json!({
                             "title": article.title.clone(),
                             "slug": slug.clone(),
-                            "url": format!("/posts/{slug}"),
+                            "url": format!("/posts/{}", crate::utils::url_segment(&slug)),
                             "icatch_path": icatch_path,
                             "excerpt": excerpt,
                             "created_at": utc_to_jst(article.created_at),

@@ -39,7 +39,7 @@ pub async fn article_detail(
             json!({
                 "name": tag.name,
                 "slug": slug.clone(),
-                "url": format!("/tag/{slug}"),
+                "url": format!("/tag/{}", crate::utils::url_segment(&slug)),
             })
         })
         .collect();
@@ -53,7 +53,7 @@ pub async fn article_detail(
             json!({
                 "name": category.name,
                 "slug": slug.clone(),
-                "url": format!("/category/{slug}"),
+                "url": format!("/category/{}", crate::utils::url_segment(&slug)),
             })
         })
         .collect();
@@ -69,7 +69,7 @@ pub async fn article_detail(
             json!({
                 "title":      model.title,
                 "slug":       slug.clone(),
-                "url":        format!("/posts/{slug}"),
+                "url":        format!("/posts/{}", crate::utils::url_segment(&slug)),
             })
         })
         .collect();
@@ -114,7 +114,7 @@ mod tests {
         let article = article::Model {
             id: 1,
             title: "Highlighted Rust".to_owned(),
-            slug: "highlighted-rust".to_owned(),
+            slug: "highlighted-rust#intro".to_owned(),
             excerpt: None,
             content: "```rust\nfn main() {\n\tlet s = \"<script> & hello\"; // comment\n\tprintln!(\"Hello,World\");\n\tlet n = 42;\n}\n```\n\n```kotlin\nfun main() { println(\"hello\") } // comment\n```\n\n```bash\n# comment\nif true; then echo \"hello\"; fi\n```\n"
                 .to_owned(),
@@ -143,13 +143,13 @@ mod tests {
         let client = Client::tracked(rocket)
             .await
             .expect("failed to build client");
-        let response = client.get("/posts/highlighted-rust").dispatch().await;
+        let response = client.get("/posts/highlighted-rust%23intro").dispatch().await;
         assert_eq!(response.status(), Status::Ok);
         assert_eq!(response.content_type(), Some(ContentType::HTML));
         let html = response.into_string().await.expect("missing article body");
         assert!(
             html.replace("&#x2F;", "/")
-                .contains("href=\"/posts/highlighted-rust\""),
+                .contains("href=\"/posts/highlighted-rust%23intro\""),
             "{html}"
         );
         assert!(html.contains("href=\"/css/site.css\""));

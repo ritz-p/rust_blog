@@ -132,7 +132,7 @@ async fn render_index(
         .into_iter()
         .map(|m| {
             let excerpt = match m.excerpt.as_ref() {
-                Some(value) => value.clone(),
+                Some(value) => crate::utils::markdown::markdown_to_text(value),
                 None => cut_out_string(&markdown_to_text(&m.content), 100),
             };
             let slug = m.slug;
@@ -143,7 +143,7 @@ async fn render_index(
             json!({
                 "title":      m.title,
                 "slug":       slug.clone(),
-                "url":        format!("/posts/{slug}"),
+                "url":        format!("/posts/{}", crate::utils::url_segment(&slug)),
                 "excerpt":    excerpt,
                 "icatch_path": icatch_path,
                 "created_at": utc_to_jst(m.created_at),
