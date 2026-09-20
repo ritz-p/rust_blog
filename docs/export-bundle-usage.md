@@ -64,6 +64,11 @@ your-static-site-repo/
 未指定時は、まず現在の作業ディレクトリを見て、見つからなければ `export` バイナリの配置ディレクトリを見ます。  
 別リポジトリで `content/` を bundle の外に置く場合は、`RUST_BLOG_CONTENT_DIR` を設定してください。
 
+以下の実行例はすべて、記事を管理するリポジトリのルートで実行します。
+`blog_config.toml` の `image_dir`・`icon_dir` は `RUST_BLOG_CONTENT_DIR` より優先され、
+相対パスは実行時の作業ディレクトリから解決されます。`content/image` などを指定した場合も、
+バンドルのディレクトリへ移動せずに実行することで画像・アイコンを正しくコピーできます。
+
 ## 最小手順
 
 1. 対象リリースの CI artifact を取得して展開する
@@ -79,19 +84,18 @@ your-static-site-repo/
 set -eu
 mkdir -p tools
 tar -xzf rust-blog-export-tools-v0.1.0-x86_64-unknown-linux-gnu.tar.gz -C tools
-cd tools/rust-blog-export-tools-v0.1.0-x86_64-unknown-linux-gnu
 export_db_dir=$(mktemp -d /tmp/rust-blog-export.XXXXXX)
 trap 'rm -f "$export_db_dir/blog.db" "$export_db_dir/blog.db-shm" "$export_db_dir/blog.db-wal" "$export_db_dir/blog.db-journal"; rmdir "$export_db_dir"' EXIT
 export DATABASE_URL="sqlite://$export_db_dir/blog.db?mode=rwc"
-export RUST_BLOG_CONTENT_DIR="../../content"
-export ARTICLE_PATH="../../content/articles"
-export FIXED_CONTENT_PATH="../../content/fixed_contents"
-export CONFIG_TOML_PATH="../../blog_config.toml"
+export RUST_BLOG_CONTENT_DIR="content"
+export ARTICLE_PATH="content/articles"
+export FIXED_CONTENT_PATH="content/fixed_contents"
+export CONFIG_TOML_PATH="blog_config.toml"
 export RUST_BLOG_CONFIG_PATH="$CONFIG_TOML_PATH"
 export RUST_BLOG_REQUIRE_CREATED_AT=1
-./migration up
-./seed
-./export ../../dist
+./tools/rust-blog-export-tools-v0.1.0-x86_64-unknown-linux-gnu/migration up
+./tools/rust-blog-export-tools-v0.1.0-x86_64-unknown-linux-gnu/seed
+./tools/rust-blog-export-tools-v0.1.0-x86_64-unknown-linux-gnu/export dist
 )
 ```
 
@@ -108,19 +112,18 @@ SQLite は毎回新しい一時 DB を使い、終了時に削除します。
 set -eu
 mkdir -p tools
 tar -xzf rust-blog-export-tools-v0.1.0-x86_64-unknown-linux-gnu.tar.gz -C tools
-cd tools/rust-blog-export-tools-v0.1.0-x86_64-unknown-linux-gnu
 export_db_dir=$(mktemp -d /tmp/rust-blog-export.XXXXXX)
 trap 'rm -f "$export_db_dir/blog.db" "$export_db_dir/blog.db-shm" "$export_db_dir/blog.db-wal" "$export_db_dir/blog.db-journal"; rmdir "$export_db_dir"' EXIT
 export DATABASE_URL="sqlite://$export_db_dir/blog.db?mode=rwc"
-export RUST_BLOG_CONTENT_DIR="../../content"
-export ARTICLE_PATH="../../content/articles"
-export FIXED_CONTENT_PATH="../../content/fixed_contents"
-export CONFIG_TOML_PATH="../../blog_config.toml"
+export RUST_BLOG_CONTENT_DIR="content"
+export ARTICLE_PATH="content/articles"
+export FIXED_CONTENT_PATH="content/fixed_contents"
+export CONFIG_TOML_PATH="blog_config.toml"
 export RUST_BLOG_CONFIG_PATH="$CONFIG_TOML_PATH"
 export RUST_BLOG_REQUIRE_CREATED_AT=1
-./migration up
-./seed
-./export ../../dist
+./tools/rust-blog-export-tools-v0.1.0-x86_64-unknown-linux-gnu/migration up
+./tools/rust-blog-export-tools-v0.1.0-x86_64-unknown-linux-gnu/seed
+./tools/rust-blog-export-tools-v0.1.0-x86_64-unknown-linux-gnu/export dist
 )
 ```
 
@@ -157,7 +160,7 @@ export RUST_BLOG_REQUIRE_CREATED_AT=1
 例:
 
 ```bash
-./export ../../dist
+./tools/rust-blog-export-tools-v0.1.0-x86_64-unknown-linux-gnu/export dist
 ```
 
 この結果、別リポジトリ側の `dist/` に HTML, CSS, JS, `_headers`, `_redirects` が出力されます。  
