@@ -13,15 +13,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-
       - name: Install linker dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends clang mold
 
-      - name: Cache Cargo
+      - name: Install Rust and cache Cargo
         uses: actions-rust-lang/setup-rust-toolchain@v2
 
       - name: Build project

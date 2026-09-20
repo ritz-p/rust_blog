@@ -1,6 +1,7 @@
-FROM rust:latest
+FROM rust:1.93.1-bookworm
 
 WORKDIR /workspace/rust_blog
+COPY rust-toolchain.toml ./
 ENV CARGO_HOME=/home/vscode/.cargo
 ENV RUSTUP_HOME=/home/vscode/.rustup
 ENV CARGO_TARGET_DIR=/home/vscode/.cargo/target
@@ -23,7 +24,7 @@ RUN groupadd --gid ${USER_GID} ${USERNAME} && \
     chown -R ${USER_UID}:${USER_GID} /home/${USERNAME}
 USER ${USERNAME}
 ENV PATH=/home/${USERNAME}/.cargo/bin:$PATH
-RUN rustup default stable
+RUN rustup show active-toolchain
 RUN cargo install sea-orm-cli
 RUN rustup component add rustfmt clippy
 
