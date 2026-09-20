@@ -49,6 +49,14 @@ async fn run_article_seed(db: &DatabaseConnection, dir: &str) -> Result<(), anyh
             continue;
         }
 
+        if std::env::var("RUST_BLOG_REQUIRE_CREATED_AT").as_deref() == Ok("1") {
+            anyhow::ensure!(
+                front_matter.created_at.is_some(),
+                "{}: static export requires created_at (or date) in article front matter",
+                path.display()
+            );
+        }
+
         let article_id = seed_article(db, &front_matter, &body).await?;
         seed_tag(db, &front_matter, article_id).await?;
         seed_category(db, &front_matter, article_id).await?;
