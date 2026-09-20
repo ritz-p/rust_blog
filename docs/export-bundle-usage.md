@@ -18,7 +18,7 @@ artifact には次が含まれます。
 
 - `export`
 - `migration`
-- `blog_config.toml`
+- `seed`
 - `templates/`
 
 `export` は単体バイナリではなく、上記ファイル群と同じディレクトリ構成で使う前提です。
@@ -29,6 +29,7 @@ artifact には次が含まれます。
 - `DATABASE_URL` を設定できる
 - SQLite を使う場合は書き込み可能な配置先を使う
 - 別リポジトリ側で記事データ投入元を用意する
+- 別リポジトリ側で `blog_config.toml` を用意する（`[common]`・`[categories]`・`[tags]` テーブルが必要）
 
 ## 推奨ディレクトリ構成
 
@@ -40,13 +41,14 @@ your-static-site-repo/
 │  └─ rust-blog-export/
 │     ├─ export
 │     ├─ migration
-│     ├─ blog_config.toml
+│     ├─ seed
 │     ├─ templates/
 │     └─ ...
 ├─ content/
 │  ├─ icon/
 │  └─ image/
 ├─ blog.db
+├─ blog_config.toml
 └─ dist/
 ```
 
@@ -68,7 +70,7 @@ your-static-site-repo/
 1. 対象リリースの CI artifact を取得して展開する
 2. `DATABASE_URL` を設定する
 3. `migration up` を実行する
-4. 必要な記事データを DB へ投入する
+4. `seed` で Markdown を DB へ投入する
 5. `export dist` を実行する
 
 例:
@@ -79,7 +81,12 @@ tar -xzf rust-blog-export-tools-v0.1.0-x86_64-unknown-linux-gnu.tar.gz -C tools
 cd tools/rust-blog-export-tools-v0.1.0-x86_64-unknown-linux-gnu
 export DATABASE_URL="sqlite://../../blog.db?mode=rwc"
 export RUST_BLOG_CONTENT_DIR="../../content"
+export ARTICLE_PATH="../../content/articles"
+export FIXED_CONTENT_PATH="../../content/fixed_contents"
+export CONFIG_TOML_PATH="../../blog_config.toml"
+export RUST_BLOG_CONFIG_PATH="$CONFIG_TOML_PATH"
 ./migration up
+./seed
 ./export ../../dist
 ```
 
@@ -96,21 +103,34 @@ tar -xzf rust-blog-export-tools-v0.1.0-x86_64-unknown-linux-gnu.tar.gz -C tools
 cd tools/rust-blog-export-tools-v0.1.0-x86_64-unknown-linux-gnu
 export DATABASE_URL="sqlite://../../blog.db?mode=rwc"
 export RUST_BLOG_CONTENT_DIR="../../content"
+export ARTICLE_PATH="../../content/articles"
+export FIXED_CONTENT_PATH="../../content/fixed_contents"
+export CONFIG_TOML_PATH="../../blog_config.toml"
+export RUST_BLOG_CONFIG_PATH="$CONFIG_TOML_PATH"
 ./migration up
+./seed
 ./export ../../dist
 ```
 
 ## DB への記事投入について
 
-この bundle には `seed` バイナリを含めていません。したがって、記事データ投入は別リポジトリ側で決める必要があります。
+バンドルの `seed` を使用します。古いバンドルには含まれていないため、再ビルドしてください。
+別リポジトリのルートから、次のように同じ DB に migration・seed・export を順に実行します。
 
-選択肢:
+```bash
+export DATABASE_URL="sqlite://$PWD/blog.db?mode=rwc"
+export ARTICLE_PATH="content/articles"
+export FIXED_CONTENT_PATH="content/fixed_contents"
+export CONFIG_TOML_PATH="blog_config.toml"
+export RUST_BLOG_CONFIG_PATH="$CONFIG_TOML_PATH"
+export RUST_BLOG_CONTENT_DIR="content"
+export RUST_BLOG_REQUIRE_CREATED_AT=1
+./tools/rust-blog-export/migration up
+./tools/rust-blog-export/seed
+./tools/rust-blog-export/export dist
+```
 
-- このリポジトリ側で将来 `seed` も bundle に含める
-- 別リポジトリ側で SQL を直接流す
-- 別リポジトリ側で独自の import スクリプトを持つ
-
-現状の bundle は、`export` 実行時点で必要なテーブルとデータが揃っていることを前提にしています。
+`export` 自体は Markdown を取り込みません。毎回空の DB を用意すれば、入力ディレクトリから除外した記事も公開されません。
 
 ## 出力先
 
@@ -145,6 +165,4 @@ export RUST_BLOG_CONTENT_DIR="../../content"
 
 ## 将来の改善候補
 
-- `seed` バイナリも bundle に含める
-- bundle を `.tar.gz` でまとめて release artifact 化する
 - 実行時依存を埋め込んで、`export` 単体で完結する形へ寄せる

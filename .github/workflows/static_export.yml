@@ -24,7 +24,7 @@ jobs:
 
       - name: Build export tools
         run: |
-          cargo build --release --target x86_64-unknown-linux-gnu -p rust_blog --bin export
+          cargo build --release --target x86_64-unknown-linux-gnu -p rust_blog --bin export --bin seed
           cargo build --release --target x86_64-unknown-linux-gnu -p migration --bin migration
 
       - name: Assemble export bundle
@@ -33,6 +33,7 @@ jobs:
           BUNDLE_DIR="artifact/rust-blog-export-tools-${{ github.ref_name }}-x86_64-unknown-linux-gnu"
           mkdir -p "${BUNDLE_DIR}/templates"
           cp target/x86_64-unknown-linux-gnu/release/export "${BUNDLE_DIR}/export"
+          cp target/x86_64-unknown-linux-gnu/release/seed "${BUNDLE_DIR}/seed"
           cp target/x86_64-unknown-linux-gnu/release/migration "${BUNDLE_DIR}/migration"
           cp -R templates/. "${BUNDLE_DIR}/templates/"
 
