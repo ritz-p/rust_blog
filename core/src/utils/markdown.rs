@@ -411,6 +411,19 @@ End paragraph.";
     }
 
     #[test]
+    fn plain_text_ignores_link_and_image_titles() {
+        for (markdown, expected) in [
+            (r#"[label](https://example.com "tooltip")"#, "label"),
+            (r#"[**bold** `code`](https://example.com "tooltip")"#, "bold code"),
+            (r#"![alt text](image.png "tooltip")"#, "alt text"),
+            ("[label][ref]\n\n[ref]: https://example.com \"tooltip\"", "label"),
+            (r#"[](https://example.com "tooltip")"#, ""),
+        ] {
+            assert_eq!(markdown_to_text(markdown), expected, "{markdown}");
+        }
+    }
+
+    #[test]
     fn link_with_itself() {
         let markdown = "Go to [https://www.google.com].";
         let expected = "Go to https://www.google.com.";

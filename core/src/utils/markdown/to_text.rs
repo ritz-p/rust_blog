@@ -2,7 +2,7 @@ use pulldown_cmark::Tag;
 
 pub fn start_tag(tag: &Tag, buffer: &mut String, tags_stack: &mut Vec<Tag>) {
     match tag {
-        Tag::Link(_, _, title) | Tag::Image(_, _, title) => buffer.push_str(&title),
+        Tag::Link(..) | Tag::Image(..) => (),
         Tag::Item => {
             buffer.push('\n');
             let mut lists_stack = tags_stack
