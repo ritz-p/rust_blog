@@ -7,8 +7,12 @@
 ワークスペースルートで実行:
 
 ```bash
-cargo test
+docker compose run --rm web cargo test --workspace
 ```
+
+PR の Cargo Test は Rust ソース、Cargo manifest / lockfile、Rust・ブログ設定、
+テスト workflow の変更時に実行します。CSS・JavaScript・テンプレート・記事・画像・
+ドキュメントのみの変更では実行しません。
 
 ## テスト観点一覧
 

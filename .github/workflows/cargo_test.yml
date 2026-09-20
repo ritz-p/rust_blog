@@ -5,14 +5,14 @@ on:
     branches:
       - "master"
     paths:
-      - "content/**"
-      - "core/**"
-      - "migration/**"
-      - "templates/**"
+      - "**/*.rs"
+      - "**/Cargo.toml"
+      - "Cargo.lock"
       - ".env"
-      - "Cargo.toml"
       - "Rocket.toml"
-      - ".cargo/config.toml"
+      - "blog_config.toml"
+      - ".cargo/**"
+      - "rust-toolchain*"
       - ".github/workflows/cargo_test.yml"
 
 jobs:
