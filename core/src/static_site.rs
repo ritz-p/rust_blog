@@ -333,6 +333,7 @@ async fn export_tag_variant(
                     "icatch_path": icatch_path,
                     "excerpt": excerpt,
                     "created_at": utc_to_jst(article.created_at),
+                    "updated_at": utc_to_jst(article.updated_at),
                 })
             })
             .collect();
@@ -457,6 +458,7 @@ async fn export_category_variant(
                     "icatch_path": icatch_path,
                     "excerpt": excerpt,
                     "created_at": utc_to_jst(article.created_at),
+                    "updated_at": utc_to_jst(article.updated_at),
                 })
             })
             .collect();

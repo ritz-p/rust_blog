@@ -96,6 +96,7 @@ pub async fn tag_detail(
                             "icatch_path": icatch_path,
                             "excerpt": excerpt,
                             "created_at": utc_to_jst(article.created_at),
+                    "updated_at": utc_to_jst(article.updated_at),
                         })
                     }).collect::<Vec<_>>(),
                     page: page_info.current_page,

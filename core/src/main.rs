@@ -2,7 +2,7 @@
 extern crate rocket;
 
 mod domain;
-mod entity;
+use rust_blog::entity;
 mod entity_extension;
 mod repository;
 mod route;

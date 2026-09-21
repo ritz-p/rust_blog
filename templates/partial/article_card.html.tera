@@ -1,0 +1,28 @@
+<article class="article-card">
+  {% if article.icatch_path and article.icatch_path | length > 0 %}
+  <a class="article-card-image" href="{{ article.url }}" tabindex="-1" aria-hidden="true">
+    <img src="{{ article.icatch_path }}" alt="" loading="lazy" decoding="async" width="240" height="160">
+  </a>
+  {% endif %}
+  <div class="article-card-body">
+    <p class="article-card-date"><span class="date-item">公開日 {{ article.created_at }}</span>{% if article.updated_at is defined and article.updated_at %}<span class="date-item date-updated"><span class="date-separator" aria-hidden="true">/</span>更新日 {{ article.updated_at }}</span>{% endif %}</p>
+    <h2 class="article-card-title"><a href="{{ article.url }}">{{ article.title }}</a></h2>
+    {% if article.excerpt is defined and article.excerpt %}
+    <p class="article-card-excerpt">{{ article.excerpt }}</p>
+    {% endif %}
+    {% if article.categories is defined and article.categories | length > 0 %}
+    <div class="tags article-card-taxonomy" aria-label="カテゴリ">
+      {% for category in article.categories %}
+      <a class="tag is-info is-light" href="{{ category.url }}">{{ category.name }}</a>
+      {% endfor %}
+    </div>
+    {% endif %}
+    {% if article.tags is defined and article.tags | length > 0 %}
+    <div class="tags article-card-taxonomy" aria-label="タグ">
+      {% for tag in article.tags %}
+      <a class="tag is-light" href="{{ tag.url }}">#{{ tag.name }}</a>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+</article>

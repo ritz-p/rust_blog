@@ -6,13 +6,15 @@
 {% block content %}
 <div class="columns">
   <div class="column is-8">
-    <article aria-labelledby="post-title">
-      <header class="mb-5">
+    <article class="article-page" aria-labelledby="post-title">
+      <header class="article-header">
         <h1 id="post-title" class="title is-2">{{ title }}</h1>
-        <p class="is-size-7 has-text-grey">
-          公開: {{ created_at }}{% if updated_at %} / 更新: {{ updated_at }}{% endif %}
-        </p>
-        <hr>
+        <dl class="article-dates">
+          <div><dt>公開日</dt><dd>{{ created_at }}</dd></div>
+          {% if updated_at %}
+          <div class="date-updated"><dt><span class="date-separator" aria-hidden="true">/</span>更新日</dt><dd>{{ updated_at }}</dd></div>
+          {% endif %}
+        </dl>
       </header>
       <div class="content is-medium">
         {{ content_html | safe }}

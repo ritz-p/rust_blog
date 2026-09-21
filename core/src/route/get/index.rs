@@ -248,7 +248,7 @@ mod tests {
             let response = client.get("/").dispatch().await;
             assert_eq!(response.status(), Status::Ok);
             let html = response.into_string().await.unwrap();
-            assert_eq!(html.matches("<h2 class=\"title is-4\">").count(), 10);
+            assert_eq!(html.matches("<article class=\"article-card\">").count(), 10);
             assert!(html.contains("class=\"pagination-previous\" disabled"));
             if total == 10 {
                 assert!(html.contains("Page 1 / 1"));
@@ -261,7 +261,7 @@ mod tests {
                 let response = client.get("/?page=2&per=10").dispatch().await;
                 assert_eq!(response.status(), Status::Ok);
                 let html = response.into_string().await.unwrap();
-                assert_eq!(html.matches("<h2 class=\"title is-4\">").count(), 1);
+                assert_eq!(html.matches("<article class=\"article-card\">").count(), 1);
                 assert!(html.contains("Boundary article 01"));
                 assert!(html.contains("Page 2 / 2"));
                 assert!(html.contains("class=\"pagination-next\" disabled"));
