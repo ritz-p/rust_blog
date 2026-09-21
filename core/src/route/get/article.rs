@@ -1,9 +1,6 @@
 use crate::{
     repository::{
-        article::{
-            get_all_published_articles, get_article_by_slug, get_latest_articles,
-            surrounding_articles,
-        },
+        article::{get_article_by_slug, get_latest_articles, get_surrounding_articles},
         category::get_categories_by_article,
         tag::get_tags_by_article,
     },
@@ -72,10 +69,9 @@ pub async fn article_detail(
     let created_at = utc_to_jst(article.created_at);
     let updated_at = utc_to_jst(article.updated_at);
 
-    let published = get_all_published_articles(db)
+    let surrounding: Vec<_> = get_surrounding_articles(db, &article)
         .await
-        .map_err(|_| Status::InternalServerError)?;
-    let surrounding: Vec<_> = surrounding_articles(&published, article.id)
+        .map_err(|_| Status::InternalServerError)?
         .into_iter()
         .map(|model| {
             let slug = model.slug.clone();
@@ -153,7 +149,8 @@ mod tests {
             .append_query_results([vec![article.clone()]])
             .append_query_results([Vec::<tag::Model>::new()])
             .append_query_results([Vec::<category::Model>::new()])
-            .append_query_results([vec![article.clone()]])
+            .append_query_results([Vec::<article::Model>::new()])
+            .append_query_results([Vec::<article::Model>::new()])
             .append_query_results([vec![article]])
             .into_connection();
         let rocket = rocket::custom(rocket::Config::figment().merge((
