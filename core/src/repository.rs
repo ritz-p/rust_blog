@@ -5,6 +5,50 @@ pub mod tag;
 
 #[cfg(test)]
 mod repository_tests {
+    #[rocket::async_test]
+    async fn taxonomy_lists_only_include_published_article_assignments() {
+        use sea_orm::{ConnectionTrait, Database, Statement};
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        for sql in [
+            "CREATE TABLE article (id INTEGER PRIMARY KEY, created_at TEXT)",
+            "INSERT INTO article VALUES (1, '2020-01-01'), (2, '2999-01-01')",
+            "CREATE TABLE tag (id INTEGER PRIMARY KEY, name TEXT, slug TEXT)",
+            "CREATE TABLE category (id INTEGER PRIMARY KEY, name TEXT, slug TEXT)",
+            "CREATE TABLE article_tag (article_id INTEGER, tag_id INTEGER)",
+            "CREATE TABLE article_category (article_id INTEGER, category_id INTEGER)",
+            "INSERT INTO tag VALUES (1, 'unused', 'unused'), (2, 'future', 'future'), (3, 'published', 'published')",
+            "INSERT INTO category SELECT * FROM tag",
+            "INSERT INTO article_tag VALUES (2, 2)",
+            "INSERT INTO article_category VALUES (2, 2)",
+        ] {
+            db.execute(Statement::from_string(DatabaseBackend::Sqlite, sql))
+                .await
+                .unwrap();
+        }
+        assert!(super::tag::get_all_tags(&db).await.unwrap().is_empty());
+        assert!(
+            super::category::get_all_categories(&db)
+                .await
+                .unwrap()
+                .is_empty()
+        );
+        for sql in [
+            "INSERT INTO article_tag VALUES (1, 3)",
+            "INSERT INTO article_category VALUES (1, 3)",
+        ] {
+            db.execute(Statement::from_string(DatabaseBackend::Sqlite, sql))
+                .await
+                .unwrap();
+        }
+        assert_eq!(
+            super::tag::get_all_tags(&db).await.unwrap()[0].slug,
+            "published"
+        );
+        assert_eq!(
+            super::category::get_all_categories(&db).await.unwrap()[0].slug,
+            "published"
+        );
+    }
     use crate::domain::page::Page;
     use crate::entity::article;
     use crate::repository::article::{get_all_articles, get_article_by_slug};

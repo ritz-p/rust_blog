@@ -1,3 +1,22 @@
+.taxonomy-empty {
+  color: #65758b;
+  font-size: 0.8125rem;
+  padding: 0.25rem 0.625rem;
+  border: 1px dashed #cbd5e1;
+  border-radius: 4px;
+  background: #f8fafc;
+}
+
+.taxonomy-empty-state {
+  padding: 2rem;
+  border: 1px dashed #cbd5e1;
+  border-radius: 8px;
+  color: #526176;
+  background: #f8fafc;
+}
+
+.taxonomy-empty-state p + p { margin-top: 0.75rem; }
+
 .article-header {
   margin-bottom: 2.5rem;
 }
