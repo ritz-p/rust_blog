@@ -1,6 +1,6 @@
 use crate::{
     repository::{
-        article::{get_article_by_slug, get_latest_articles},
+        article::{get_article_by_slug, get_latest_articles, get_surrounding_articles},
         category::get_categories_by_article,
         tag::get_tags_by_article,
     },
@@ -69,16 +69,28 @@ pub async fn article_detail(
     let created_at = utc_to_jst(article.created_at);
     let updated_at = utc_to_jst(article.updated_at);
 
+    let surrounding: Vec<_> = get_surrounding_articles(db, &article)
+        .await
+        .map_err(|_| Status::InternalServerError)?
+        .into_iter()
+        .map(|model| {
+            let slug = model.slug.clone();
+            json!({
+                "title":      model.title,
+                "slug":       slug.clone(),
+                "url":        format!("/posts/{}", crate::utils::url_segment(&slug)),
+            })
+        })
+        .collect();
+
     let latest_articles: Vec<_> = get_latest_articles(db, 5)
         .await
         .map_err(|_| Status::InternalServerError)?
         .into_iter()
         .map(|model| {
-            let slug = model.slug;
             json!({
-                "title":      model.title,
-                "slug":       slug.clone(),
-                "url":        format!("/posts/{}", crate::utils::url_segment(&slug)),
+                "title": model.title,
+                "url": format!("/posts/{}", crate::utils::url_segment(&model.slug)),
             })
         })
         .collect();
@@ -97,7 +109,8 @@ pub async fn article_detail(
             updated_at: updated_at,
             tags: &tags,
             categories: &categories,
-            latest_articles: latest_articles
+            latest_articles: latest_articles,
+            surrounding_articles: surrounding
         },
     ))
 }
@@ -136,6 +149,8 @@ mod tests {
             .append_query_results([vec![article.clone()]])
             .append_query_results([Vec::<tag::Model>::new()])
             .append_query_results([Vec::<category::Model>::new()])
+            .append_query_results([Vec::<article::Model>::new()])
+            .append_query_results([Vec::<article::Model>::new()])
             .append_query_results([vec![article]])
             .into_connection();
         let rocket = rocket::custom(rocket::Config::figment().merge((

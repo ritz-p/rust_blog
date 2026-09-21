@@ -177,10 +177,16 @@ async fn export_article_pages(
     config: &CommonConfig,
     out_dir: &Path,
 ) -> Result<()> {
+    let mut articles = get_all_published_articles(db).await?;
+    articles.sort_by_key(|a| std::cmp::Reverse((a.created_at, a.id)));
     let latest_articles = latest_articles_json(db).await?;
-    let articles = get_all_published_articles(db).await?;
-    for article in articles {
-        let tags: Vec<_> = get_tags_by_article(db, &article)
+    for (index, article) in articles.iter().enumerate() {
+        let surrounding: Vec<_> =
+            crate::repository::article::surrounding_articles(&articles, index)
+                .into_iter()
+                .map(|a| json!({"title": a.title, "url": static_article_url(&a.slug)}))
+                .collect();
+        let tags: Vec<_> = get_tags_by_article(db, article)
             .await?
             .into_iter()
             .map(|tag| {
@@ -188,7 +194,7 @@ async fn export_article_pages(
                 json!({ "name": tag.name, "slug": slug.clone(), "url": static_tag_url(&slug, "created_at", 1) })
             })
             .collect();
-        let categories: Vec<_> = get_categories_by_article(db, &article)
+        let categories: Vec<_> = get_categories_by_article(db, article)
             .await?
             .into_iter()
             .map(|category| {
@@ -211,6 +217,7 @@ async fn export_article_pages(
         ctx.insert("tags", &tags);
         ctx.insert("categories", &categories);
         ctx.insert("latest_articles", &latest_articles);
+        ctx.insert("surrounding_articles", &surrounding);
 
         render_to_path(
             tera,
@@ -936,7 +943,8 @@ mod tests {
             table_of_contents: false,
         };
         let db = MockDatabase::new(DatabaseBackend::Sqlite)
-            .append_query_results([vec![article.clone()], vec![article]])
+            .append_query_results([vec![article.clone()]])
+            .append_query_results([vec![article]])
             .append_query_results([Vec::<tag::Model>::new()])
             .append_query_results([Vec::<category::Model>::new()])
             .into_connection();
