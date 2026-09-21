@@ -36,10 +36,10 @@ pub fn toc(input: &str) -> String {
             .append_element_content_handler(element!(
                 "h1 img, h2 img, h3 img, h4 img, h5 img, h6 img",
                 |el| {
-                    if let Some(alt) = el.get_attribute("alt") {
-                        if let Some(heading) = headings.borrow_mut().last_mut() {
-                            heading.2.push_str(&alt);
-                        }
+                    if let Some(alt) = el.get_attribute("alt")
+                        && let Some(heading) = headings.borrow_mut().last_mut()
+                    {
+                        heading.2.push_str(&alt);
                     }
                     Ok(())
                 }
