@@ -2,7 +2,8 @@ use crate::domain::page::{Page, PageInfo};
 use chrono::{DateTime, Datelike, NaiveDate, TimeZone, Utc};
 use chrono_tz::Asia::Tokyo;
 use sea_orm::{
-    ColumnTrait, DatabaseConnection, DbErr, EntityTrait, QueryFilter, QueryOrder, QuerySelect,
+    ColumnTrait, Condition, DatabaseConnection, DbErr, EntityTrait, QueryFilter, QueryOrder,
+    QuerySelect,
     prelude::*,
     sea_query::{Expr, SimpleExpr},
 };
@@ -157,18 +158,58 @@ pub async fn get_latest_articles(
     Ok(articles)
 }
 
-/// Up to three published articles on each side, newest first.
-/// The id breaks ties for articles with identical publication timestamps.
-pub fn surrounding_articles(articles: &[article::Model], current_id: i32) -> Vec<&article::Model> {
-    let mut ordered: Vec<_> = articles.iter().collect();
-    ordered.sort_by_key(|a| std::cmp::Reverse((a.created_at, a.id)));
-    let Some(index) = ordered.iter().position(|a| a.id == current_id) else {
+/// Fetch only the three nearest published articles on each side, newest first.
+pub async fn get_surrounding_articles(
+    db: &DatabaseConnection,
+    current: &article::Model,
+) -> Result<Vec<article::Model>, DbErr> {
+    let base = article::Entity::find().filter(article::Column::CreatedAt.lte(Utc::now()));
+    let mut newer = base
+        .clone()
+        .filter(
+            Condition::any()
+                .add(article::Column::CreatedAt.gt(current.created_at))
+                .add(
+                    Condition::all()
+                        .add(article::Column::CreatedAt.eq(current.created_at))
+                        .add(article::Column::Id.gt(current.id)),
+                ),
+        )
+        .order_by_asc(article::Column::CreatedAt)
+        .order_by_asc(article::Column::Id)
+        .limit(3)
+        .all(db)
+        .await?;
+    newer.reverse();
+    let older = base
+        .filter(
+            Condition::any()
+                .add(article::Column::CreatedAt.lt(current.created_at))
+                .add(
+                    Condition::all()
+                        .add(article::Column::CreatedAt.eq(current.created_at))
+                        .add(article::Column::Id.lt(current.id)),
+                ),
+        )
+        .order_by_desc(article::Column::CreatedAt)
+        .order_by_desc(article::Column::Id)
+        .limit(3)
+        .all(db)
+        .await?;
+    newer.extend(older);
+    Ok(newer)
+}
+
+/// The caller supplies articles sorted by (created_at, id) descending and the current index.
+// Used by the static export pipeline in the library target.
+#[allow(dead_code)]
+pub fn surrounding_articles(articles: &[article::Model], index: usize) -> Vec<&article::Model> {
+    if index >= articles.len() {
         return Vec::new();
-    };
-    ordered[index.saturating_sub(3)..(index + 4).min(ordered.len())]
+    }
+    articles[index.saturating_sub(3)..(index + 4).min(articles.len())]
         .iter()
-        .copied()
-        .filter(|a| a.id != current_id)
+        .filter(|a| a.id != articles[index].id)
         .collect()
 }
 
@@ -295,10 +336,61 @@ pub async fn get_article_by_category_slug(
 
 #[cfg(test)]
 mod tests {
+    #[rocket::async_test]
+    async fn database_neighbors_match_export_and_exclude_future_articles() {
+        use crate::entity::article;
+        use sea_orm::{ConnectionTrait, Database, EntityTrait, IntoActiveModel, Schema};
+
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        let backend = db.get_database_backend();
+        db.execute(backend.build(&Schema::new(backend).create_table_from_entity(article::Entity)))
+            .await
+            .unwrap();
+        let now = chrono::Utc::now();
+        let mut published = Vec::new();
+        for id in 1..=10 {
+            let created_at = if id == 10 {
+                now + chrono::Duration::days(1)
+            } else {
+                now - chrono::Duration::days(10 - i64::from(id / 3))
+            };
+            let model = article::Model {
+                id,
+                title: id.to_string(),
+                slug: id.to_string(),
+                content: "body".repeat(1000),
+                excerpt: None,
+                icatch_path: None,
+                table_of_contents: false,
+                created_at,
+                updated_at: now,
+            };
+            article::Entity::insert(model.clone().into_active_model())
+                .exec(&db)
+                .await
+                .unwrap();
+            if id != 10 {
+                published.push(model);
+            }
+        }
+        published.sort_by_key(|a| std::cmp::Reverse((a.created_at, a.id)));
+        for (index, current) in published.iter().enumerate() {
+            let actual = super::get_surrounding_articles(&db, current).await.unwrap();
+            let expected = super::surrounding_articles(&published, index);
+            assert_eq!(
+                actual.iter().map(|a| a.id).collect::<Vec<_>>(),
+                expected.iter().map(|a| a.id).collect::<Vec<_>>()
+            );
+            assert!(actual.len() <= 6);
+            assert!(actual.iter().all(|a| a.id != current.id && a.id != 10));
+        }
+    }
+
     #[test]
     fn neighbors_shrink_at_both_ends_and_break_timestamp_ties() {
         let now = chrono::Utc::now();
         let articles: Vec<_> = (1..=9)
+            .rev()
             .map(|id| crate::entity::article::Model {
                 id,
                 title: id.to_string(),
@@ -320,13 +412,13 @@ mod tests {
             (2, vec![5, 4, 3, 1]),
             (1, vec![4, 3, 2]),
         ] {
-            let actual: Vec<_> = super::surrounding_articles(&articles, id)
+            let actual: Vec<_> = super::surrounding_articles(&articles, (9 - id) as usize)
                 .iter()
                 .map(|a| a.id)
                 .collect();
             assert_eq!(actual, expected);
         }
-        assert!(super::surrounding_articles(&articles[..1], 1).is_empty());
+        assert!(super::surrounding_articles(&articles[..1], 0).is_empty());
         assert!(super::surrounding_articles(&[], 1).is_empty());
     }
     use super::ArticlePeriod;
