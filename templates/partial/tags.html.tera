@@ -2,6 +2,7 @@
 <div class="mb-2">
   <div class="is-size-7 has-text-weight-semibold has-text-grey">Tags</div>
   <div class="tags mt-1">
+    {% if items | length == 0 %}<span class="taxonomy-empty">タグ未設定</span>{% endif %}
     {% for item in items %}
       <a class="tag is-light" href="{{ item.url }}">#{{ item.name }}</a>
     {% endfor %}

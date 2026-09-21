@@ -1,10 +1,27 @@
-use crate::entity::{article, category};
+use crate::entity::{article, article_category, category};
 use sea_orm::{
     ColumnTrait, DatabaseConnection, DbErr, EntityTrait, ModelTrait, QueryFilter, QueryOrder,
 };
 
 pub async fn get_all_categories(db: &DatabaseConnection) -> Result<Vec<category::Model>, DbErr> {
     category::Entity::find()
+        .filter(
+            category::Column::Id.in_subquery(
+                sea_orm::sea_query::Query::select()
+                    .column(article_category::Column::CategoryId)
+                    .from(article_category::Entity)
+                    .and_where(
+                        article_category::Column::ArticleId.in_subquery(
+                            sea_orm::sea_query::Query::select()
+                                .column(article::Column::Id)
+                                .from(article::Entity)
+                                .and_where(article::Column::CreatedAt.lte(chrono::Utc::now()))
+                                .to_owned(),
+                        ),
+                    )
+                    .to_owned(),
+            ),
+        )
         .order_by(category::Column::Name, sea_orm::Order::Asc)
         .all(db)
         .await

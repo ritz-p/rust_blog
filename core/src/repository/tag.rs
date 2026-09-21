@@ -1,10 +1,27 @@
-use crate::entity::{article, tag};
+use crate::entity::{article, article_tag, tag};
 use sea_orm::{
     ColumnTrait, DatabaseConnection, DbErr, EntityTrait, ModelTrait, QueryFilter, QueryOrder,
 };
 
 pub async fn get_all_tags(db: &DatabaseConnection) -> Result<Vec<tag::Model>, DbErr> {
     tag::Entity::find()
+        .filter(
+            tag::Column::Id.in_subquery(
+                sea_orm::sea_query::Query::select()
+                    .column(article_tag::Column::TagId)
+                    .from(article_tag::Entity)
+                    .and_where(
+                        article_tag::Column::ArticleId.in_subquery(
+                            sea_orm::sea_query::Query::select()
+                                .column(article::Column::Id)
+                                .from(article::Entity)
+                                .and_where(article::Column::CreatedAt.lte(chrono::Utc::now()))
+                                .to_owned(),
+                        ),
+                    )
+                    .to_owned(),
+            ),
+        )
         .order_by(tag::Column::Name, sea_orm::Order::Asc)
         .all(db)
         .await

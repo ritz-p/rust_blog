@@ -158,7 +158,17 @@ pub async fn get_latest_articles(
     Ok(articles)
 }
 
-/// Fetch only the three nearest published articles on each side, newest first.
+#[allow(dead_code)]
+pub fn surrounding_articles(articles: &[article::Model], index: usize) -> Vec<&article::Model> {
+    if index >= articles.len() {
+        return Vec::new();
+    }
+    articles[index.saturating_sub(3)..(index + 4).min(articles.len())]
+        .iter()
+        .filter(|a| a.id != articles[index].id)
+        .collect()
+}
+
 pub async fn get_surrounding_articles(
     db: &DatabaseConnection,
     current: &article::Model,
@@ -198,19 +208,6 @@ pub async fn get_surrounding_articles(
         .await?;
     newer.extend(older);
     Ok(newer)
-}
-
-/// The caller supplies articles sorted by (created_at, id) descending and the current index.
-// Used by the static export pipeline in the library target.
-#[allow(dead_code)]
-pub fn surrounding_articles(articles: &[article::Model], index: usize) -> Vec<&article::Model> {
-    if index >= articles.len() {
-        return Vec::new();
-    }
-    articles[index.saturating_sub(3)..(index + 4).min(articles.len())]
-        .iter()
-        .filter(|a| a.id != articles[index].id)
-        .collect()
 }
 
 pub async fn get_articles_by_tag_slug(
@@ -412,7 +409,7 @@ mod tests {
             (2, vec![5, 4, 3, 1]),
             (1, vec![4, 3, 2]),
         ] {
-            let actual: Vec<_> = super::surrounding_articles(&articles, (9 - id) as usize)
+            let actual: Vec<_> = super::surrounding_articles(&articles, 9 - id)
                 .iter()
                 .map(|a| a.id)
                 .collect();

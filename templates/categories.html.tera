@@ -23,6 +23,6 @@
     {% endfor %}
   </div>
 {% else %}
-  <p class="has-text-grey">カテゴリはまだありません。</p>
+  <div class="taxonomy-empty-state"><p>記事にカテゴリが設定されていません。</p><p><a href="/">記事一覧を見る</a></p></div>
 {% endif %}
 {% endblock content %}
