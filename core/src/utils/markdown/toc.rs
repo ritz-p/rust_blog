@@ -53,6 +53,8 @@ pub fn toc(input: &str) -> String {
         return input.to_owned();
     }
     for (_, _, label) in &mut headings {
+        // lol_html passes text chunks through without unescaping entities.
+        // Decode once after collecting chunks, then escape when rendering links.
         *label = html_escape::decode_html_entities(label).into_owned();
     }
     let mut output = format!(
@@ -84,6 +86,21 @@ fn render_toc(headings: &[(u8, String, String)], index: &mut usize, parent: u8, 
 mod tests {
     use super::toc;
     use crate::utils::markdown::markdown_to_html;
+
+    #[test]
+    fn toc_preserves_literal_entity_syntax() {
+        for (markdown, label) in [
+            ("## `&lt;`", "&amp;lt;"),
+            ("## `&#60;`", "&amp;#60;"),
+            ("## `&amp;lt;`", "&amp;amp;lt;"),
+            ("## A & B", "A &amp; B"),
+            ("## &lt;", "&lt;"),
+        ] {
+            let output = toc(&markdown_to_html(markdown));
+            let nav = output.split_once("</nav>").unwrap().0;
+            assert!(nav.contains(&format!(">{label}</a>")), "{markdown}: {nav}");
+        }
+    }
 
     #[test]
     fn toc_preserves_rendered_body_except_heading_ids() {
