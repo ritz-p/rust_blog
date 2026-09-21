@@ -1,7 +1,8 @@
+<div class="column is-4">
 {% if latest_articles and latest_articles | length > 0 %}
     <aside class="menu">
         <p class="menu-label">
-            {% if surrounding_articles is defined and surrounding_articles %}前後の記事{% else %}📰 最新記事{% endif %}
+            📰 最新記事
         </p>
         <ul class="menu-list">
             {% for latest_article in latest_articles %}
@@ -16,3 +17,15 @@
         </ul>
     </aside>
 {% endif %}
+
+{% if surrounding_articles is defined and surrounding_articles | length > 0 %}
+    <aside class="menu mt-5" aria-label="前後の記事">
+        <p class="menu-label">前後の記事</p>
+        <ul class="menu-list">
+            {% for article in surrounding_articles %}
+            <li><a href="{{ article.url }}">{{ article.title }}</a></li>
+            {% endfor %}
+        </ul>
+    </aside>
+{% endif %}
+</div>

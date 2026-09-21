@@ -1,6 +1,9 @@
 use crate::{
     repository::{
-        article::{get_all_published_articles, get_article_by_slug, surrounding_articles},
+        article::{
+            get_all_published_articles, get_article_by_slug, get_latest_articles,
+            surrounding_articles,
+        },
         category::get_categories_by_article,
         tag::get_tags_by_article,
     },
@@ -72,7 +75,7 @@ pub async fn article_detail(
     let published = get_all_published_articles(db)
         .await
         .map_err(|_| Status::InternalServerError)?;
-    let latest_articles: Vec<_> = surrounding_articles(&published, article.id)
+    let surrounding: Vec<_> = surrounding_articles(&published, article.id)
         .into_iter()
         .map(|model| {
             let slug = model.slug.clone();
@@ -80,6 +83,18 @@ pub async fn article_detail(
                 "title":      model.title,
                 "slug":       slug.clone(),
                 "url":        format!("/posts/{}", crate::utils::url_segment(&slug)),
+            })
+        })
+        .collect();
+
+    let latest_articles: Vec<_> = get_latest_articles(db, 5)
+        .await
+        .map_err(|_| Status::InternalServerError)?
+        .into_iter()
+        .map(|model| {
+            json!({
+                "title": model.title,
+                "url": format!("/posts/{}", crate::utils::url_segment(&model.slug)),
             })
         })
         .collect();
@@ -99,7 +114,7 @@ pub async fn article_detail(
             tags: &tags,
             categories: &categories,
             latest_articles: latest_articles,
-            surrounding_articles: true
+            surrounding_articles: surrounding
         },
     ))
 }
@@ -138,6 +153,7 @@ mod tests {
             .append_query_results([vec![article.clone()]])
             .append_query_results([Vec::<tag::Model>::new()])
             .append_query_results([Vec::<category::Model>::new()])
+            .append_query_results([vec![article.clone()]])
             .append_query_results([vec![article]])
             .into_connection();
         let rocket = rocket::custom(rocket::Config::figment().merge((
@@ -163,8 +179,7 @@ mod tests {
         assert_eq!(response.content_type(), Some(ContentType::HTML));
         let html = response.into_string().await.expect("missing article body");
         assert!(
-            !html
-                .replace("&#x2F;", "/")
+            html.replace("&#x2F;", "/")
                 .contains("href=\"/posts/highlighted-rust%23intro\""),
             "{html}"
         );

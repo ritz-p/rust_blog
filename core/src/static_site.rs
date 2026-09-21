@@ -178,8 +178,9 @@ async fn export_article_pages(
     out_dir: &Path,
 ) -> Result<()> {
     let articles = get_all_published_articles(db).await?;
+    let latest_articles = latest_articles_json(db).await?;
     for article in &articles {
-        let latest_articles: Vec<_> =
+        let surrounding: Vec<_> =
             crate::repository::article::surrounding_articles(&articles, article.id)
                 .into_iter()
                 .map(|a| json!({"title": a.title, "url": static_article_url(&a.slug)}))
@@ -215,7 +216,7 @@ async fn export_article_pages(
         ctx.insert("tags", &tags);
         ctx.insert("categories", &categories);
         ctx.insert("latest_articles", &latest_articles);
-        ctx.insert("surrounding_articles", &true);
+        ctx.insert("surrounding_articles", &surrounding);
 
         render_to_path(
             tera,
@@ -941,6 +942,7 @@ mod tests {
             table_of_contents: false,
         };
         let db = MockDatabase::new(DatabaseBackend::Sqlite)
+            .append_query_results([vec![article.clone()]])
             .append_query_results([vec![article]])
             .append_query_results([Vec::<tag::Model>::new()])
             .append_query_results([Vec::<category::Model>::new()])
@@ -963,7 +965,7 @@ mod tests {
             .expect("failed to export article");
         let html = fs::read_to_string(output.0.join("posts/highlighted-rust/index.html"))
             .expect("missing exported article");
-        assert!(!html.contains("href=\"/posts/highlighted-rust/\""));
+        assert!(html.contains("href=\"/posts/highlighted-rust/\""));
         assert!(html.contains("href=\"/css/site.css\""));
         let content = html
             .split("<div class=\"content is-medium\">")
