@@ -4,14 +4,3 @@
 "favicon_path" = "/icon/fox_girl_black_line_white.png"
 image_dir = "content/image"
 icon_dir = "content/icon"
-
-[categories]
-"Category slug file" = "Category Slug file"
-"開発" = "development"
-"日記" = "diary"
-
-[tags]
-"tag slug file" = "Tag Slug file"
-"Rust" = "Rust"
-"Hello World" = "hello-world"
-"Test" = "test"

@@ -3,18 +3,14 @@ pub mod config;
 pub mod fixed_content;
 pub mod markdown;
 mod taxonomy;
-use crate::{
-    entity::category::Entity as CategoryEntity,
-    entity::tag::Entity as TagEntity,
-    seed::{
-        fixed_content::seed_fixed_content,
-        markdown::{
-            markdown_files, parse_markdown_to_fixed_content_matter, parse_markdown_to_front_matter,
-        },
+use crate::seed::{
+    fixed_content::seed_fixed_content,
+    markdown::{
+        markdown_files, parse_markdown_to_fixed_content_matter, parse_markdown_to_front_matter,
     },
 };
 use article::{delete_article_by_slug, seed_article, seed_category, seed_tag};
-use config::{env::load_env, seed::seed_from_toml};
+use config::env::load_env;
 use sea_orm::DatabaseConnection;
 
 pub async fn run_all(db: DatabaseConnection) -> anyhow::Result<()> {
@@ -25,10 +21,6 @@ pub async fn run_all(db: DatabaseConnection) -> anyhow::Result<()> {
     println!("✅ 固定ページ Markdown → DB のシード完了");
     run_article_seed(&db, &config.article_path).await?;
     println!("✅ Article Markdown → DB のシード完了");
-    seed_from_toml::<TagEntity>(&db, &config.config_toml_path, "tags").await?;
-    println!("✅ Tag Toml → DB のシード完了");
-    seed_from_toml::<CategoryEntity>(&db, &config.config_toml_path, "categories").await?;
-    println!("✅ Category Toml → DB のシード完了");
 
     Ok(())
 }

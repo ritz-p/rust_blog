@@ -1,9 +1,7 @@
 pub mod domain;
 pub mod entity;
 pub mod entity_extension;
-pub mod entity_trait;
 pub mod repository;
 pub mod seed;
-pub mod slug_config;
 pub mod static_site;
 pub mod utils;

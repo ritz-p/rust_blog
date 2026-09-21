@@ -6,6 +6,5 @@ pub fn load_env() -> PathConfig {
     PathConfig::new(
         env::var("FIXED_CONTENT_PATH").ok(),
         env::var("ARTICLE_PATH").ok(),
-        env::var("CONFIG_TOML_PATH").ok(),
     )
 }
