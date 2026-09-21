@@ -1,7 +1,7 @@
 {% if latest_articles and latest_articles | length > 0 %}
     <aside class="menu">
         <p class="menu-label">
-            📰 最新記事
+            {% if surrounding_articles is defined and surrounding_articles %}前後の記事{% else %}📰 最新記事{% endif %}
         </p>
         <ul class="menu-list">
             {% for latest_article in latest_articles %}

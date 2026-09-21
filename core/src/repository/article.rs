@@ -157,6 +157,21 @@ pub async fn get_latest_articles(
     Ok(articles)
 }
 
+/// Up to three published articles on each side, newest first.
+/// The id breaks ties for articles with identical publication timestamps.
+pub fn surrounding_articles(articles: &[article::Model], current_id: i32) -> Vec<&article::Model> {
+    let mut ordered: Vec<_> = articles.iter().collect();
+    ordered.sort_by_key(|a| std::cmp::Reverse((a.created_at, a.id)));
+    let Some(index) = ordered.iter().position(|a| a.id == current_id) else {
+        return Vec::new();
+    };
+    ordered[index.saturating_sub(3)..(index + 4).min(ordered.len())]
+        .iter()
+        .copied()
+        .filter(|a| a.id != current_id)
+        .collect()
+}
+
 pub async fn get_articles_by_tag_slug(
     db: &DatabaseConnection,
     page: Page,
@@ -280,6 +295,40 @@ pub async fn get_article_by_category_slug(
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn neighbors_shrink_at_both_ends_and_break_timestamp_ties() {
+        let now = chrono::Utc::now();
+        let articles: Vec<_> = (1..=9)
+            .map(|id| crate::entity::article::Model {
+                id,
+                title: id.to_string(),
+                slug: id.to_string(),
+                content: String::new(),
+                excerpt: None,
+                icatch_path: None,
+                table_of_contents: false,
+                created_at: now,
+                updated_at: now,
+            })
+            .collect();
+        for (id, expected) in [
+            (9, vec![8, 7, 6]),
+            (8, vec![9, 7, 6, 5]),
+            (7, vec![9, 8, 6, 5, 4]),
+            (5, vec![8, 7, 6, 4, 3, 2]),
+            (3, vec![6, 5, 4, 2, 1]),
+            (2, vec![5, 4, 3, 1]),
+            (1, vec![4, 3, 2]),
+        ] {
+            let actual: Vec<_> = super::surrounding_articles(&articles, id)
+                .iter()
+                .map(|a| a.id)
+                .collect();
+            assert_eq!(actual, expected);
+        }
+        assert!(super::surrounding_articles(&articles[..1], 1).is_empty());
+        assert!(super::surrounding_articles(&[], 1).is_empty());
+    }
     use super::ArticlePeriod;
     use chrono::{TimeZone, Utc};
 

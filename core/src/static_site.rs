@@ -177,10 +177,14 @@ async fn export_article_pages(
     config: &CommonConfig,
     out_dir: &Path,
 ) -> Result<()> {
-    let latest_articles = latest_articles_json(db).await?;
     let articles = get_all_published_articles(db).await?;
-    for article in articles {
-        let tags: Vec<_> = get_tags_by_article(db, &article)
+    for article in &articles {
+        let latest_articles: Vec<_> =
+            crate::repository::article::surrounding_articles(&articles, article.id)
+                .into_iter()
+                .map(|a| json!({"title": a.title, "url": static_article_url(&a.slug)}))
+                .collect();
+        let tags: Vec<_> = get_tags_by_article(db, article)
             .await?
             .into_iter()
             .map(|tag| {
@@ -188,7 +192,7 @@ async fn export_article_pages(
                 json!({ "name": tag.name, "slug": slug.clone(), "url": static_tag_url(&slug, "created_at", 1) })
             })
             .collect();
-        let categories: Vec<_> = get_categories_by_article(db, &article)
+        let categories: Vec<_> = get_categories_by_article(db, article)
             .await?
             .into_iter()
             .map(|category| {
@@ -211,6 +215,7 @@ async fn export_article_pages(
         ctx.insert("tags", &tags);
         ctx.insert("categories", &categories);
         ctx.insert("latest_articles", &latest_articles);
+        ctx.insert("surrounding_articles", &true);
 
         render_to_path(
             tera,
@@ -936,7 +941,7 @@ mod tests {
             table_of_contents: false,
         };
         let db = MockDatabase::new(DatabaseBackend::Sqlite)
-            .append_query_results([vec![article.clone()], vec![article]])
+            .append_query_results([vec![article]])
             .append_query_results([Vec::<tag::Model>::new()])
             .append_query_results([Vec::<category::Model>::new()])
             .into_connection();
@@ -958,7 +963,7 @@ mod tests {
             .expect("failed to export article");
         let html = fs::read_to_string(output.0.join("posts/highlighted-rust/index.html"))
             .expect("missing exported article");
-        assert!(html.contains("href=\"/posts/highlighted-rust/\""));
+        assert!(!html.contains("href=\"/posts/highlighted-rust/\""));
         assert!(html.contains("href=\"/css/site.css\""));
         let content = html
             .split("<div class=\"content is-medium\">")

@@ -1,6 +1,6 @@
 use crate::{
     repository::{
-        article::{get_article_by_slug, get_latest_articles},
+        article::{get_all_published_articles, get_article_by_slug, surrounding_articles},
         category::get_categories_by_article,
         tag::get_tags_by_article,
     },
@@ -69,12 +69,13 @@ pub async fn article_detail(
     let created_at = utc_to_jst(article.created_at);
     let updated_at = utc_to_jst(article.updated_at);
 
-    let latest_articles: Vec<_> = get_latest_articles(db, 5)
+    let published = get_all_published_articles(db)
         .await
-        .map_err(|_| Status::InternalServerError)?
+        .map_err(|_| Status::InternalServerError)?;
+    let latest_articles: Vec<_> = surrounding_articles(&published, article.id)
         .into_iter()
         .map(|model| {
-            let slug = model.slug;
+            let slug = model.slug.clone();
             json!({
                 "title":      model.title,
                 "slug":       slug.clone(),
@@ -97,7 +98,8 @@ pub async fn article_detail(
             updated_at: updated_at,
             tags: &tags,
             categories: &categories,
-            latest_articles: latest_articles
+            latest_articles: latest_articles,
+            surrounding_articles: true
         },
     ))
 }
@@ -161,7 +163,7 @@ mod tests {
         assert_eq!(response.content_type(), Some(ContentType::HTML));
         let html = response.into_string().await.expect("missing article body");
         assert!(
-            html.replace("&#x2F;", "/")
+            !html.replace("&#x2F;", "/")
                 .contains("href=\"/posts/highlighted-rust%23intro\""),
             "{html}"
         );
