@@ -7,6 +7,8 @@ pub struct FrontMatter {
     pub slug: String,
     #[serde(default)]
     pub deleted: bool,
+    #[serde(default)]
+    pub table_of_contents: bool,
     #[serde(default, alias = "date")]
     pub created_at: Option<String>,
     pub excerpt: Option<String>,
@@ -35,11 +37,34 @@ impl FrontMatter {
             title,
             slug,
             deleted,
+            table_of_contents: false,
             created_at,
             excerpt,
             icatch_path,
             tags,
             categories,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::FrontMatter;
+
+    #[test]
+    fn table_of_contents_is_opt_in() {
+        let base = "title: Test\nslug: test\ntags: []\ncategories: []\n";
+        for (setting, expected) in [
+            ("", false),
+            ("table_of_contents: false\n", false),
+            ("table_of_contents: true\n", true),
+        ] {
+            let matter: FrontMatter = serde_yaml::from_str(&format!("{base}{setting}")).unwrap();
+            assert_eq!(matter.table_of_contents, expected);
+        }
+        assert!(
+            serde_yaml::from_str::<FrontMatter>(&format!("{base}table_of_contents: invalid"))
+                .is_err()
+        );
     }
 }

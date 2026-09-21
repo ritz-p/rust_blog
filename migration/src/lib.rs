@@ -9,6 +9,7 @@ mod m20251024_190826_create_fixed_content_table;
 mod m20251231_000001_create_article_icatch_path;
 
 pub struct Migrator;
+mod m20260922_000001_article_table_of_contents;
 
 #[async_trait::async_trait]
 impl MigratorTrait for Migrator {
@@ -21,6 +22,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20250824_170452_create_article_category_table::Migration),
             Box::new(m20251024_190826_create_fixed_content_table::Migration),
             Box::new(m20251231_000001_create_article_icatch_path::Migration),
+            Box::new(m20260922_000001_article_table_of_contents::Migration),
         ]
     }
 }

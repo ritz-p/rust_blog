@@ -118,6 +118,29 @@ pub async fn seed_category(
 
 #[cfg(test)]
 mod tests {
+    #[rocket::async_test]
+    async fn reseed_updates_table_of_contents_in_both_directions() {
+        use sea_orm::{ConnectionTrait, Database, EntityTrait, Schema};
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        let backend = db.get_database_backend();
+        let schema = Schema::new(backend);
+        db.execute(backend.build(&schema.create_table_from_entity(article::Entity)))
+            .await
+            .unwrap();
+        let mut matter = build_front_matter_from_title_and_slug("TOC", "31");
+        for enabled in [false, true, false] {
+            matter.table_of_contents = enabled;
+            let id = seed_article(&db, &matter, "## Heading").await.unwrap();
+            let saved = article::Entity::find_by_id(id)
+                .one(&db)
+                .await
+                .unwrap()
+                .unwrap();
+            assert_eq!(saved.table_of_contents, enabled);
+            assert_eq!(saved.content, "## Heading");
+        }
+    }
+
     use super::{delete_article_by_slug, seed_article};
     use crate::entity::article;
     use crate::utils::front_matter::FrontMatter;
@@ -204,6 +227,7 @@ mod tests {
             created_at: ts.unwrap(),
             updated_at: ts.unwrap(),
             icatch_path: None,
+            table_of_contents: false,
         }
     }
 
