@@ -163,7 +163,8 @@ mod tests {
         assert_eq!(response.content_type(), Some(ContentType::HTML));
         let html = response.into_string().await.expect("missing article body");
         assert!(
-            !html.replace("&#x2F;", "/")
+            !html
+                .replace("&#x2F;", "/")
                 .contains("href=\"/posts/highlighted-rust%23intro\""),
             "{html}"
         );
