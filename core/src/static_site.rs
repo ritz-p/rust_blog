@@ -177,11 +177,12 @@ async fn export_article_pages(
     config: &CommonConfig,
     out_dir: &Path,
 ) -> Result<()> {
-    let articles = get_all_published_articles(db).await?;
+    let mut articles = get_all_published_articles(db).await?;
+    articles.sort_by_key(|a| std::cmp::Reverse((a.created_at, a.id)));
     let latest_articles = latest_articles_json(db).await?;
-    for article in &articles {
+    for (index, article) in articles.iter().enumerate() {
         let surrounding: Vec<_> =
-            crate::repository::article::surrounding_articles(&articles, article.id)
+            crate::repository::article::surrounding_articles(&articles, index)
                 .into_iter()
                 .map(|a| json!({"title": a.title, "url": static_article_url(&a.slug)}))
                 .collect();
