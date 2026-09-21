@@ -4,7 +4,11 @@ use crate::{
         category::get_categories_by_article,
         tag::get_tags_by_article,
     },
-    utils::{config::CommonConfig, markdown::markdown_to_html, utc_to_jst},
+    utils::{
+        config::CommonConfig,
+        markdown::{markdown_to_html, toc},
+        utc_to_jst,
+    },
 };
 use rocket::{State, http::Status};
 use rocket_dyn_templates::{Template, context};
@@ -29,6 +33,11 @@ pub async fn article_detail(
     };
 
     let content = markdown_to_html(&article.content);
+    let content = if article.table_of_contents {
+        toc(&content)
+    } else {
+        content
+    };
 
     let tags: Vec<_> = get_tags_by_article(conn, &article)
         .await
@@ -121,6 +130,7 @@ mod tests {
             created_at: Utc::now(),
             updated_at: Utc::now(),
             icatch_path: None,
+            table_of_contents: false,
         };
         let db = MockDatabase::new(DatabaseBackend::Sqlite)
             .append_query_results([vec![article.clone()]])

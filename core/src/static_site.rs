@@ -26,7 +26,7 @@ use crate::{
     utils::{
         config::CommonConfig,
         cut_out_string,
-        markdown::{markdown_to_html, markdown_to_text},
+        markdown::{markdown_to_html, markdown_to_text, toc},
         utc_to_jst,
     },
 };
@@ -199,7 +199,13 @@ async fn export_article_pages(
 
         let mut ctx = base_context(config);
         ctx.insert("title", &article.title);
-        ctx.insert("content_html", &markdown_to_html(&article.content));
+        let content = markdown_to_html(&article.content);
+        let content = if article.table_of_contents {
+            toc(&content)
+        } else {
+            content
+        };
+        ctx.insert("content_html", &content);
         ctx.insert("created_at", &utc_to_jst(article.created_at));
         ctx.insert("updated_at", &utc_to_jst(article.updated_at));
         ctx.insert("tags", &tags);
@@ -925,6 +931,7 @@ mod tests {
             created_at: Utc::now(),
             updated_at: Utc::now(),
             icatch_path: None,
+            table_of_contents: false,
         };
         let db = MockDatabase::new(DatabaseBackend::Sqlite)
             .append_query_results([vec![article.clone()], vec![article]])

@@ -17,6 +17,7 @@ pub struct Model {
     pub created_at: DateTimeUtc,
     pub updated_at: DateTimeUtc,
     pub icatch_path: Option<String>,
+    pub table_of_contents: bool,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

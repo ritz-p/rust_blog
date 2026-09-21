@@ -40,3 +40,5 @@ taplo = { version = "0.14.0", features = ["serde"] }
 chrono-tz = "0.10.4"
 garde = { version = "0.22.1", features = ["full"] }
 ammonia = "4.0.0"
+lol_html = "3.0.1"
+html-escape = "0.2"

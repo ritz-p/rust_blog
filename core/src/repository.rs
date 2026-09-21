@@ -24,6 +24,7 @@ mod repository_tests {
             created_at: Utc::now(),
             updated_at: Utc::now(),
             icatch_path: None,
+            table_of_contents: false,
         };
         let page = Page { number: 1, per: 10 };
         let db = MockDatabase::new(DatabaseBackend::Sqlite)

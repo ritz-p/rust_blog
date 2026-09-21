@@ -1,4 +1,5 @@
 pub mod to_text;
+mod toc;
 use ammonia::Builder;
 use pulldown_cmark::{CodeBlockKind, Event, Options, Parser, Tag, html};
 use std::sync::LazyLock;
@@ -7,6 +8,7 @@ use syntect::{
     parsing::{SyntaxReference, SyntaxSet},
     util::LinesWithEndings,
 };
+pub use toc::toc;
 
 use to_text::{end_tag, is_strikethrough, start_tag};
 
@@ -139,6 +141,45 @@ pub fn markdown_to_text(markdown: &str) -> String {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn toc_is_opt_in_and_omitted_without_headings() {
+        let input = "## 見出し\n\nbody";
+        assert!(!super::markdown_to_html(input).contains("table-of-contents"));
+        assert_eq!(
+            super::toc(&super::markdown_to_html("body")),
+            super::markdown_to_html("body")
+        );
+    }
+
+    #[test]
+    fn toc_links_are_unique_and_follow_nested_heading_order() {
+        let input = "## 同名\n\n#### **深い** `code` [link](https://example.com)\n\n## 同名\n\n末尾\n====\n\n```bash\n# not a heading\n```";
+        let html = super::toc(&super::markdown_to_html(input));
+        let toc = html.split("</nav>").next().unwrap();
+        assert!(toc.contains("<a href=\"#toc-heading-1\">同名</a><ol><li><a href=\"#toc-heading-2\">深い code link</a>"));
+        for i in 1..=4 {
+            assert_eq!(html.matches(&format!("id=\"toc-heading-{i}\"")).count(), 1);
+            assert_eq!(
+                toc.matches(&format!("href=\"#toc-heading-{i}\"")).count(),
+                1
+            );
+        }
+        assert!(!toc.contains("not a heading"));
+        assert_eq!(toc.matches("<ol>").count(), toc.matches("</ol>").count());
+        assert_eq!(toc.matches("<li>").count(), toc.matches("</li>").count());
+    }
+
+    #[test]
+    fn toc_escapes_labels_and_preserves_content_sanitization() {
+        let html = super::toc(&super::markdown_to_html(
+            "# `<img src=x onerror=alert(1)>` & text\n\n<script>alert(1)</script>\n\n[bad](javascript:alert(1))",
+        ));
+        assert!(html.contains("&lt;img src=x onerror=alert(1)&gt;"));
+        assert!(!html.contains("<img"));
+        assert!(!html.contains("<script"));
+        assert!(!html.contains("javascript:"));
+    }
+
     use super::{markdown_to_html, markdown_to_text};
 
     fn without_spans(html: &str) -> String {

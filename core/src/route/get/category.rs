@@ -160,7 +160,7 @@ mod tests {
         .expect("failed to create category table");
         db.execute(Statement::from_string(
             DbBackend::Sqlite,
-            "CREATE TABLE article (id INTEGER PRIMARY KEY, title TEXT NOT NULL, slug TEXT NOT NULL, excerpt TEXT NULL, content TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, icatch_path TEXT NULL);",
+            "CREATE TABLE article (id INTEGER PRIMARY KEY, title TEXT NOT NULL, slug TEXT NOT NULL, excerpt TEXT NULL, content TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, icatch_path TEXT NULL, table_of_contents BOOLEAN NOT NULL DEFAULT false);",
         ))
         .await
         .expect("failed to create article table");
