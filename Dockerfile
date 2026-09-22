@@ -1,4 +1,4 @@
-FROM rust:1.93.1-bookworm
+FROM rust:1.98.1-bookworm
 
 WORKDIR /workspace/rust_blog
 COPY rust-toolchain.toml ./

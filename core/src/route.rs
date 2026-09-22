@@ -56,6 +56,10 @@ impl Fairing for SecurityHeaders {
     }
 }
 
+#[expect(
+    clippy::result_large_err,
+    reason = "Preserve Rocket's error type at the application startup boundary"
+)]
 pub async fn launch(
     db: DatabaseConnection,
     config_map: HashMap<String, String>,
