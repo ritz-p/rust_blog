@@ -35,6 +35,20 @@ export は出力ディレクトリを作り直すため、実行後は上記の�
 
 ## GitHub Actions で生成
 
+CI は静的サイトを `static-site`、その生成に使った SQLite DB を
+`static-site-database`（`blog.db`）として個別のアーティファクトに保存します。
+DB は `dist/` の外に配置するため、Cloudflare の公開対象には含まれません。
+DB は SQLite のバックアップ機能で単独のファイルに保存します。
+
+ローカルで DB も保存する場合:
+
+```sh
+docker compose exec -T -e EXPORT_DATABASE_PATH=artifact/static-export/blog.db web sh docker/export-articles.sh
+```
+
+`EXPORT_DATABASE_PATH` を省略した場合は、従来どおり一時 DB を実行後に削除します。
+保存先には公開ディレクトリの外を指定してください。
+
 入力パスと出力先は `.github/workflows/deploy_static.yml` の `env` で設定します。
 これらを `docker compose exec -e` でコンテナへ渡します。
 `docker/export-articles.sh` はリポジトリ直下から実行し、環境変数を読み込みます。
