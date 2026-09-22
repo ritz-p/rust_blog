@@ -4,14 +4,8 @@
 {% block content %}
 <div class="columns">
   <div class="column is-8">
-    <article aria-labelledby="post-title">
-      <header class="mb-5">
-        <h1 id="post-title" class="title is-2">{{ title }}</h1>
-        <p class="is-size-7 has-text-grey">
-          公開: {{ created_at }}{% if updated_at %} / 更新: {{ updated_at }}{% endif %}
-        </p>
-        <hr>
-      </header>
+    <article class="article-page" aria-labelledby="post-title">
+      {% include "partial/article_header" %}
       <div class="content is-medium">
         {{ content_html | safe }}
       </div>
