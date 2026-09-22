@@ -69,8 +69,7 @@ fn validate_title(title: &str) -> Result<()> {
 }
 
 fn validate_slug(slug: &str) -> Result<()> {
-    ensure!(!slug.trim().is_empty(), "slug must not be blank");
-    validate_length("slug", slug, 100)
+    rust_blog::slug::validate(slug, 100)
 }
 
 fn validate_created_at(created_at: Option<&str>) -> Result<()> {
@@ -209,12 +208,19 @@ fn main() -> Result<()> {
     let paths = collect_paths(roots)?;
     let mut pending = Vec::new();
     let mut errors = Vec::new();
+    let mut slugs = rust_blog::slug::SlugRegistry::default();
     for path in paths {
         let result = fs::read_to_string(&path)
             .map_err(anyhow::Error::from)
             .and_then(|text| {
                 let document = parse(&text)?;
                 validate(&document.matter)?;
+                let slug = document
+                    .matter
+                    .get(Value::String("slug".into()))
+                    .and_then(Value::as_str)
+                    .context("slug must be a string")?;
+                slugs.insert(slug, path.clone())?;
                 let formatted = render(&document, &format(&document.matter))?;
                 Ok((text, formatted))
             });

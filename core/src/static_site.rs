@@ -50,6 +50,7 @@ pub async fn export_site(
     paths: &ExportPaths,
 ) -> Result<()> {
     let out_dir = out_dir.as_ref();
+    validate_content_slugs(db).await?;
     reset_output_dir(out_dir)?;
     write_static_assets(out_dir, &paths.content_dir, config_map)?;
 
@@ -72,6 +73,73 @@ pub async fn export_site(
     write_cloudflare_support_files(out_dir)?;
 
     Ok(())
+}
+
+async fn validate_content_slugs(db: &DatabaseConnection) -> Result<()> {
+    use crate::{
+        entity::article,
+        slug::{SlugRegistry, validate, validate_fixed},
+    };
+    use sea_orm::EntityTrait;
+    let mut articles = SlugRegistry::default();
+    for model in article::Entity::find().all(db).await? {
+        validate(&model.slug, 100).with_context(|| format!("article {}", model.id))?;
+        articles.insert(&model.slug, format!("article {}", model.id))?;
+    }
+    let mut fixed = SlugRegistry::default();
+    for model in get_all_fixed_contents(db).await? {
+        validate_fixed(&model.slug).with_context(|| format!("fixed page {}", model.id))?;
+        fixed.insert(&model.slug, format!("fixed page {}", model.id))?;
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod slug_tests {
+    use super::*;
+    use crate::entity::article;
+    use sea_orm::{ActiveModelTrait, ConnectionTrait, Database, Schema, Set};
+
+    #[rocket::async_test]
+    async fn rejects_unsafe_database_slug_before_resetting_output() {
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        let backend = db.get_database_backend();
+        db.execute(backend.build(&Schema::new(backend).create_table_from_entity(article::Entity)))
+            .await
+            .unwrap();
+        article::ActiveModel {
+            title: Set("Test".into()),
+            slug: Set("../escape".into()),
+            content: Set("body".into()),
+            created_at: Set(Utc::now()),
+            updated_at: Set(Utc::now()),
+            table_of_contents: Set(false),
+            ..Default::default()
+        }
+        .insert(&db)
+        .await
+        .unwrap();
+        let root = std::env::temp_dir().join(format!(
+            "slug-export-{}-{}",
+            std::process::id(),
+            Utc::now().timestamp_nanos_opt().unwrap()
+        ));
+        fs::create_dir_all(&root).unwrap();
+        fs::write(root.join("keep.txt"), "previous export").unwrap();
+        let paths = ExportPaths {
+            templates_dir: root.join("templates"),
+            content_dir: root.join("content"),
+        };
+        let error = export_site(&db, &HashMap::new(), &root, &paths)
+            .await
+            .unwrap_err();
+        assert!(format!("{error:#}").contains("slug"));
+        assert_eq!(
+            fs::read_to_string(root.join("keep.txt")).unwrap(),
+            "previous export"
+        );
+        fs::remove_dir_all(root).unwrap();
+    }
 }
 
 async fn export_search_index(

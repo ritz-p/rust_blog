@@ -19,6 +19,9 @@ pub async fn seed_fixed_content(
     fixed_content_matter: &FixedContentMatter,
     body: &str,
 ) -> Result<i32, anyhow::Error> {
+    crate::slug::validate_fixed(&fixed_content_matter.slug)?;
+    crate::slug::validate_database_collision(db, "fixed_content", &fixed_content_matter.slug)
+        .await?;
     let model: Option<FixedContentModel> = FixedContentEntity::find()
         .filter(FixedContentColumn::Slug.eq(fixed_content_matter.slug.clone()))
         .one(db)
