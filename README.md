@@ -1,162 +1,66 @@
-**Rust Blog (Rocket + SeaORM) Workspace Setup & Operations**
+# Rust Blog
 
-この README では、ワークスペース構成のもとで SeaORM のマイグレーション／エンティティ生成／シード／サーバ起動までの一連の操作手順をまとめています。
+Rocket・SeaORM を使うブログ。サーバー表示と静的 HTML 出力に対応しています。
 
----
+## 構成
 
-## 目次
+- `core/src/`: アプリケーション、エンティティ、seed、静的 export
+- `migration/`: DB マイグレーション
+- `content/articles/`: 記事 Markdown
+- `content/fixed_contents/`: 固定ページ Markdown
+- `templates/`: Tera テンプレート
+- `core/assets/`: 静的アセット
+- `blog_config.toml`: ブログ設定
 
-1. [前提条件](#前提条件)
-2. [リポジトリ構成](#リポジトリ構成)
-3. [環境変数](#環境変数)
-4. [マイグレーションの適用](#マイグレーションの適用)
-5. [エンティティの生成](#エンティティの生成)
-6. [シード用バイナリの実行](#シード用バイナリの実行)
-7. [アプリケーションの起動](#アプリケーションの起動)
-8. [Docker 開発環境](#docker-開発環境)
-9. [トラブルシューティング](#トラブルシューティング)
-10. [テスト観点まとめ](#テスト観点まとめ)
+## 開発
 
----
+Docker を使用します。`web` サービスでは `DATABASE_URL=sqlite://./blog.db?mode=rwc` が設定されます。
 
-## 前提条件
-
-- Rust (rustup + cargo) がインストール済み
-- Docker インストール済み
-
-## リポジトリ構成
-
-```
-rust_blog/             ← ワークスペースルート
-├── Cargo.toml         ← ワークスペース定義
-├── blog.db            ← SQLite DB ファイル
-├── core/              ← アプリケーションクレート
-│   ├── Cargo.toml
-│   └── src/
-│       ├── main.rs
-│       └── bin/seed.rs
-└── entity/            ← SeaORM エンティティクレート
-    ├── Cargo.toml
-    └── src/
+```bash
+docker compose up -d web
+docker compose exec web sea-orm-cli migrate up
+docker compose exec web cargo run -p rust_blog --bin seed
+docker compose exec web cargo run -p rust_blog
 ```
 
-## マイグレーションの適用
+[http://localhost:8888/](http://localhost:8888/) で確認できます。
+`ARTICLE_PATH`・`FIXED_CONTENT_PATH` で seed の入力ディレクトリを変更できます。
 
-1. ワークスペースルートでマイグレーションを実行：
+エンティティの再生成:
 
-   ```bash
-   sea-orm-cli migrate up
-   ```
-
-2. テーブル構造が `blog.db` に作成されることを確認します。
-
-## エンティティの生成
-
-1. マイグレーション適用後、`entity` クレートにモデルを出力：
-
-   ```bash
-   sea-orm-cli generate entity -o core/src/entity
-   ```
-
-2. `core/src/entity/*.rs` に `Relation` 含むコードが生成されることを確認。
-
-## シード用バイナリの実行
-
-1. `core` クレートをビルドしつつ seed を実行：
-
-   ```bash
-   cargo run -p rust_blog --bin seed
-   ```
-
-   - `seed.rs` が `content/articles/*.md` を読み込み DB に投入します。
-
-### Markdown のコードブロック
-
-コードフェンスの直後に `rust`、`javascript`、`python`、`bash` などの言語名を指定すると、構文ハイライトが適用されます。
-
-````markdown
-```rust
-fn main() {
-    println!("Hello, world!");
-}
+```bash
+docker compose exec web sea-orm-cli generate entity -o core/src/entity --with-serde both
 ```
-````
 
-- ハイライトは HTML 生成時に行うため、JavaScript や外部 CDN は不要です。
-- サーバー表示と静的 export の両方で適用されます。既存の静的サイトには export の再実行が必要です。
-- 言語指定なし・未対応言語・インデント形式のコードブロックは、通常のテキスト表示になります。
-- 長い行は折り返さず、コードブロック内で横スクロールできます。
+テスト:
 
-## アプリケーションの起動
+```bash
+docker compose exec web cargo test -p rust_blog
+```
 
-1. rust_blog を起動：
+## 静的出力
 
-   ```bash
-   cargo run -p rust_blog
-   ```
+```bash
+docker compose exec web cargo run -p rust_blog --bin export
+docker compose up -d --force-recreate static
+```
 
-2. 以下にアクセス:
+[http://localhost:8081/](http://localhost:8081/) で確認できます。生成先は `dist/` です。
 
-   - 記事一覧: [http://localhost:8888/](http://localhost:8000/)
-   - 記事詳細: [http://localhost:8888/posts/](http://localhost:8000/posts/<slug>)
-   - タグ一覧: [http://localhost:8888/tags](http://localhost:8000/tags)
+## Markdown
 
-## Docker 開発環境
+コードフェンスに `rust`、`javascript`、`python`、`bash` などの言語名を指定すると、
+サーバー表示と静的出力で構文ハイライトが適用されます。
+言語指定なし・未対応言語・インデント形式は通常のテキスト表示です。
+長い行は横スクロールできます。
 
-1. Docker イメージのビルド＆起動：
-
-   ```bash
-   docker-compose up --build -d
-   ```
-
-## トラブルシューティング
-
-- **外部キー制約を生成しているのに Relation が生成されない**
-
-  - `migrate up` → `generate entity` を順に確実に実行する
-  - `--verbose` フラグで FK 検出ログを確認
-
-- **SQLite ファイルがディレクトリになる**
-
-  - ホストに `touch blog.db` で空ファイルを作成
-
-- **バージョン衝突**
-
-  - workspace 内で対象のライブラリのバージョンを揃える
-
-## テスト観点まとめ
-
-テストで何を検証しているかは `docs/testing.md` にまとめています。
-
-## デプロイメモ
-
-テスト記事をまとめて静的 export し、GitHub Actions から Cloudflare に公開する手順は
-[静的デプロイ手順](docs/static-deploy.md) を参照してください。
-
-Cloudflare へ載せるときの考え方と選択肢は `docs/cloudflare.md` にまとめています。
-
-### コンテナで最短公開する場合
-
-Cloudflare を DNS / CDN / WAF として使い、アプリ本体は別のコンテナ基盤で動かす構成を取りやすいように、`prod/Dockerfile` を用意しています。
-
-ビルド:
+## 本番コンテナ
 
 ```bash
 docker build -f prod/Dockerfile -t rust-blog:prod .
+docker run --rm -p 8080:8080 -v "$(pwd)/data:/data" rust-blog:prod
 ```
-
-起動:
-
-```bash
-docker run --rm \
-  -p 8080:8080 \
-  -v $(pwd)/data:/data \
-  -e PORT=8080 \
-  rust-blog:prod
-```
-
 このイメージは起動時に以下を行います。
-
 1. SQLite ファイルを `/data/blog.db` に用意
 2. migration を適用
 3. `rust_blog` を起動
@@ -221,3 +125,31 @@ docker compose exec web cargo run -p rust_blog --bin format_markdown -- --check 
 `date` は名前を保持し、`created_at` と同じ位置に並べます。省略された任意項目は追加しません。
 YAML のコメントや引用形式は正規化されますが、本文は保持します。
 `--check` は検証エラーまたは未整形の場合に非ゼロで終了します。
+## DB から Markdown を出力
+
+```bash
+docker compose exec web cargo run -p rust_blog --bin export_markdown
+```
+
+`DATABASE_URL` の DB から `markdown_output/articles/<id>.md` と
+`markdown_output/fixed_contents/<id>.md` に出力します。引数で出力先を変更できます。
+既存ファイルや古い出力があればエラーになります。更新する場合は `--force` を指定してください。
+`--force` は上書きに加え、DB に存在しない `articles/<id>.md`・`fixed_contents/<id>.md` を削除します。空の DB でも古い出力を削除します。
+削除対象は各ディレクトリ直下の整数 ID のファイルだけです。それ以外のファイルは保持するため、seed 用の出力先には手書きの Markdown を混在させないでください。
+記事の公開日時・目次設定・タグ・カテゴリ・本文を保持します。
+DB の ID・更新日時および固定ページの日時は seed の入力項目ではないためヘッダーには含めません。
+タグ・カテゴリは seed と同じ名前の配列です。独立した taxonomy の slug や未使用項目のバックアップには使えません。
+
+再投入:
+
+```bash
+docker compose exec -e ARTICLE_PATH=markdown_output/articles -e FIXED_CONTENT_PATH=markdown_output/fixed_contents web cargo run -p rust_blog --bin seed
+```
+## 関連ドキュメント
+
+- [テスト観点](docs/testing.md)
+- [目次設定](docs/table-of-contents.md)
+- [静的デプロイ](docs/static-deploy.md)
+- [export バンドル](docs/export-bundle-usage.md)
+- [Cloudflare](docs/cloudflare.md)
+- [出力アーキテクチャ](docs/dual-output-architecture.md)
