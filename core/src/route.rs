@@ -56,10 +56,14 @@ impl Fairing for SecurityHeaders {
     }
 }
 
+#[expect(
+    clippy::result_large_err,
+    reason = "Preserve Rocket's error type at the application startup boundary"
+)]
 pub async fn launch(
     db: DatabaseConnection,
     config_map: HashMap<String, String>,
-) -> Result<Rocket<Ignite>, Box<rocket::Error>> {
+) -> Result<Rocket<Ignite>, rocket::Error> {
     rocket::build()
         .manage(db)
         .manage(CommonConfig {
@@ -121,5 +125,4 @@ pub async fn launch(
         )
         .launch()
         .await
-        .map_err(Box::new)
 }
