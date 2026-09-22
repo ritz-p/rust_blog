@@ -47,6 +47,17 @@ docker compose up -d --force-recreate static
 
 [http://localhost:8081/](http://localhost:8081/) で確認できます。生成先は `dist/` です。
 
+## 記事検索
+
+記事一覧の検索欄から、タイトル・概要・本文を部分一致で検索できます。
+英字の大文字・小文字は区別せず、空白で区切った複数語はすべて含む記事を表示します。
+検索語は URL の `q` に保存され、ページ送りと月別絞り込みでも保持されます。
+「解除」で通常の一覧へ戻れます。
+
+サーバーモードは公開済み記事を読み込み、Markdown をテキスト化して検索します。
+静的サイトは export 時に生成する `search-index.json` をブラウザーで検索するため、
+JavaScript が必要です。記事の変更を検索へ反映するには export を再実行してください。
+
 ## Markdown
 
 コードフェンスに `rust`、`javascript`、`python`、`bash` などの言語名を指定すると、

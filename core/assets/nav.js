@@ -18,7 +18,10 @@ document.addEventListener('DOMContentLoaded', () => {
       const option = select.options[select.selectedIndex];
       const href = option ? option.dataset.href : '';
       if (href) {
-        window.location.assign(href);
+        const url = new URL(href, window.location.origin);
+        const query = new URLSearchParams(window.location.search).get('q');
+        if (query && query.trim()) url.searchParams.set('q', query.trim());
+        window.location.assign(url.href);
       }
     });
   }

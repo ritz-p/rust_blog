@@ -35,6 +35,7 @@ const BULMA_CSS: &[u8] =
     include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/bulma.min.css"));
 const SITE_CSS: &[u8] = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/site.css"));
 const NAV_JS: &[u8] = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/nav.js"));
+const SEARCH_JS: &[u8] = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/search.js"));
 
 #[derive(Debug, Clone)]
 pub struct ExportPaths {
@@ -60,6 +61,8 @@ pub async fn export_site(
     };
     let tera = load_templates(&paths.templates_dir)?;
 
+    export_search_index(db, &config, out_dir).await?;
+
     export_index_pages(&tera, db, &config, out_dir).await?;
     export_article_pages(&tera, db, &config, out_dir).await?;
     export_fixed_content_pages(&tera, db, &config, out_dir).await?;
@@ -68,6 +71,34 @@ pub async fn export_site(
     export_error_page(&tera, &config, out_dir, "404", "404.html")?;
     write_cloudflare_support_files(out_dir)?;
 
+    Ok(())
+}
+
+async fn export_search_index(
+    db: &DatabaseConnection,
+    config: &CommonConfig,
+    out_dir: &Path,
+) -> Result<()> {
+    let mut articles = get_all_published_articles(db).await?;
+    articles.sort_by_key(|article| std::cmp::Reverse((article.created_at, article.id)));
+    let records: Vec<_> = articles.iter().map(|article| {
+        let date = article.created_at.with_timezone(&chrono_tz::Asia::Tokyo);
+        json!({
+            "title": article.title,
+            "url": static_article_url(&article.slug),
+            "excerpt": article.excerpt.as_deref().map(markdown_to_text).unwrap_or_else(|| cut_out_string(&markdown_to_text(&article.content), 100)),
+            "text": crate::utils::search::article_text(article),
+            "icatch_path": article.icatch_path.as_ref().or(config.default_icatch_path.as_ref()),
+            "created_at": utc_to_jst(article.created_at),
+            "updated_at": utc_to_jst(article.updated_at),
+            "year": date.year(),
+            "month": date.month(),
+        })
+    }).collect();
+    fs::write(
+        out_dir.join("search-index.json"),
+        serde_json::to_vec(&records)?,
+    )?;
     Ok(())
 }
 
@@ -144,6 +175,12 @@ async fn export_index_variant(
             .collect();
 
         let mut ctx = base_context(config);
+        ctx.insert("search_query", "");
+        ctx.insert("static_search", &true);
+        ctx.insert("search_year", &period.map(|period| period.year));
+        ctx.insert("search_month", &period.map(|period| period.month));
+        ctx.insert("all_periods_url", "/");
+        ctx.insert("clear_search_url", &static_index_url(1, period));
         ctx.insert("articles", &articles);
         ctx.insert("page", &page_info.current_page);
         ctx.insert("per", &page_info.per);
@@ -619,6 +656,7 @@ fn write_static_assets(
     write_embedded_asset_file(out_dir.join("css/bulma.min.css"), BULMA_CSS)?;
     write_embedded_asset_file(out_dir.join("css/site.css"), SITE_CSS)?;
     write_embedded_asset_file(out_dir.join("js/nav.js"), NAV_JS)?;
+    write_embedded_asset_file(out_dir.join("js/search.js"), SEARCH_JS)?;
     for (key, directory) in [("image_dir", "image"), ("icon_dir", "icon")] {
         let source = config_map
             .get(key)
@@ -651,7 +689,7 @@ fn build_headers_file() -> String {
         "  Cache-Control: public, max-age=31556952, immutable",
         "",
         "/js/*",
-        "  Cache-Control: public, max-age=31556952, immutable",
+        "  Cache-Control: public, max-age=0, must-revalidate",
         "",
         "/image/*",
         "  Cache-Control: public, max-age=31556952, immutable",
@@ -839,6 +877,7 @@ fn is_reserved_root_dir(name: &str) -> bool {
             | "js"
             | "page"
             | "posts"
+            | "search-index.json"
             | "tag"
             | "tags"
     )
@@ -859,6 +898,81 @@ mod tests {
             .expect("system time before unix epoch")
             .as_nanos();
         std::env::temp_dir().join(format!("rust-blog-static-site-{unique}"))
+    }
+
+    #[test]
+    fn search_terms_are_case_insensitive_and_split_on_whitespace() {
+        assert_eq!(
+            crate::utils::search::terms(" RUST　所有権\n "),
+            vec!["rust", "所有権"]
+        );
+        assert!(crate::utils::search::terms(" \t ").is_empty());
+    }
+
+    #[rocket::async_test]
+    async fn search_index_contains_only_published_plain_text_and_static_urls() {
+        use crate::entity::article;
+        use sea_orm::{ActiveModelTrait, ConnectionTrait, Database, EntityTrait, Schema, Set};
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        let backend = db.get_database_backend();
+        db.execute(backend.build(&Schema::new(backend).create_table_from_entity(article::Entity)))
+            .await
+            .unwrap();
+        for (id, title, created_at) in [
+            (1, "Rust 入門", "2025-12-31T15:00:00Z"),
+            (2, "Future secret", "2099-01-01T00:00:00Z"),
+        ] {
+            let date = chrono::DateTime::parse_from_rfc3339(created_at)
+                .unwrap()
+                .with_timezone(&chrono::Utc);
+            article::ActiveModel {
+                id: Set(id),
+                title: Set(title.into()),
+                slug: Set(format!("日本語 {id}")),
+                excerpt: Set(Some("**概要**".into())),
+                content: Set("# 所有権\n\n本文".into()),
+                created_at: Set(date),
+                updated_at: Set(date),
+                icatch_path: Set(None),
+                table_of_contents: Set(false),
+            }
+            .insert(&db)
+            .await
+            .unwrap();
+        }
+        let root = temp_export_dir();
+        fs::create_dir_all(&root).unwrap();
+        let config = crate::utils::config::CommonConfig {
+            articles_per_page: 10,
+            site_name: None,
+            default_icatch_path: None,
+            favicon_path: None,
+        };
+        super::export_search_index(&db, &config, &root)
+            .await
+            .unwrap();
+        let data: serde_json::Value =
+            serde_json::from_slice(&fs::read(root.join("search-index.json")).unwrap()).unwrap();
+        assert_eq!(data.as_array().unwrap().len(), 1);
+        assert_eq!(data[0]["url"], "/posts/%E6%97%A5%E6%9C%AC%E8%AA%9E%201/");
+        assert_eq!(data[0]["year"], 2026);
+        assert_eq!(data[0]["month"], 1);
+        assert!(
+            data[0]["text"]
+                .as_str()
+                .unwrap()
+                .contains("rust 入門\n概要\n")
+        );
+        assert!(!data.to_string().contains("Future secret"));
+        article::Entity::delete_many().exec(&db).await.unwrap();
+        super::export_search_index(&db, &config, &root)
+            .await
+            .unwrap();
+        assert_eq!(
+            fs::read_to_string(root.join("search-index.json")).unwrap(),
+            "[]"
+        );
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
