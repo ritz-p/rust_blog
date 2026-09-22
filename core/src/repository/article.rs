@@ -86,6 +86,42 @@ pub async fn get_all_articles(
     Ok((articles, page_info))
 }
 
+pub async fn search_articles(
+    db: &DatabaseConnection,
+    page: Page,
+    period: Option<ArticlePeriod>,
+    query: &str,
+) -> Result<(Vec<article::Model>, PageInfo, u64), DbErr> {
+    let terms = crate::utils::search::terms(query);
+    let mut base = article::Entity::find().filter(article::Column::CreatedAt.lte(Utc::now()));
+    if let Some(period) = period
+        && let Some(filter) = period.sqlite_datetime_range_filter()
+    {
+        base = base.filter(filter);
+    }
+    let articles = base
+        .order_by_desc(article::Column::CreatedAt)
+        .order_by_desc(article::Column::Id)
+        .all(db)
+        .await?;
+    let matches: Vec<_> = articles
+        .into_iter()
+        .filter(|article| {
+            let text = crate::utils::search::article_text(article);
+            terms.iter().all(|term| text.contains(term))
+        })
+        .collect();
+    let total = matches.len() as u64;
+    let info = PageInfo::new(page.normalize(SQLITE_MAX), total);
+    let offset = (info.current_page - 1) * info.per;
+    let articles = matches
+        .into_iter()
+        .skip(offset as usize)
+        .take(info.per as usize)
+        .collect();
+    Ok((articles, info, total))
+}
+
 pub async fn get_article_periods(
     db: &DatabaseConnection,
     period: Option<ArticlePeriod>,

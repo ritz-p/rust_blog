@@ -8,7 +8,7 @@ use crate::{
         page::{Page, PageInfo},
         query::{PagingQuery, index::IndexQuery},
     },
-    repository::article::{ArticlePeriod, get_all_articles, get_article_periods},
+    repository::article::{ArticlePeriod, get_all_articles, get_article_periods, search_articles},
     utils::{config::CommonConfig, cut_out_string, markdown::markdown_to_text, utc_to_jst},
 };
 
@@ -23,8 +23,9 @@ fn build_index_url(
     per: u64,
     period: Option<ArticlePeriod>,
     mode: IndexUrlMode,
+    search_query: &str,
 ) -> String {
-    match (mode, period) {
+    let mut url = match (mode, period) {
         (IndexUrlMode::Archive, Some(period)) if page <= 1 => {
             format!("/archive/{}/{:02}", period.year, period.month)
         }
@@ -36,7 +37,13 @@ fn build_index_url(
             period.year, period.month
         ),
         _ => format!("/?page={page}&per={per}"),
+    };
+    if !search_query.is_empty() {
+        url.push(if url.contains('?') { '&' } else { '?' });
+        url.push_str("q=");
+        url.push_str(&crate::utils::url_segment(search_query));
     }
+    url
 }
 
 #[get("/?<query..>")]
@@ -48,35 +55,39 @@ pub async fn index(
     render_index(config, db, query, IndexUrlMode::Query).await
 }
 
-#[get("/archive/<year>/<month>")]
+#[get("/archive/<year>/<month>?<q>")]
 pub async fn index_archive(
     config: &State<CommonConfig>,
     db: &State<DatabaseConnection>,
     year: i32,
     month: u32,
+    q: Option<String>,
 ) -> Result<Template, Status> {
     let query = IndexQuery {
         page: None,
         per: None,
         year: Some(year),
         month: Some(month),
+        q,
     };
     render_index(config, db, Some(query), IndexUrlMode::Archive).await
 }
 
-#[get("/archive/<year>/<month>/page/<page>")]
+#[get("/archive/<year>/<month>/page/<page>?<q>")]
 pub async fn index_archive_page(
     config: &State<CommonConfig>,
     db: &State<DatabaseConnection>,
     year: i32,
     month: u32,
     page: u64,
+    q: Option<String>,
 ) -> Result<Template, Status> {
     let query = IndexQuery {
         page: Some(page),
         per: None,
         year: Some(year),
         month: Some(month),
+        q,
     };
     render_index(config, db, Some(query), IndexUrlMode::Archive).await
 }
@@ -89,6 +100,8 @@ async fn render_index(
 ) -> Result<Template, Status> {
     let query = query.unwrap_or(IndexQuery::new());
     let page = Page::new_from_query(&query, config.articles_per_page);
+    let search_query = query.q.as_deref().unwrap_or_default().trim();
+    let mut search_count = None;
     let has_period_query = query.year.is_some() || query.month.is_some();
     let selected_period = match (query.year, query.month) {
         (Some(year), Some(month)) => ArticlePeriod::new(year, month),
@@ -99,18 +112,37 @@ async fn render_index(
     }
     let (models, page_info) = if has_period_query && selected_period.is_none() {
         (Vec::new(), PageInfo::new(page.normalize(u64::MAX), 0))
+    } else if !search_query.is_empty() {
+        let (models, info, total) =
+            search_articles(db.inner(), page, selected_period, search_query)
+                .await
+                .map_err(|_| Status::InternalServerError)?;
+        search_count = Some(total);
+        (models, info)
     } else {
         get_all_articles(db.inner(), page, selected_period)
             .await
             .map_err(|_| Status::InternalServerError)?
     };
     let prev_url = if page_info.has_prev {
-        build_index_url(page_info.prev_page, page_info.per, selected_period, mode)
+        build_index_url(
+            page_info.prev_page,
+            page_info.per,
+            selected_period,
+            mode,
+            search_query,
+        )
     } else {
         String::new()
     };
     let next_url = if page_info.has_next {
-        build_index_url(page_info.next_page, page_info.per, selected_period, mode)
+        build_index_url(
+            page_info.next_page,
+            page_info.per,
+            selected_period,
+            mode,
+            search_query,
+        )
     } else {
         String::new()
     };
@@ -123,7 +155,7 @@ async fn render_index(
         .map(|period| {
             json!({
                 "label": format!("{}/{:02}", period.year, period.month),
-                "href": build_index_url(1, page.per, Some(*period), IndexUrlMode::Archive),
+                "href": build_index_url(1, page.per, Some(*period), IndexUrlMode::Archive, search_query),
                 "is_selected": selected_period == Some(*period),
             })
         })
@@ -160,7 +192,14 @@ async fn render_index(
             tags_url: "/tags",
             categories_url: "/categories",
             about_url: "/about",
-            articles:  articles,
+            search_query: search_query,
+            search_count: search_count,
+            search_year: selected_period.map(|period| period.year),
+            search_month: selected_period.map(|period| period.month),
+            static_search: false,
+            all_periods_url: build_index_url(1, page_info.per, None, IndexUrlMode::Query, search_query),
+            clear_search_url: build_index_url(1, page_info.per, selected_period, mode, ""),
+            articles: articles,
             page: page_info.current_page,
             per: page_info.per,
             total_pages: page_info.total_pages,
@@ -170,7 +209,7 @@ async fn render_index(
             next_page: page_info.next_page,
             prev_url: prev_url,
             next_url: next_url,
-            pagination: page_info.navigation(|number| build_index_url(number, page_info.per, selected_period, mode)),
+            pagination: page_info.navigation(|number| build_index_url(number, page_info.per, selected_period, mode, search_query)),
             selected_period: selected_period.map(|period| format!("{}/{:02}", period.year, period.month)),
             period_links: period_links,
         },
@@ -231,6 +270,74 @@ mod tests {
         .await
         .expect("failed to insert articles");
         db
+    }
+
+    #[rocket::async_test]
+    async fn search_matches_plain_text_and_preserves_pagination_and_period() {
+        let db = prepare_index_db().await;
+        db.execute(Statement::from_sql_and_values(DbBackend::Sqlite,
+            "INSERT INTO article (id, title, slug, excerpt, content, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            vec![7.into(), "Rust 入門".into(), "rust-search".into(), "安全性".into(), "**所有権**と東京、100%_literal".into(), "2025-12-20T00:00:00Z".into(), "2025-12-20T00:00:00Z".into()]
+        )).await.unwrap();
+        let client = client_with_page_size(db, 1).await;
+        for (query, expected) in [
+            ("RUST 所有権", 1),
+            ("安全性 東京", 1),
+            ("%_literal", 1),
+            ("Future", 0),
+            ("no-such-word", 0),
+        ] {
+            let response = client
+                .get(format!("/?q={}", crate::utils::url_segment(query)))
+                .dispatch()
+                .await;
+            assert_eq!(response.status(), Status::Ok);
+            let body = response.into_string().await.unwrap();
+            assert!(body.contains(&format!("検索結果: {expected}件")), "{body}");
+            assert_eq!(
+                body.matches("<article class=\"article-card\">").count(),
+                expected
+            );
+        }
+        let response = client
+            .get("/?q=DEC%20body&per=1&year=2025&month=12")
+            .dispatch()
+            .await;
+        let body =
+            html_escape::decode_html_entities(&response.into_string().await.unwrap()).into_owned();
+        assert!(body.contains("検索結果: 2件"));
+        assert!(body.contains("/?page=2&per=1&year=2025&month=12&q=DEC%20body"));
+        let response = client
+            .get("/archive/2025/12/page/2?q=DEC%20body")
+            .dispatch()
+            .await;
+        assert_eq!(response.status(), Status::Ok);
+        let body =
+            html_escape::decode_html_entities(&response.into_string().await.unwrap()).into_owned();
+        assert!(body.contains("Dec 1"));
+        assert!(!body.contains("Dec 2"));
+        assert!(body.contains("/archive/2025/12?q=DEC%20body"));
+        let response = client.get("/?q=Rust&year=2025&month=11").dispatch().await;
+        assert!(
+            response
+                .into_string()
+                .await
+                .unwrap()
+                .contains("検索結果: 0件")
+        );
+        let response = client.get("/?q=%20%20").dispatch().await;
+        assert!(!response.into_string().await.unwrap().contains("検索結果:"));
+        let response = client
+            .get("/?q=%3Cscript%3Ealert%281%29%3C%2Fscript%3E")
+            .dispatch()
+            .await;
+        assert!(
+            !response
+                .into_string()
+                .await
+                .unwrap()
+                .contains("<script>alert(1)</script>")
+        );
     }
 
     #[rocket::async_test]

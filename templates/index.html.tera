@@ -4,12 +4,31 @@
 {% block content %}
 <h1 class="title">記事一覧 - {{ site_name }}</h1>
 
+<form action="/" method="get" role="search" class="mb-5" id="article-search">
+  <label class="label" for="search-query">記事を検索</label>
+  <div class="field has-addons">
+    <div class="control is-expanded">
+      <input class="input" id="search-query" name="q" type="search" value="{{ search_query }}" placeholder="タイトル・概要・本文を検索">
+    </div>
+    <div class="control"><button class="button is-link" type="submit">検索</button></div>
+    <div class="control"><a class="button" href="{{ clear_search_url }}" id="clear-search">解除</a></div>
+  </div>
+  <input type="hidden" name="per" value="{{ per }}">
+  {% if search_year and search_month %}
+    <input type="hidden" name="year" value="{{ search_year }}">
+    <input type="hidden" name="month" value="{{ search_month }}">
+  {% endif %}
+  <p class="help">空白で区切ると、すべての語を含む記事を検索します。</p>
+</form>
+{% if static_search %}<noscript><p>記事検索には JavaScript を有効にしてください。</p></noscript>{% endif %}
+<p id="search-status" role="status" class="mb-4">{% if search_query %}「{{ search_query }}」の検索結果: {{ search_count | default(value=0) }}件{% endif %}</p>
+
 {% if period_links and period_links | length > 0 %}
   <div class="mb-5">
     <p class="is-size-7 has-text-grey mb-2">時期別</p>
     <div class="select is-small">
       <select aria-label="時期別フィルタ" data-period-filter>
-        <option data-href="/" {% if not selected_period %}selected{% endif %}>すべて</option>
+        <option data-href="{{ all_periods_url }}" {% if not selected_period %}selected{% endif %}>すべて</option>
         {% for period in period_links %}
           <option data-href="{{ period.href }}" {% if period.is_selected %}selected{% endif %}>
             {{ period.label }}
@@ -20,6 +39,7 @@
   </div>
 {% endif %}
 
+<div id="index-results" data-static-search="{{ static_search }}" data-per="{{ per }}" data-year="{{ search_year | default(value='') }}" data-month="{{ search_month | default(value='') }}">
 {% if articles and articles | length > 0 %}
   <div class="article-list">
     {% for article in articles %}
@@ -27,7 +47,13 @@
     {% endfor %}
   </div>
 {% else %}
-  <p class="has-text-grey">まだ記事がありません。</p>
+  <p class="has-text-grey">{% if search_query %}一致する記事がありません。{% else %}まだ記事がありません。{% endif %}</p>
 {% endif %}
 {% include "partial/page" %}
+</div>
 {% endblock content %}
+
+{% block scripts %}
+{{ super() }}
+{% if static_search %}<script src="/js/search.js" defer></script>{% endif %}
+{% endblock scripts %}
