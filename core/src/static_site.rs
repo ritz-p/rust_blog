@@ -689,7 +689,7 @@ fn build_headers_file() -> String {
         "  Cache-Control: public, max-age=31556952, immutable",
         "",
         "/js/*",
-        "  Cache-Control: public, max-age=31556952, immutable",
+        "  Cache-Control: public, max-age=0, must-revalidate",
         "",
         "/image/*",
         "  Cache-Control: public, max-age=31556952, immutable",

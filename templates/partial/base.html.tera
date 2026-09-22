@@ -42,7 +42,7 @@
     </div>
   </footer>
   {% block scripts %}
-  <script src="/js/nav.js" defer></script>
+  <script src="/js/nav.js?v=2" defer></script>
   {% endblock scripts %}
 </body>
 </html>

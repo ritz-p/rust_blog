@@ -55,5 +55,5 @@
 
 {% block scripts %}
 {{ super() }}
-{% if static_search %}<script src="/js/search.js" defer></script>{% endif %}
+{% if static_search %}<script src="/js/search.js?v=2" defer></script>{% endif %}
 {% endblock scripts %}
