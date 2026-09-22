@@ -35,6 +35,7 @@ pub fn parse_markdown_to_fixed_content_matter(
 }
 
 fn split_front_matter(text: &str) -> Result<(&str, &str), std::io::Error> {
+    let text = text.strip_prefix('\u{feff}').unwrap_or(text);
     let missing = || std::io::Error::new(std::io::ErrorKind::InvalidData, "FrontMatter not found");
     let mut lines = text.split_inclusive('\n');
     let first = lines.next().ok_or_else(missing)?;
@@ -70,6 +71,25 @@ mod tests {
             std::env::temp_dir().join(format!("seed_markdown_test_{}_{}", std::process::id(), ts));
         fs::create_dir_all(&dir).expect("failed to create temp dir");
         dir
+    }
+
+    #[test]
+    fn accepts_optional_bom_for_articles_and_fixed_pages() {
+        let dir = create_temp_dir();
+        let path = dir.join("bom.md");
+        for newline in ["\n", "\r\n"] {
+            let text =
+                "\u{feff}---\ntitle: Test\nslug: test\ntags: []\ncategories: []\n---\n本文\n"
+                    .replace('\n', newline);
+            fs::write(&path, text).unwrap();
+            let (article, body) = parse_markdown_to_front_matter(&path).unwrap();
+            assert_eq!(article.title, "Test");
+            assert_eq!(body, format!("本文{newline}"));
+            let (fixed, body) = parse_markdown_to_fixed_content_matter(&path).unwrap();
+            assert_eq!(fixed.title, "Test");
+            assert_eq!(body, format!("本文{newline}"));
+        }
+        fs::remove_dir_all(dir).unwrap();
     }
 
     #[test]

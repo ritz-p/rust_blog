@@ -77,7 +77,7 @@ fn resolve_created_at(
     }
 }
 
-fn parse_created_at(raw: &str) -> Result<DateTime<Utc>, DbErr> {
+pub fn parse_created_at(raw: &str) -> Result<DateTime<Utc>, DbErr> {
     if let Ok(dt) = DateTime::parse_from_rfc3339(raw) {
         return Ok(dt.with_timezone(&Utc));
     }

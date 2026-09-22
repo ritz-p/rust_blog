@@ -111,6 +111,22 @@ seaorm migrate status -u "$DATABASE_URL"
 seaorm migrate refresh -u "$DATABASE_URL"
 ```
 
+## 記事 Markdown の整形・検証
+
+```bash
+docker compose exec web cargo run -p rust_blog --bin format_markdown -- content/articles
+docker compose exec web cargo run -p rust_blog --bin format_markdown -- --check content/articles
+```
+
+省略時の対象は `content/articles`。ファイル・ディレクトリを複数指定できます。
+明示指定したシンボリックリンクはリンク先を処理します。ディレクトリ配下のリンクはたどりません。
+UTF-8 BOM 付きファイルにも対応し、BOM と改行形式を保持します。
+必須項目は `title`、`slug`、`tags`、`categories`（配列は空でも可）。
+型・文字数・日時・未知の項目を検証し、不正なファイルがある場合は書き換えません。
+順序は `title`, `slug`, `deleted`, `table_of_contents`, `created_at`, `excerpt`, `icatch_path`, `tags`, `categories`。
+`date` は名前を保持し、`created_at` と同じ位置に並べます。省略された任意項目は追加しません。
+YAML のコメントや引用形式は正規化されますが、本文は保持します。
+`--check` は検証エラーまたは未整形の場合に非ゼロで終了します。
 ## DB から Markdown を出力
 
 ```bash
