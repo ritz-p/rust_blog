@@ -159,6 +159,7 @@ mod tests {
         )))
         .manage(db)
         .manage(CommonConfig {
+            articles_per_page: 10,
             site_name: Some("Test Blog".to_owned()),
             default_icatch_path: None,
             favicon_path: None,

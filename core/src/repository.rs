@@ -2,6 +2,7 @@ pub mod article;
 pub mod category;
 pub mod fixed_content;
 pub mod tag;
+pub const SQLITE_MAX: u64 = i64::MAX as u64;
 
 #[cfg(test)]
 mod repository_tests {

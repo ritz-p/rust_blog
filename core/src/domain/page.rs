@@ -13,13 +13,13 @@ impl Page {
         Self { number, per }
     }
 
-    pub fn new_from_query<T>(query: &T) -> Self
+    pub fn new_from_query<T>(query: &T, default_per: u64) -> Self
     where
         T: PagingQuery,
     {
         Self {
             number: query.page().unwrap_or(1),
-            per: query.per().unwrap_or(10),
+            per: query.per().unwrap_or(default_per),
         }
     }
 }
@@ -97,6 +97,7 @@ impl PageInfo {
 mod tests {
     use super::{Page, PageInfo};
     use crate::domain::query::PagingQuery;
+    use crate::repository::SQLITE_MAX;
 
     #[derive(Clone, Copy)]
     struct MockQuery {
@@ -124,9 +125,19 @@ mod tests {
     #[test]
     fn page_new_from_query_uses_defaults() {
         let query = MockQuery::new();
-        let page = Page::new_from_query(&query);
+        let page = Page::new_from_query(&query, 10);
         assert_eq!(page.number, 1);
         assert_eq!(page.per, 10);
+    }
+
+    #[test]
+    fn configured_page_size_has_no_fifty_article_cap() {
+        let query = MockQuery::new();
+        let page = Page::new_from_query(&query, 75).normalize(SQLITE_MAX);
+        assert_eq!(page.per, 75);
+        let info = PageInfo::new(page, 151);
+        assert_eq!(info.total_pages, 3);
+        assert_eq!(info.get_next_url("/", None), "/?page=2&per=75");
     }
 
     #[test]
@@ -135,7 +146,7 @@ mod tests {
             page: Some(3),
             per: Some(25),
         };
-        let page = Page::new_from_query(&query);
+        let page = Page::new_from_query(&query, 10);
         assert_eq!(page.number, 3);
         assert_eq!(page.per, 25);
     }

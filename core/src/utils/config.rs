@@ -4,6 +4,7 @@ use std::{collections::HashMap, fs, path::Path};
 
 #[derive(Debug, Deserialize)]
 pub struct CommonConfig {
+    pub articles_per_page: u64,
     pub site_name: Option<String>,
     pub default_icatch_path: Option<String>,
     pub favicon_path: Option<String>,
@@ -17,7 +18,7 @@ pub struct CommonConfigMap {
 #[derive(Deserialize)]
 struct Top {
     #[serde(flatten)]
-    tables: HashMap<String, HashMap<String, String>>,
+    tables: HashMap<String, HashMap<String, toml::Value>>,
 }
 
 impl CommonConfigMap {
@@ -28,6 +29,16 @@ impl CommonConfigMap {
             .with_context(|| format!("failed to parse TOML {:?}", path.as_ref()))?;
 
         if let Some(map) = top.tables.remove(key) {
+            let map = map
+                .into_iter()
+                .map(|(key, value)| {
+                    let value = match value {
+                        toml::Value::String(value) => value,
+                        value => value.to_string(),
+                    };
+                    (key, value)
+                })
+                .collect();
             Ok(CommonConfigMap { map })
         } else {
             let keys: Vec<_> = top.tables.keys().cloned().collect();
@@ -40,6 +51,13 @@ pub fn load_config() -> HashMap<String, String> {
     let path =
         std::env::var("RUST_BLOG_CONFIG_PATH").unwrap_or_else(|_| "blog_config.toml".to_string());
     load_config_from_file(path)
+}
+
+pub fn articles_per_page(map: &HashMap<String, String>) -> u64 {
+    map.get("articles_per_page")
+        .and_then(|value| value.parse().ok())
+        .filter(|value| *value > 0)
+        .unwrap_or(10)
 }
 
 pub fn load_config_from_file(toml_path: impl AsRef<Path>) -> HashMap<String, String> {
@@ -74,6 +92,22 @@ fn load_config_from_path(toml_path: &str) -> HashMap<String, String> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn page_size_accepts_integer_and_defaults_for_missing_or_invalid_values() {
+        for (setting, expected) in [
+            ("", 10),
+            ("articles_per_page = 75", 75),
+            ("articles_per_page = 0", 10),
+            ("articles_per_page = -1", 10),
+            ("articles_per_page = \"invalid\"", 10),
+        ] {
+            let path = write_temp_toml(&format!("[common]\nsite_name = \"Example\"\n{setting}\n"));
+            let map = super::load_config_from_file(&path);
+            assert_eq!(super::articles_per_page(&map), expected);
+            assert_eq!(map.get("site_name").unwrap(), "Example");
+            fs::remove_file(path).unwrap();
+        }
+    }
     use super::CommonConfigMap;
     use std::fs;
     use std::path::PathBuf;

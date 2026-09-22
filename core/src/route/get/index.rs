@@ -88,7 +88,7 @@ async fn render_index(
     mode: IndexUrlMode,
 ) -> Result<Template, Status> {
     let query = query.unwrap_or(IndexQuery::new());
-    let page = Page::new_from_query(&query);
+    let page = Page::new_from_query(&query, config.articles_per_page);
     let has_period_query = query.year.is_some() || query.month.is_some();
     let selected_period = match (query.year, query.month) {
         (Some(year), Some(month)) => ArticlePeriod::new(year, month),
@@ -98,7 +98,7 @@ async fn render_index(
         return Err(Status::NotFound);
     }
     let (models, page_info) = if has_period_query && selected_period.is_none() {
-        (Vec::new(), PageInfo::new(page.normalize(50), 0))
+        (Vec::new(), PageInfo::new(page.normalize(u64::MAX), 0))
     } else {
         get_all_articles(db.inner(), page, selected_period)
             .await
@@ -186,10 +186,15 @@ mod tests {
     use sea_orm::{ConnectionTrait, Database, DatabaseConnection, DbBackend, Statement};
 
     async fn client_with_db(db: sea_orm::DatabaseConnection) -> Client {
+        client_with_page_size(db, 10).await
+    }
+
+    async fn client_with_page_size(db: sea_orm::DatabaseConnection, per: u64) -> Client {
         let rocket =
             rocket::custom(rocket::Config::figment().merge(("template_dir", "../templates")))
                 .manage(db)
                 .manage(CommonConfig {
+                    articles_per_page: per,
                     site_name: Some("Test Blog".to_string()),
                     default_icatch_path: Some("/default.png".to_string()),
                     favicon_path: Some("/favicon.ico".to_string()),
@@ -225,6 +230,20 @@ mod tests {
         .await
         .expect("failed to insert articles");
         db
+    }
+
+    #[rocket::async_test]
+    async fn index_uses_configured_page_size_and_keeps_query_override() {
+        let client = client_with_page_size(prepare_index_db().await, 2).await;
+        for (url, count) in [("/", 2), ("/?page=3", 1), ("/?per=3", 3)] {
+            let response = client.get(url).dispatch().await;
+            assert_eq!(response.status(), Status::Ok);
+            let html = response.into_string().await.unwrap();
+            assert_eq!(
+                html.matches("<article class=\"article-card\">").count(),
+                count
+            );
+        }
     }
 
     #[rocket::async_test]
