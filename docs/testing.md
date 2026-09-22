@@ -32,12 +32,6 @@ PR の Cargo Test は Rust ソース、Cargo manifest / lockfile、Rust・ブロ
   - ページ遷移不可時に空文字を返す
   - `sort_key` 付き URL 生成
 
-### スラッグ設定 (`core/src/slug_config.rs`)
-
-- TOML から `map` を正しく読み取れること
-- 指定テーブルキーのみを抽出できること
-- 存在しないテーブルキー指定時にエラーになること
-
 ### 共通設定 (`core/src/utils/config.rs`)
 
 - TOML から `CommonConfigMap` を読み取れること
