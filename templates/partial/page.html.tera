@@ -37,11 +37,7 @@
           <span class="pagination-link" aria-disabled="true">Oldest</span>
         {% endif %}
       </li>
-      <li>
-        <span class="pagination-ellipsis">
-          Page {{ page }} / {{ total_pages }}
-        </span>
-      </li>
     </ul>
   </nav>
+  <p class="has-text-centered">Page {{ page }} / {{ total_pages }}</p>
 {% endif %}
