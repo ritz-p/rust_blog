@@ -31,7 +31,6 @@ use crate::{
     },
 };
 
-const PAGE_SIZE: u64 = 10;
 const BULMA_CSS: &[u8] =
     include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/bulma.min.css"));
 const SITE_CSS: &[u8] = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/site.css"));
@@ -54,6 +53,7 @@ pub async fn export_site(
     write_static_assets(out_dir, &paths.content_dir, config_map)?;
 
     let config = CommonConfig {
+        articles_per_page: crate::utils::config::articles_per_page(config_map),
         site_name: config_map.get("site_name").cloned(),
         default_icatch_path: config_map.get("default_icatch_path").cloned(),
         favicon_path: config_map.get("favicon_path").cloned(),
@@ -97,7 +97,7 @@ async fn export_index_variant(
         db,
         Page {
             number: 1,
-            per: PAGE_SIZE,
+            per: config.articles_per_page,
         },
         period,
     )
@@ -106,7 +106,7 @@ async fn export_index_variant(
     for page_number in 1..=first_page_info.total_pages {
         let page = Page {
             number: page_number,
-            per: PAGE_SIZE,
+            per: config.articles_per_page,
         };
         let (models, page_info) = get_all_articles(db, page, period).await?;
         let default_icatch_path = config.default_icatch_path.clone().unwrap_or_default();
@@ -301,7 +301,7 @@ async fn export_tag_variant(
         db,
         Page {
             number: 1,
-            per: PAGE_SIZE,
+            per: config.articles_per_page,
         },
         slug,
         sort_key,
@@ -313,7 +313,7 @@ async fn export_tag_variant(
             db,
             Page {
                 number: page_number,
-                per: PAGE_SIZE,
+                per: config.articles_per_page,
             },
             slug,
             sort_key,
@@ -426,7 +426,7 @@ async fn export_category_variant(
         db,
         Page {
             number: 1,
-            per: PAGE_SIZE,
+            per: config.articles_per_page,
         },
         slug,
         sort_key,
@@ -438,7 +438,7 @@ async fn export_category_variant(
             db,
             Page {
                 number: page_number,
-                per: PAGE_SIZE,
+                per: config.articles_per_page,
             },
             slug,
             sort_key,
@@ -949,6 +949,7 @@ mod tests {
             .append_query_results([Vec::<category::Model>::new()])
             .into_connection();
         let config = CommonConfig {
+            articles_per_page: 10,
             site_name: Some("Test Blog".to_owned()),
             default_icatch_path: None,
             favicon_path: None,

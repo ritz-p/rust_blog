@@ -59,7 +59,7 @@ pub async fn category_detail(
     slug: &str,
 ) -> Result<Template, Status> {
     let query = query.unwrap_or(CategoryQuery::new());
-    let page = Page::new_from_query(&query);
+    let page = Page::new_from_query(&query, config.articles_per_page);
     let sort_key = query.sort_key.unwrap_or_else(|| "created_at".to_string());
     match get_article_by_category_slug(db.inner(), page, slug, &sort_key).await {
         Ok((articles, page_info)) => {
@@ -138,6 +138,7 @@ mod tests {
             rocket::custom(rocket::Config::figment().merge(("template_dir", "../templates")))
                 .manage(db)
                 .manage(CommonConfig {
+                    articles_per_page: 10,
                     site_name: Some("Test Blog".to_string()),
                     default_icatch_path: Some("/default.png".to_string()),
                     favicon_path: Some("/favicon.ico".to_string()),

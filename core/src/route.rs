@@ -63,6 +63,7 @@ pub async fn launch(
     rocket::build()
         .manage(db)
         .manage(CommonConfig {
+            articles_per_page: crate::utils::config::articles_per_page(&config_map),
             site_name: config_map.get("site_name").cloned(),
             default_icatch_path: config_map.get("default_icatch_path").cloned(),
             favicon_path: config_map.get("favicon_path").cloned(),
