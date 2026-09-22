@@ -29,7 +29,10 @@ artifact には次が含まれます。
 - `DATABASE_URL` を設定できる
 - SQLite を使う場合は書き込み可能な配置先を使う
 - 別リポジトリ側で記事データ投入元を用意する
-- 別リポジトリ側で `blog_config.toml` を用意する（`[common]`・`[categories]`・`[tags]` テーブルが必要）
+- 別リポジトリ側で `blog_config.toml` を用意する（`[common]` にサイト名・画像ディレクトリなどの共通設定を記述する）
+
+タグ・カテゴリは各記事のMarkdownフロントマターの `tags`・`categories` で指定します。
+`blog_config.toml` の `[tags]`・`[categories]` は不要で、残っていてもseedでは読みません。
 
 ## 推奨ディレクトリ構成
 
@@ -90,8 +93,7 @@ export DATABASE_URL="sqlite://$export_db_dir/blog.db?mode=rwc"
 export RUST_BLOG_CONTENT_DIR="content"
 export ARTICLE_PATH="content/articles"
 export FIXED_CONTENT_PATH="content/fixed_contents"
-export CONFIG_TOML_PATH="blog_config.toml"
-export RUST_BLOG_CONFIG_PATH="$CONFIG_TOML_PATH"
+export RUST_BLOG_CONFIG_PATH="blog_config.toml"
 export RUST_BLOG_REQUIRE_CREATED_AT=1
 export RUST_BLOG_TEMPLATES_DIR="tools/rust-blog-export-tools-v0.1.0-x86_64-unknown-linux-gnu/templates"
 ./tools/rust-blog-export-tools-v0.1.0-x86_64-unknown-linux-gnu/migration up
@@ -119,8 +121,7 @@ export DATABASE_URL="sqlite://$export_db_dir/blog.db?mode=rwc"
 export RUST_BLOG_CONTENT_DIR="content"
 export ARTICLE_PATH="content/articles"
 export FIXED_CONTENT_PATH="content/fixed_contents"
-export CONFIG_TOML_PATH="blog_config.toml"
-export RUST_BLOG_CONFIG_PATH="$CONFIG_TOML_PATH"
+export RUST_BLOG_CONFIG_PATH="blog_config.toml"
 export RUST_BLOG_REQUIRE_CREATED_AT=1
 export RUST_BLOG_TEMPLATES_DIR="tools/rust-blog-export-tools-v0.1.0-x86_64-unknown-linux-gnu/templates"
 ./tools/rust-blog-export-tools-v0.1.0-x86_64-unknown-linux-gnu/migration up
@@ -132,6 +133,9 @@ export RUST_BLOG_TEMPLATES_DIR="tools/rust-blog-export-tools-v0.1.0-x86_64-unkno
 ## DB への記事投入について
 
 バンドルの `seed` を使用します。古いバンドルには含まれていないため、再ビルドしてください。
+`seed` は `ARTICLE_PATH`・`FIXED_CONTENT_PATH` で指定したMarkdownを読み込みます。
+`RUST_BLOG_REQUIRE_CREATED_AT=1` は記事の公開日時を必須にする設定です。
+`seed` は `blog_config.toml` を読みません。以下の `RUST_BLOG_CONFIG_PATH` は `export` 用です。
 別リポジトリのルートから、次のように新規の一時 DB に migration・seed・export を順に実行します。
 
 ```bash
@@ -142,8 +146,7 @@ trap 'rm -f "$export_db_dir/blog.db" "$export_db_dir/blog.db-shm" "$export_db_di
 export DATABASE_URL="sqlite://$export_db_dir/blog.db?mode=rwc"
 export ARTICLE_PATH="content/articles"
 export FIXED_CONTENT_PATH="content/fixed_contents"
-export CONFIG_TOML_PATH="blog_config.toml"
-export RUST_BLOG_CONFIG_PATH="$CONFIG_TOML_PATH"
+export RUST_BLOG_CONFIG_PATH="blog_config.toml"
 export RUST_BLOG_CONTENT_DIR="content"
 export RUST_BLOG_REQUIRE_CREATED_AT=1
 export RUST_BLOG_TEMPLATES_DIR="tools/rust-blog-export-tools-v0.1.0-x86_64-unknown-linux-gnu/templates"
@@ -183,7 +186,7 @@ export RUST_BLOG_TEMPLATES_DIR="tools/rust-blog-export-tools-v0.1.0-x86_64-unkno
 ## 注意点
 
 - `export` は `templates/` を実行時に読む
-- `blog_config.toml` も実行時に読む
+- `export` は `blog_config.toml` の共通設定も実行時に読む
 - `content/image` と `content/icon` は bundle に含まれない
 - 画像や icon が必要なら、別リポジトリ側で `content/image` と `content/icon` を用意し、必要に応じて `RUST_BLOG_CONTENT_DIR` を設定する
 
