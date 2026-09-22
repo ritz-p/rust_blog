@@ -25,6 +25,8 @@ docker compose exec web cargo run -p rust_blog
 
 [http://localhost:8888/](http://localhost:8888/) で確認できます。
 `ARTICLE_PATH`・`FIXED_CONTENT_PATH` で seed の入力ディレクトリを変更できます。
+seed は読み込み・解析・検証・DB 操作のエラーをファイル単位で集約し、処理可能なファイルを最後まで処理します。
+最後にエラー一覧を表示し、1 件でも失敗した場合は非ゼロで終了します。成功した変更は DB に残ります。DB に接続できない場合は処理を開始できません。
 
 エンティティの再生成:
 
