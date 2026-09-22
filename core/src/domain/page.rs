@@ -97,6 +97,7 @@ impl PageInfo {
 mod tests {
     use super::{Page, PageInfo};
     use crate::domain::query::PagingQuery;
+    use crate::repository::SQLITE_MAX;
 
     #[derive(Clone, Copy)]
     struct MockQuery {
@@ -132,7 +133,7 @@ mod tests {
     #[test]
     fn configured_page_size_has_no_fifty_article_cap() {
         let query = MockQuery::new();
-        let page = Page::new_from_query(&query, 75).normalize(u64::MAX);
+        let page = Page::new_from_query(&query, 75).normalize(SQLITE_MAX);
         assert_eq!(page.per, 75);
         let info = PageInfo::new(page, 151);
         assert_eq!(info.total_pages, 3);

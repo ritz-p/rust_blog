@@ -1,4 +1,6 @@
 use crate::domain::page::{Page, PageInfo};
+use crate::entity::{article, category, tag};
+use crate::repository::SQLITE_MAX;
 use chrono::{DateTime, Datelike, NaiveDate, TimeZone, Utc};
 use chrono_tz::Asia::Tokyo;
 use sea_orm::{
@@ -7,8 +9,6 @@ use sea_orm::{
     prelude::*,
     sea_query::{Expr, SimpleExpr},
 };
-
-use crate::entity::{article, category, tag};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ArticlePeriod {
@@ -74,7 +74,7 @@ pub async fn get_all_articles(
     }
 
     let total = base_query.clone().count(db).await?;
-    let page = page.normalize(u64::MAX);
+    let page = page.normalize(SQLITE_MAX);
     let page_info = PageInfo::new(page, total);
     let offset = (page_info.current_page - 1) * page_info.per;
     let articles = base_query
@@ -228,7 +228,7 @@ pub async fn get_articles_by_tag_slug(
             .distinct()
             .count(db)
             .await?;
-        let page = page.normalize(u64::MAX);
+        let page = page.normalize(SQLITE_MAX);
         let page_info = PageInfo::new(page, total);
         let offset = (page_info.current_page - 1) * page_info.per;
         let articles = match sort_key {
@@ -287,7 +287,7 @@ pub async fn get_article_by_category_slug(
             .distinct()
             .count(db)
             .await?;
-        let page = page.normalize(u64::MAX);
+        let page = page.normalize(SQLITE_MAX);
         let page_info = PageInfo::new(page, total);
         let offset = (page_info.current_page - 1) * page_info.per;
         let articles = match sort_key {
