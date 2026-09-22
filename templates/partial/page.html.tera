@@ -15,6 +15,29 @@
 
     <ul class="pagination-list">
       <li>
+        {% if has_prev %}
+          <a class="pagination-link" href="{{ pagination.latest_url }}" aria-label="Latest page">Latest</a>
+        {% else %}
+          <span class="pagination-link" aria-disabled="true">Latest</span>
+        {% endif %}
+      </li>
+      {% for item in pagination.pages %}
+        <li>
+          {% if item.current %}
+            <span class="pagination-link is-current" aria-current="page" aria-label="Page {{ item.number }}">{{ item.number }}</span>
+          {% else %}
+            <a class="pagination-link" href="{{ item.url }}" aria-label="Page {{ item.number }}">{{ item.number }}</a>
+          {% endif %}
+        </li>
+      {% endfor %}
+      <li>
+        {% if has_next %}
+          <a class="pagination-link" href="{{ pagination.oldest_url }}" aria-label="Oldest page">Oldest</a>
+        {% else %}
+          <span class="pagination-link" aria-disabled="true">Oldest</span>
+        {% endif %}
+      </li>
+      <li>
         <span class="pagination-ellipsis">
           Page {{ page }} / {{ total_pages }}
         </span>

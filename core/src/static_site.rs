@@ -155,6 +155,10 @@ async fn export_index_variant(
         ctx.insert("prev_url", &static_index_url(page_info.prev_page, period));
         ctx.insert("next_url", &static_index_url(page_info.next_page, period));
         ctx.insert(
+            "pagination",
+            &page_info.navigation(|number| static_index_url(number, period)),
+        );
+        ctx.insert(
             "selected_period",
             &period.map(|p| format!("{}/{:02}", p.year, p.month)),
         );
@@ -366,6 +370,10 @@ async fn export_tag_variant(
             "next_url",
             &static_tag_url(slug, sort_key, page_info.next_page),
         );
+        ctx.insert(
+            "pagination",
+            &page_info.navigation(|number| static_tag_url(slug, sort_key, number)),
+        );
 
         render_to_path(
             tera,
@@ -496,6 +504,10 @@ async fn export_category_variant(
         ctx.insert(
             "next_url",
             &static_category_url(slug, sort_key, page_info.next_page),
+        );
+        ctx.insert(
+            "pagination",
+            &page_info.navigation(|number| static_category_url(slug, sort_key, number)),
         );
 
         render_to_path(
@@ -847,6 +859,45 @@ mod tests {
             .expect("system time before unix epoch")
             .as_nanos();
         std::env::temp_dir().join(format!("rust-blog-static-site-{unique}"))
+    }
+
+    #[test]
+    fn numbered_static_navigation_uses_static_paths() {
+        use crate::domain::page::{Page, PageInfo};
+        let info = PageInfo::new(Page { number: 5, per: 1 }, 10);
+        let period = crate::repository::article::ArticlePeriod::new(2025, 12).unwrap();
+        let variants = [
+            info.navigation(|page| super::static_index_url(page, None)),
+            info.navigation(|page| super::static_index_url(page, Some(period))),
+            info.navigation(|page| super::static_tag_url("rust", "updated_at", page)),
+            info.navigation(|page| super::static_category_url("dev", "created_at", page)),
+        ];
+        let expected = [
+            ("/", "/page/10/"),
+            ("/archive/2025/12/", "/archive/2025/12/page/10/"),
+            ("/tag/rust/updated/", "/tag/rust/updated/page/10/"),
+            ("/category/dev/", "/category/dev/page/10/"),
+        ];
+        for (navigation, (latest, oldest)) in variants.into_iter().zip(expected) {
+            let mut context = tera::Context::new();
+            context.insert("pagination", &navigation);
+            context.insert("total_pages", &10);
+            context.insert("page", &5);
+            context.insert("has_prev", &true);
+            context.insert("has_next", &true);
+            context.insert("prev_url", &navigation.pages[2].url);
+            context.insert("next_url", &navigation.pages[4].url);
+            let html = tera::Tera::one_off(
+                include_str!("../../templates/partial/page.html.tera"),
+                &context,
+                false,
+            )
+            .unwrap();
+            assert!(html.contains(&format!("href=\"{latest}\" aria-label=\"Latest page\"")));
+            assert!(html.contains(&format!("href=\"{oldest}\" aria-label=\"Oldest page\"")));
+            assert_eq!(html.matches("aria-label=\"Page ").count(), 7);
+            assert!(!html.contains("?page="));
+        }
     }
 
     #[test]

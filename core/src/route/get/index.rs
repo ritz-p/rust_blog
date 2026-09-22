@@ -170,6 +170,7 @@ async fn render_index(
             next_page: page_info.next_page,
             prev_url: prev_url,
             next_url: next_url,
+            pagination: page_info.navigation(|number| build_index_url(number, page_info.per, selected_period, mode)),
             selected_period: selected_period.map(|period| format!("{}/{:02}", period.year, period.month)),
             period_links: period_links,
         },
@@ -230,6 +231,35 @@ mod tests {
         .await
         .expect("failed to insert articles");
         db
+    }
+
+    #[rocket::async_test]
+    async fn numbered_navigation_keeps_query_and_archive_urls() {
+        let client = client_with_page_size(prepare_index_db().await, 1).await;
+        for (url, latest, oldest) in [
+            (
+                "/?page=2&per=1&year=2025&month=12",
+                "/?page=1&per=1&year=2025&month=12",
+                "/?page=2&per=1&year=2025&month=12",
+            ),
+            (
+                "/archive/2025/12/page/2",
+                "/archive/2025/12",
+                "/archive/2025/12/page/2",
+            ),
+        ] {
+            let response = client.get(url).dispatch().await;
+            assert_eq!(response.status(), Status::Ok);
+            let html = html_escape::decode_html_entities(&response.into_string().await.unwrap())
+                .into_owned();
+            assert!(
+                html.contains(&format!("href=\"{latest}\" aria-label=\"Latest page\"")),
+                "{html}"
+            );
+            assert!(html.contains("aria-current=\"page\" aria-label=\"Page 2\""));
+            assert!(html.contains("aria-disabled=\"true\">Oldest"));
+            assert!(!html.contains(&format!("href=\"{oldest}\" aria-label=\"Oldest page\"")));
+        }
     }
 
     #[rocket::async_test]
