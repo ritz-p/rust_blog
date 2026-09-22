@@ -17,12 +17,17 @@ const ORDER: &[&str] = &[
 ];
 
 struct Document<'a> {
+    bom: &'a str,
     matter: Mapping,
     body: &'a str,
     newline: &'a str,
 }
 
 fn parse(text: &str) -> Result<Document<'_>> {
+    let (bom, text) = match text.strip_prefix('\u{feff}') {
+        Some(text) => ("\u{feff}", text),
+        None => ("", text),
+    };
     let newline = if text.starts_with("---\r\n") {
         "\r\n"
     } else {
@@ -39,6 +44,7 @@ fn parse(text: &str) -> Result<Document<'_>> {
     for line in lines {
         if line.trim_end_matches(['\r', '\n']) == "---" {
             return Ok(Document {
+                bom,
                 matter: serde_yaml::from_str(&text[start..end])?,
                 body: &text[end + line.len()..],
                 newline,
@@ -149,7 +155,36 @@ fn format(source: &Mapping) -> Mapping {
 fn render(document: &Document<'_>, matter: &Mapping) -> Result<String> {
     let newline = document.newline;
     let yaml = serde_yaml::to_string(matter)?.replace('\n', newline);
-    Ok(format!("---{newline}{yaml}---{newline}{}", document.body))
+    Ok(format!(
+        "{}---{newline}{yaml}---{newline}{}",
+        document.bom, document.body
+    ))
+}
+
+fn collect_paths(roots: Vec<PathBuf>) -> Result<Vec<PathBuf>> {
+    let mut paths = Vec::new();
+    for root in roots {
+        let metadata = fs::metadata(&root).with_context(|| root.display().to_string())?;
+        if metadata.is_file() {
+            if root.extension().is_some_and(|extension| extension == "md") {
+                paths.push(fs::canonicalize(&root).with_context(|| root.display().to_string())?);
+            }
+        } else if metadata.is_dir() {
+            let root = fs::canonicalize(&root).with_context(|| root.display().to_string())?;
+            for entry in WalkDir::new(root).follow_links(false) {
+                let entry = entry?;
+                if entry.file_type().is_file()
+                    && entry.path().extension().is_some_and(|x| x == "md")
+                {
+                    paths.push(entry.into_path());
+                }
+            }
+        }
+    }
+    paths.sort();
+    paths.dedup();
+    ensure!(!paths.is_empty(), "no Markdown files found");
+    Ok(paths)
 }
 
 fn main() -> Result<()> {
@@ -171,18 +206,7 @@ fn main() -> Result<()> {
     if roots.is_empty() {
         roots.push("content/articles".into());
     }
-    let mut paths = Vec::new();
-    for root in roots {
-        for entry in WalkDir::new(root) {
-            let entry = entry?;
-            if entry.file_type().is_file() && entry.path().extension().is_some_and(|x| x == "md") {
-                paths.push(entry.into_path());
-            }
-        }
-    }
-    paths.sort();
-    paths.dedup();
-    ensure!(!paths.is_empty(), "no Markdown files found");
+    let paths = collect_paths(roots)?;
     let mut pending = Vec::new();
     let mut errors = Vec::new();
     for path in paths {
@@ -222,6 +246,70 @@ mod tests {
         let document = parse(text)?;
         validate(&document.matter)?;
         render(&document, &format(&document.matter))
+    }
+
+    #[test]
+    fn preserves_optional_bom_and_line_endings() {
+        for newline in ["\n", "\r\n"] {
+            for bom in ["", "\u{feff}"] {
+                let text = format!("{bom}---\ncategories: []\ntags: []\nslug: test\ntitle: Test\n---\n\n  本文\n\u{feff}body\n").replace('\n', newline);
+                let output = checked_format(&text).unwrap();
+                assert!(output.starts_with(&format!("{bom}---{newline}title: Test{newline}")));
+                assert!(output.ends_with(&format!(
+                    "---{newline}{newline}  本文{newline}\u{feff}body{newline}"
+                )));
+                assert_eq!(checked_format(&output).unwrap(), output);
+            }
+        }
+        assert!(parse("\u{feff}\u{feff}---\ntitle: Test\n---\n").is_err());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn follows_explicit_links_but_not_nested_links() {
+        use std::os::unix::fs::symlink;
+        let root = std::env::temp_dir().join(format!(
+            "format-links-{}-{}",
+            std::process::id(),
+            chrono::Utc::now().timestamp_nanos_opt().unwrap()
+        ));
+        let directory = root.join("articles");
+        fs::create_dir_all(&directory).unwrap();
+        let article = directory.join("article.md");
+        let text = "---\ncategories: []\ntags: []\nslug: test\ntitle: Test\n---\nbody\n";
+        fs::write(&article, text).unwrap();
+        fs::write(directory.join("notes.txt"), "ignore").unwrap();
+        let file_link = root.join("linked.md");
+        let directory_link = root.join("linked-directory");
+        symlink(&article, &file_link).unwrap();
+        symlink(&directory, &directory_link).unwrap();
+        symlink(&directory, directory.join("cycle")).unwrap();
+        symlink(root.join("missing.md"), directory.join("broken.md")).unwrap();
+        let expected = vec![fs::canonicalize(&article).unwrap()];
+        assert_eq!(collect_paths(vec![file_link.clone()]).unwrap(), expected);
+        assert_eq!(
+            collect_paths(vec![directory_link.clone()]).unwrap(),
+            expected
+        );
+        let paths =
+            collect_paths(vec![article.clone(), file_link.clone(), directory_link]).unwrap();
+        assert_eq!(paths, expected);
+        for path in paths {
+            let formatted = checked_format(&fs::read_to_string(&path).unwrap()).unwrap();
+            fs::write(path, formatted).unwrap();
+        }
+        assert_eq!(
+            fs::read_to_string(&article).unwrap(),
+            checked_format(text).unwrap()
+        );
+        assert!(
+            fs::symlink_metadata(file_link)
+                .unwrap()
+                .file_type()
+                .is_symlink()
+        );
+        assert!(collect_paths(vec![directory.join("broken.md")]).is_err());
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
