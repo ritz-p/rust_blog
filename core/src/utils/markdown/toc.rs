@@ -2,8 +2,6 @@ use std::cell::RefCell;
 
 use lol_html::{RewriteStrSettings, element, rewrite_str, text};
 
-/// Adds a table of contents to sanitized HTML produced by `markdown_to_html`.
-/// The original HTML is retained when there are no headings or rewriting fails.
 pub fn toc(input: &str) -> String {
     let headings = RefCell::new(Vec::<(u8, String, String)>::new());
     let selector = "h1, h2, h3, h4, h5, h6";
@@ -53,8 +51,6 @@ pub fn toc(input: &str) -> String {
         return input.to_owned();
     }
     for (_, _, label) in &mut headings {
-        // lol_html passes text chunks through without unescaping entities.
-        // Decode once after collecting chunks, then escape when rendering links.
         *label = html_escape::decode_html_entities(label).into_owned();
     }
     let mut output = format!(

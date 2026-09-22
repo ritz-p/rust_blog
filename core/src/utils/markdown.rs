@@ -264,7 +264,6 @@ mod tests {
             classes.iter().all(|class| class.starts_with("syntax-")),
             "{html}"
         );
-        // Bulma's .section otherwise adds padding to the macro's parentheses.
         assert!(
             html.contains("class=\"syntax-punctuation syntax-section syntax-group syntax-begin syntax-rust\">("),
             "{html}"
