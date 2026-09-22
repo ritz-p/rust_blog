@@ -59,7 +59,7 @@ impl Fairing for SecurityHeaders {
 pub async fn launch(
     db: DatabaseConnection,
     config_map: HashMap<String, String>,
-) -> Result<Rocket<Ignite>, rocket::Error> {
+) -> Result<Rocket<Ignite>, Box<rocket::Error>> {
     rocket::build()
         .manage(db)
         .manage(CommonConfig {
@@ -121,4 +121,5 @@ pub async fn launch(
         )
         .launch()
         .await
+        .map_err(Box::new)
 }
