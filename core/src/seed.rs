@@ -3,70 +3,178 @@ pub mod config;
 pub mod fixed_content;
 pub mod markdown;
 mod taxonomy;
-use crate::seed::{
-    fixed_content::seed_fixed_content,
-    markdown::{
-        markdown_files, parse_markdown_to_fixed_content_matter, parse_markdown_to_front_matter,
-    },
-};
+
+use anyhow::{Context, Result, ensure};
 use article::{delete_article_by_slug, seed_article, seed_category, seed_tag};
-use config::env::load_env;
+use config::{PathConfig, env::load_env};
+use fixed_content::seed_fixed_content;
+use markdown::{
+    markdown_files, parse_markdown_to_fixed_content_matter, parse_markdown_to_front_matter,
+};
 use sea_orm::DatabaseConnection;
+use std::path::Path;
 
-pub async fn run_all(db: DatabaseConnection) -> anyhow::Result<()> {
-    taxonomy::normalize(&db).await?;
-    let config = load_env();
-    println!("{:?}", config);
-    run_fixed_content_seed(&db, &config.fixed_content_path).await?;
-    println!("✅ 固定ページ Markdown → DB のシード完了");
-    run_article_seed(&db, &config.article_path).await?;
-    println!("✅ Article Markdown → DB のシード完了");
+pub async fn run_all(db: DatabaseConnection) -> Result<()> {
+    run_with_config(
+        &db,
+        &load_env(),
+        std::env::var("RUST_BLOG_REQUIRE_CREATED_AT").as_deref() == Ok("1"),
+    )
+    .await
+}
 
+async fn run_with_config(
+    db: &DatabaseConnection,
+    config: &PathConfig,
+    require_created_at: bool,
+) -> Result<()> {
+    let mut errors = Vec::new();
+    let mut succeeded = 0;
+    if let Err(error) = taxonomy::normalize(db).await {
+        errors.push(format!("taxonomy normalization: {error:#}"));
+    }
+    for (dir, article) in [
+        (&config.fixed_content_path, false),
+        (&config.article_path, true),
+    ] {
+        for entry in markdown_files(dir) {
+            let path = match entry {
+                Ok(path) => path,
+                Err(error) => {
+                    errors.push(format!(
+                        "{}: traversal: {error}",
+                        error.path().unwrap_or(Path::new(dir)).display()
+                    ));
+                    continue;
+                }
+            };
+            let result = if article {
+                seed_article_file(db, &path, require_created_at).await
+            } else {
+                seed_fixed_file(db, &path).await
+            };
+            match result {
+                Ok(()) => succeeded += 1,
+                Err(error) => errors.push(format!("{}: {error:#}", path.display())),
+            }
+        }
+    }
+    println!(
+        "Seed completed: {succeeded} file(s) succeeded, {} error(s)",
+        errors.len()
+    );
+    ensure!(errors.is_empty(), "Seed errors:\n{}", errors.join("\n"));
     Ok(())
 }
 
-async fn run_article_seed(db: &DatabaseConnection, dir: &str) -> Result<(), anyhow::Error> {
-    for path in markdown_files(dir) {
-        println!("{:?}", path);
-        let (front_matter, body) = match parse_markdown_to_front_matter(&path) {
-            Ok(x) => x,
-            Err(e) => {
-                eprintln!("FrontMatter parse error {:?}", e);
-                continue;
-            }
-        };
-
-        if front_matter.deleted {
-            delete_article_by_slug(db, &front_matter.slug).await?;
-            continue;
-        }
-
-        if std::env::var("RUST_BLOG_REQUIRE_CREATED_AT").as_deref() == Ok("1") {
-            anyhow::ensure!(
-                front_matter.created_at.is_some(),
-                "{}: static export requires created_at (or date) in article front matter",
-                path.display()
-            );
-        }
-
-        let article_id = seed_article(db, &front_matter, &body).await?;
-        seed_tag(db, &front_matter, article_id).await?;
-        seed_category(db, &front_matter, article_id).await?;
+async fn seed_article_file(
+    db: &DatabaseConnection,
+    path: &Path,
+    require_created_at: bool,
+) -> Result<()> {
+    let (matter, body) =
+        parse_markdown_to_front_matter(path).map_err(|error| anyhow::anyhow!("parse: {error}"))?;
+    if matter.deleted {
+        delete_article_by_slug(db, &matter.slug)
+            .await
+            .context("delete article")?;
+        return Ok(());
     }
+    ensure!(
+        !require_created_at || matter.created_at.is_some(),
+        "static export requires created_at (or date) in article front matter"
+    );
+    let id = seed_article(db, &matter, &body)
+        .await
+        .context("save article")?;
+    let mut errors = Vec::new();
+    if let Err(error) = seed_tag(db, &matter, id).await {
+        errors.push(format!("save tags: {error:#}"));
+    }
+    if let Err(error) = seed_category(db, &matter, id).await {
+        errors.push(format!("save categories: {error:#}"));
+    }
+    ensure!(errors.is_empty(), "{}", errors.join("; "));
     Ok(())
 }
 
-async fn run_fixed_content_seed(db: &DatabaseConnection, dir: &str) -> Result<(), anyhow::Error> {
-    for path in markdown_files(dir) {
-        println!("{:?}", path);
-        let (front_matter, body) = match parse_markdown_to_fixed_content_matter(&path) {
-            Ok(x) => x,
-            Err(e) => {
-                eprintln!("FrontMatter parse error {:?}", e);
-                continue;
-            }
-        };
-        seed_fixed_content(db, &front_matter, &body).await?;
-    }
+async fn seed_fixed_file(db: &DatabaseConnection, path: &Path) -> Result<()> {
+    let (matter, body) = parse_markdown_to_fixed_content_matter(path)
+        .map_err(|error| anyhow::anyhow!("parse: {error}"))?;
+    seed_fixed_content(db, &matter, &body)
+        .await
+        .context("save fixed page")?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::entity::{article, article_category, article_tag, category, tag};
+    use sea_orm::{ConnectionTrait, Database, EntityTrait, Schema, Statement};
+
+    #[rocket::async_test]
+    async fn collects_errors_and_seeds_later_files() {
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        let backend = db.get_database_backend();
+        let schema = Schema::new(backend);
+        for table in [
+            schema.create_table_from_entity(article::Entity),
+            schema.create_table_from_entity(tag::Entity),
+            schema.create_table_from_entity(category::Entity),
+            schema.create_table_from_entity(article_tag::Entity),
+            schema.create_table_from_entity(article_category::Entity),
+        ] {
+            db.execute(backend.build(&table)).await.unwrap();
+        }
+        db.execute(Statement::from_string(backend, "CREATE TRIGGER reject_article BEFORE INSERT ON article WHEN NEW.slug = 'reject' BEGIN SELECT RAISE(FAIL, 'rejected article'); END;")).await.unwrap();
+        let root = std::env::temp_dir().join(format!(
+            "seed-errors-{}-{}",
+            std::process::id(),
+            chrono::Utc::now().timestamp_nanos_opt().unwrap()
+        ));
+        let articles = root.join("articles");
+        std::fs::create_dir_all(&articles).unwrap();
+        std::fs::write(articles.join("01-broken.md"), "broken").unwrap();
+        std::fs::write(
+            articles.join("01-invalid.md"),
+            "---\ntitle: ''\nslug: invalid\ndate: 2026-01-01\ntags: []\ncategories: []\n---\nbody",
+        )
+        .unwrap();
+        for (file, slug, date) in [
+            ("02-date.md", "no-date", ""),
+            ("03-db.md", "reject", "date: 2026-01-01\n"),
+            ("04-good.md", "good", "date: 2026-01-01\n"),
+        ] {
+            std::fs::write(
+                articles.join(file),
+                format!(
+                    "---\ntitle: Test\nslug: {slug}\n{date}tags: []\ncategories: []\n---\nbody"
+                ),
+            )
+            .unwrap();
+        }
+        let config = PathConfig {
+            fixed_content_path: root.join("missing-fixed").to_str().unwrap().into(),
+            article_path: articles.to_str().unwrap().into(),
+        };
+        let error = run_with_config(&db, &config, true)
+            .await
+            .unwrap_err()
+            .to_string();
+        for expected in [
+            "missing-fixed",
+            "01-broken.md",
+            "01-invalid.md",
+            "02-date.md",
+            "03-db.md",
+            "rejected article",
+        ] {
+            assert!(error.contains(expected), "{error}");
+        }
+        let saved = article::Entity::find().all(&db).await.unwrap();
+        assert_eq!(saved.len(), 1);
+        assert_eq!(saved[0].slug, "good");
+        std::fs::remove_dir_all(root).unwrap();
+    }
 }

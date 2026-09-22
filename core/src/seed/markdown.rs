@@ -3,15 +3,22 @@ use std::fs;
 use utils::front_matter::FrontMatter;
 use walkdir::WalkDir;
 
-pub fn markdown_files(dir: &str) -> impl Iterator<Item = std::path::PathBuf> {
+pub fn markdown_files(
+    dir: &str,
+) -> impl Iterator<Item = Result<std::path::PathBuf, walkdir::Error>> {
     WalkDir::new(dir)
+        .sort_by_file_name()
         .into_iter()
-        .filter_map(Result::ok)
-        .filter(|entry| {
-            entry.file_type().is_file()
-                && entry.path().extension().and_then(|os| os.to_str()) == Some("md")
+        .filter_map(|entry| match entry {
+            Ok(entry)
+                if entry.file_type().is_file()
+                    && entry.path().extension().and_then(|os| os.to_str()) == Some("md") =>
+            {
+                Some(Ok(entry.into_path()))
+            }
+            Ok(_) => None,
+            Err(error) => Some(Err(error)),
         })
-        .map(|entry| entry.into_path())
 }
 
 pub fn parse_markdown_to_front_matter(
@@ -101,7 +108,9 @@ mod tests {
         fs::write(nested.join("b.md"), "# b").expect("failed to write b.md");
         fs::write(dir.join("c.txt"), "not markdown").expect("failed to write c.txt");
 
-        let mut paths = markdown_files(dir.to_str().expect("invalid temp dir")).collect::<Vec<_>>();
+        let mut paths = markdown_files(dir.to_str().expect("invalid temp dir"))
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
         paths.sort();
         assert_eq!(paths.len(), 2);
         assert!(

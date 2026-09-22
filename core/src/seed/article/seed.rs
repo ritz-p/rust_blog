@@ -125,13 +125,7 @@ pub fn validate(front_matter: &FrontMatter, body: &str) -> Result<(), Report> {
         created_at: now,
         updated_at: now,
     };
-    match validator.validate() {
-        Ok(_) => Ok(()),
-        Err(e) => {
-            println!("{:?}", e);
-            Err(e)
-        }
-    }
+    validator.validate()
 }
 
 pub async fn upsert(db: &DatabaseConnection, mut active_model: ActiveModel) -> Result<i32, DbErr> {
