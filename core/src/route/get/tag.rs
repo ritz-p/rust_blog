@@ -66,6 +66,8 @@ pub async fn tag_detail(
             let base_path = "/tag/".to_owned() + &crate::utils::url_segment(slug);
             let prev_url = PageInfo::get_prev_url(&page_info, &base_path, Some(&sort_key));
             let next_url = PageInfo::get_next_url(&page_info, &base_path, Some(&sort_key));
+            let pagination = page_info
+                .navigation(|number| page_info.get_page_url(number, &base_path, Some(&sort_key)));
             let default_icatch_path = config.default_icatch_path.clone().unwrap_or_default();
             Ok(Template::render(
                 "tag",
@@ -108,6 +110,7 @@ pub async fn tag_detail(
                     next_page: page_info.next_page,
                     prev_url: prev_url,
                     next_url: next_url,
+                    pagination: pagination,
                 },
             ))
         }

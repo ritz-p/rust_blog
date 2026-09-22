@@ -1,4 +1,19 @@
 use crate::domain::query::PagingQuery;
+use serde::Serialize;
+
+#[derive(Debug, Serialize)]
+pub struct PageLink {
+    pub number: u64,
+    pub url: String,
+    pub current: bool,
+}
+
+#[derive(Debug, Serialize)]
+pub struct Pagination {
+    pub latest_url: String,
+    pub oldest_url: String,
+    pub pages: Vec<PageLink>,
+}
 
 #[derive(Debug, Clone, Copy)]
 pub struct Page {
@@ -36,6 +51,31 @@ pub struct PageInfo {
 }
 
 impl PageInfo {
+    pub fn navigation(&self, url: impl Fn(u64) -> String) -> Pagination {
+        let start = self.current_page.saturating_sub(3).max(1);
+        let end = self.current_page.saturating_add(3).min(self.total_pages);
+        Pagination {
+            latest_url: url(1),
+            oldest_url: url(self.total_pages),
+            pages: (start..=end)
+                .map(|number| PageLink {
+                    number,
+                    url: url(number),
+                    current: number == self.current_page,
+                })
+                .collect(),
+        }
+    }
+
+    pub fn get_page_url(&self, number: u64, base_path: &str, sort_key: Option<&String>) -> String {
+        let mut url = format!("{base_path}?page={number}&per={}", self.per);
+        if let Some(key) = sort_key {
+            url.push_str("&sort_key=");
+            url.push_str(&crate::utils::url_segment(key));
+        }
+        url
+    }
+
     pub fn new(page: Page, total: u64) -> Self {
         let total_pages = total.div_ceil(page.per).max(1);
         let current_page = page.number.clamp(1, total_pages);
@@ -98,6 +138,66 @@ mod tests {
     use super::{Page, PageInfo};
     use crate::domain::query::PagingQuery;
     use crate::repository::SQLITE_MAX;
+
+    #[test]
+    fn navigation_limits_numbers_to_three_pages_on_each_side() {
+        for (current, total, expected) in [
+            (1, 0, vec![1]),
+            (1, 10, vec![1, 2, 3, 4]),
+            (5, 10, vec![2, 3, 4, 5, 6, 7, 8]),
+            (10, 10, vec![7, 8, 9, 10]),
+        ] {
+            let info = PageInfo::new(
+                Page {
+                    number: current,
+                    per: 1,
+                },
+                total,
+            );
+            let navigation = info.navigation(|number| format!("/page/{number}"));
+            assert_eq!(
+                navigation
+                    .pages
+                    .iter()
+                    .map(|page| page.number)
+                    .collect::<Vec<_>>(),
+                expected
+            );
+            assert_eq!(
+                navigation.pages.iter().filter(|page| page.current).count(),
+                1
+            );
+            assert_eq!(navigation.latest_url, "/page/1");
+            assert_eq!(navigation.oldest_url, format!("/page/{}", total.max(1)));
+        }
+        let info = PageInfo::new(
+            Page {
+                number: u64::MAX,
+                per: 1,
+            },
+            u64::MAX,
+        );
+        assert_eq!(info.navigation(|page| page.to_string()).pages.len(), 4);
+    }
+
+    #[test]
+    fn numbered_urls_keep_page_size_and_sort_order() {
+        let info = PageInfo::new(Page { number: 5, per: 3 }, 30);
+        let sort = "updated_at".to_string();
+        let links = info.navigation(|number| info.get_page_url(number, "/tag/rust", Some(&sort)));
+        assert_eq!(
+            links.latest_url,
+            "/tag/rust?page=1&per=3&sort_key=updated_at"
+        );
+        assert_eq!(
+            links.oldest_url,
+            "/tag/rust?page=10&per=3&sort_key=updated_at"
+        );
+        assert_eq!(
+            links.pages[0].url,
+            "/tag/rust?page=2&per=3&sort_key=updated_at"
+        );
+    }
 
     #[derive(Clone, Copy)]
     struct MockQuery {
