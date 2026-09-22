@@ -1,7 +1,6 @@
 #!/bin/sh
 set -eu
 
-# Build from the checked-in Markdown, independently of the development DB.
 export_db_dir=$(mktemp -d /tmp/rust-blog-export.XXXXXX)
 trap 'rm -f "$export_db_dir/blog.db" "$export_db_dir/blog.db-shm" "$export_db_dir/blog.db-wal"; rmdir "$export_db_dir"' EXIT
 export DATABASE_URL="sqlite://$export_db_dir/blog.db?mode=rwc"
