@@ -60,14 +60,77 @@ docker compose up -d --force-recreate static
 docker build -f prod/Dockerfile -t rust-blog:prod .
 docker run --rm -p 8080:8080 -v "$(pwd)/data:/data" rust-blog:prod
 ```
+このイメージは起動時に以下を行います。
+1. SQLite ファイルを `/data/blog.db` に用意
+2. migration を適用
+3. `rust_blog` を起動
 
-起動時に SQLite DB の準備、マイグレーション、サーバー起動を行います。
-seed は事前に実行してください。
+`seed` は実行時には行いません。記事投入や初期データ作成はデプロイ前に済ませておく前提です。
 
-- `PORT`: 待受ポート（既定: `8080`）
-- `DB_PATH`: DB ファイル（既定: `/data/blog.db`）
-- `DATABASE_URL`: DB 接続先を直接指定する場合に使用
+主な環境変数:
 
+- `PORT`: アプリ待受ポート。デフォルトは `8080`
+- `DB_PATH`: SQLite ファイルの配置先。デフォルトは `/data/blog.db`
+- `DATABASE_URL`: 明示指定したい場合に使用
+
+Cloudflare 側では、このコンテナを配置したホストへ DNS を向けて Proxy を有効化します。
+
+## SeaOrm について
+
+1. テーブル作成
+
+```bash
+seaorm migrate generate ${table_name}
+```
+
+2. 生成されたファイルを編集してテーブル定義を書く
+
+# migration/src/mYYYYMMDDHHMMSS\_${table_name}.rs
+
+3. マイグレーションを適用
+
+```bash
+seaorm migrate up -u "$DATABASE_URL"
+```
+
+4. Entity を DB から再生成
+
+```bash
+seaorm generate entity -u "$DATABASE_URL" -o core/src/entity --with-serde both
+```
+
+5. 適用状況を確認
+
+```bash
+seaorm migrate status -u "$DATABASE_URL"
+```
+
+6. 全部やり直す（drop→up）
+
+```bash
+seaorm migrate refresh -u "$DATABASE_URL"
+```
+
+## DB から Markdown を出力
+
+```bash
+docker compose exec web cargo run -p rust_blog --bin export_markdown
+```
+
+`DATABASE_URL` の DB から `markdown_output/articles/<id>.md` と
+`markdown_output/fixed_contents/<id>.md` に出力します。引数で出力先を変更できます。
+既存ファイルや古い出力があればエラーになります。更新する場合は `--force` を指定してください。
+`--force` は上書きに加え、DB に存在しない `articles/<id>.md`・`fixed_contents/<id>.md` を削除します。空の DB でも古い出力を削除します。
+削除対象は各ディレクトリ直下の整数 ID のファイルだけです。それ以外のファイルは保持するため、seed 用の出力先には手書きの Markdown を混在させないでください。
+記事の公開日時・目次設定・タグ・カテゴリ・本文を保持します。
+DB の ID・更新日時および固定ページの日時は seed の入力項目ではないためヘッダーには含めません。
+タグ・カテゴリは seed と同じ名前の配列です。独立した taxonomy の slug や未使用項目のバックアップには使えません。
+
+再投入:
+
+```bash
+docker compose exec -e ARTICLE_PATH=markdown_output/articles -e FIXED_CONTENT_PATH=markdown_output/fixed_contents web cargo run -p rust_blog --bin seed
+```
 ## 関連ドキュメント
 
 - [テスト観点](docs/testing.md)
