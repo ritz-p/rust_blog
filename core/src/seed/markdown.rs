@@ -18,12 +18,9 @@ pub fn parse_markdown_to_front_matter(
     path: &std::path::Path,
 ) -> Result<(FrontMatter, String), Box<dyn std::error::Error>> {
     let text = fs::read_to_string(path)?;
-    let parts: Vec<&str> = text.splitn(3, "---").collect();
-    if parts.len() != 3 {
-        panic!("FrontMatter not found in {:?}", path);
-    }
-    let front_matter = serde_yaml::from_str(parts[1])?;
-    let body = parts[2].trim_start().to_string();
+    let (yaml, body) = split_front_matter(&text)?;
+    let front_matter = serde_yaml::from_str(yaml)?;
+    let body = body.trim_start().to_string();
     Ok((front_matter, body))
 }
 
@@ -31,13 +28,28 @@ pub fn parse_markdown_to_fixed_content_matter(
     path: &std::path::Path,
 ) -> Result<(FixedContentMatter, String), Box<dyn std::error::Error>> {
     let text = fs::read_to_string(path)?;
-    let parts: Vec<&str> = text.splitn(3, "---").collect();
-    if parts.len() != 3 {
-        panic!("FrontMatter not found in {:?}", path);
-    }
-    let fixed_content_matter = serde_yaml::from_str(parts[1])?;
-    let body = parts[2].trim_start().to_string();
+    let (yaml, body) = split_front_matter(&text)?;
+    let fixed_content_matter = serde_yaml::from_str(yaml)?;
+    let body = body.trim_start().to_string();
     Ok((fixed_content_matter, body))
+}
+
+fn split_front_matter(text: &str) -> Result<(&str, &str), std::io::Error> {
+    let missing = || std::io::Error::new(std::io::ErrorKind::InvalidData, "FrontMatter not found");
+    let mut lines = text.split_inclusive('\n');
+    let first = lines.next().ok_or_else(missing)?;
+    if first.trim_end_matches(['\r', '\n']) != "---" {
+        return Err(missing());
+    }
+    let start = first.len();
+    let mut end = start;
+    for line in lines {
+        if line.trim_end_matches(['\r', '\n']) == "---" {
+            return Ok((&text[start..end], &text[end + line.len()..]));
+        }
+        end += line.len();
+    }
+    Err(missing())
 }
 
 #[cfg(test)]
@@ -197,12 +209,12 @@ Hello world
     }
 
     #[test]
-    #[should_panic(expected = "FrontMatter not found")]
-    fn parse_markdown_to_front_matter_panics_when_delimiter_missing() {
+    fn parse_markdown_to_front_matter_errors_when_delimiter_missing() {
         let dir = create_temp_dir();
         let path = dir.join("broken.md");
         fs::write(&path, "title: no delimiter").expect("failed to write markdown file");
-        let _ = parse_markdown_to_front_matter(&path);
+        assert!(parse_markdown_to_front_matter(&path).is_err());
+        let _ = fs::remove_dir_all(dir);
     }
 
     #[test]

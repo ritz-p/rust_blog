@@ -206,3 +206,22 @@ seaorm migrate status -u "$DATABASE_URL"
 ```bash
 seaorm migrate refresh -u "$DATABASE_URL"
 ```
+
+## DB から Markdown を出力
+
+```bash
+docker compose exec web cargo run -p rust_blog --bin export_markdown
+```
+
+`DATABASE_URL` の DB から `markdown_output/articles/<id>.md` と
+`markdown_output/fixed_contents/<id>.md` に出力します。引数で出力先を変更できます。
+既存ファイルがあればエラーになります。上書きする場合は `--force` を指定してください。
+記事の公開日時・目次設定・タグ・カテゴリ・本文を保持します。
+DB の ID・更新日時および固定ページの日時は seed の入力項目ではないためヘッダーには含めません。
+タグ・カテゴリは seed と同じ名前の配列です。独立した taxonomy の slug や未使用項目のバックアップには使えません。
+
+再投入:
+
+```bash
+docker compose exec -e ARTICLE_PATH=markdown_output/articles -e FIXED_CONTENT_PATH=markdown_output/fixed_contents web cargo run -p rust_blog --bin seed
+```
