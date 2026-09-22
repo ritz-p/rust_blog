@@ -42,7 +42,7 @@ docker compose exec web cargo test -p rust_blog
 
 ```bash
 docker compose exec web cargo run -p rust_blog --bin export
-docker compose up -d static
+docker compose up -d --force-recreate static
 ```
 
 [http://localhost:8081/](http://localhost:8081/) で確認できます。生成先は `dist/` です。
