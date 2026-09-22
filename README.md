@@ -215,7 +215,9 @@ docker compose exec web cargo run -p rust_blog --bin export_markdown
 
 `DATABASE_URL` の DB から `markdown_output/articles/<id>.md` と
 `markdown_output/fixed_contents/<id>.md` に出力します。引数で出力先を変更できます。
-既存ファイルがあればエラーになります。上書きする場合は `--force` を指定してください。
+既存ファイルや古い出力があればエラーになります。更新する場合は `--force` を指定してください。
+`--force` は上書きに加え、DB に存在しない `articles/<id>.md`・`fixed_contents/<id>.md` を削除します。空の DB でも古い出力を削除します。
+削除対象は各ディレクトリ直下の整数 ID のファイルだけです。それ以外のファイルは保持するため、seed 用の出力先には手書きの Markdown を混在させないでください。
 記事の公開日時・目次設定・タグ・カテゴリ・本文を保持します。
 DB の ID・更新日時および固定ページの日時は seed の入力項目ではないためヘッダーには含めません。
 タグ・カテゴリは seed と同じ名前の配列です。独立した taxonomy の slug や未使用項目のバックアップには使えません。

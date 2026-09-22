@@ -90,7 +90,46 @@ async fn documents(db: &impl ConnectionTrait) -> Result<Vec<(PathBuf, String)>> 
     Ok(output)
 }
 
+fn stale_documents(root: &Path, documents: &[(PathBuf, String)]) -> Result<Vec<PathBuf>> {
+    let mut stale = Vec::new();
+    for directory in ["articles", "fixed_contents"] {
+        let path = root.join(directory);
+        let entries = match fs::read_dir(&path) {
+            Ok(entries) => entries,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => continue,
+            Err(error) => return Err(error).with_context(|| path.display().to_string()),
+        };
+        ensure!(
+            !fs::symlink_metadata(&path)?.file_type().is_symlink(),
+            "{} must not be a symlink",
+            path.display()
+        );
+        for entry in entries {
+            let entry = entry?;
+            let path = entry.path();
+            let managed = path.extension().is_some_and(|extension| extension == "md")
+                && path
+                    .file_stem()
+                    .and_then(|stem| stem.to_str())
+                    .is_some_and(|stem| stem.parse::<i32>().is_ok_and(|id| id.to_string() == stem));
+            let relative = PathBuf::from(directory).join(entry.file_name());
+            if managed
+                && entry.file_type()?.is_file()
+                && !documents.iter().any(|(current, _)| current == &relative)
+            {
+                stale.push(path);
+            }
+        }
+    }
+    Ok(stale)
+}
+
 fn write_documents(root: &Path, documents: &[(PathBuf, String)], force: bool) -> Result<()> {
+    let stale = stale_documents(root, documents)?;
+    ensure!(
+        force || stale.is_empty(),
+        "stale exported Markdown files exist; use --force to replace the export"
+    );
     for (relative, _) in documents {
         let path = root.join(relative);
         ensure!(
@@ -111,6 +150,9 @@ fn write_documents(root: &Path, documents: &[(PathBuf, String)], force: bool) ->
             .with_context(|| path.display().to_string())?;
         file.write_all(text.as_bytes())?;
     }
+    for path in stale {
+        fs::remove_file(&path).with_context(|| path.display().to_string())?;
+    }
     Ok(())
 }
 
@@ -123,7 +165,7 @@ async fn main() -> Result<()> {
             "--force" => force = true,
             "--help" | "-h" => {
                 println!(
-                    "Usage: export_markdown [--force] [OUTPUT_DIRECTORY]\nDefault: markdown_output. Reads DATABASE_URL."
+                    "Usage: export_markdown [--force] [OUTPUT_DIRECTORY]\nDefault: markdown_output. Reads DATABASE_URL.\n--force overwrites current files and removes stale articles/<id>.md and fixed_contents/<id>.md files."
                 );
                 return Ok(());
             }
@@ -237,6 +279,51 @@ mod tests {
             fs::read_to_string(root.join(&output[1].0)).unwrap(),
             output[1].1
         );
+        fs::write(root.join("articles/notes.md"), "unmanaged").unwrap();
+        fs::write(root.join("articles/10.png"), "asset").unwrap();
+        fs::write(root.join("README.md"), "instructions").unwrap();
+        rust_blog::entity::article_tag::Entity::delete_many()
+            .exec(&db)
+            .await
+            .unwrap();
+        rust_blog::entity::article_category::Entity::delete_many()
+            .exec(&db)
+            .await
+            .unwrap();
+        article::Entity::delete_many().exec(&db).await.unwrap();
+        let remaining = documents(&db).await.unwrap();
+        assert_eq!(remaining.len(), 1);
+        assert!(write_documents(&root, &remaining, false).is_err());
+        assert!(root.join(&output[0].0).exists());
+        write_documents(&root, &remaining, true).unwrap();
+        assert!(!root.join(&output[0].0).exists());
+        assert_eq!(
+            fs::read_to_string(root.join(&output[1].0)).unwrap(),
+            output[1].1
+        );
+        fixed_content::Entity::delete_many()
+            .exec(&db)
+            .await
+            .unwrap();
+        let empty = documents(&db).await.unwrap();
+        assert!(empty.is_empty());
+        assert!(write_documents(&root, &empty, false).is_err());
+        assert!(root.join(&output[1].0).exists());
+        write_documents(&root, &empty, true).unwrap();
+        assert!(!root.join(&output[1].0).exists());
+        assert_eq!(
+            fs::read_to_string(root.join("articles/notes.md")).unwrap(),
+            "unmanaged"
+        );
+        assert_eq!(
+            fs::read_to_string(root.join("articles/10.png")).unwrap(),
+            "asset"
+        );
+        assert_eq!(
+            fs::read_to_string(root.join("README.md")).unwrap(),
+            "instructions"
+        );
+        write_documents(&root, &empty, true).unwrap();
         fs::remove_dir_all(root).unwrap();
     }
 }
