@@ -218,6 +218,6 @@ docker compose exec web cargo run -p rust_blog --bin format_markdown -- --check 
 必須項目は `title`、`slug`、`tags`、`categories`（配列は空でも可）。
 型・文字数・日時・未知の項目を検証し、不正なファイルがある場合は書き換えません。
 順序は `title`, `slug`, `deleted`, `table_of_contents`, `created_at`, `excerpt`, `icatch_path`, `tags`, `categories`。
-`date` は `created_at` に統一します。省略された任意項目は追加しません。
+`date` は名前を保持し、`created_at` と同じ位置に並べます。省略された任意項目は追加しません。
 YAML のコメントや引用形式は正規化されますが、本文は保持します。
 `--check` は検証エラーまたは未整形の場合に非ゼロで終了します。
