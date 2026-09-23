@@ -132,6 +132,7 @@ slug が不正なファイルと重複に関わる全ファイルは保存せず
 重複判定には Unicode case folding を使い、`Σ` と `ς`、`Straße` と `STRASSE` も同一キーとして扱います。保存する slug 自体は変更しません。Windows の予約名には `COM¹`・`LPT²` などの上付き数字や拡張子つきの名前も含みます。
 既存 DB の同じ slug は通常どおり更新します。固定ページでは `posts`・`tags`・`js` などの既存ルートや出力ファイル名も使えません。
 整形 CLI も記事 slug の形式・入力内の重複を検証します。静的 export は DB 内の記事・固定ページの slug を出力先の初期化前に検証します。
+整形 CLI は書き込み前に全入力の重複を確認し、重複に関わるファイルはすべて変更せず、その他の正常なファイルを整形します。
 
 ```bash
 docker compose exec web cargo run -p rust_blog --bin format_markdown -- content/articles
