@@ -103,6 +103,7 @@ pub async fn article_detail(
             tags_url: "/tags",
             categories_url: "/categories",
             about_url: "/about",
+            metadata: crate::utils::metadata::article_metadata(&article, config, false),
             title: article.title,
             content_html: content,
             created_at: created_at,
@@ -163,6 +164,7 @@ mod tests {
             site_name: Some("Test Blog".to_owned()),
             default_icatch_path: None,
             favicon_path: None,
+            public_url: Some("https://example.com".into()),
         })
         .attach(Template::fairing())
         .mount("/", routes![article_detail, site_css]);
@@ -176,6 +178,10 @@ mod tests {
         assert_eq!(response.status(), Status::Ok);
         assert_eq!(response.content_type(), Some(ContentType::HTML));
         let html = response.into_string().await.expect("missing article body");
+        assert!(html.replace("&#x2F;", "/").contains(
+            "rel=\"canonical\" href=\"https://example.com/posts/highlighted-rust%23intro\""
+        ));
+        assert!(html.contains("property=\"og:type\" content=\"article\""));
         assert!(
             html.replace("&#x2F;", "/")
                 .contains("href=\"/posts/highlighted-rust%23intro\""),

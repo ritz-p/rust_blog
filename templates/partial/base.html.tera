@@ -5,6 +5,18 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}{{ site_name | default(value="My Blog") }}{% endblock title %}</title>
+  {% if metadata is defined %}
+  <meta name="description" content="{{ metadata.description | escape | safe }}">
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="{{ metadata.title | escape | safe }}">
+  <meta property="og:description" content="{{ metadata.description | escape | safe }}">
+  <meta property="og:site_name" content="{{ site_name | default(value="My Blog") | escape | safe }}">
+  {% if metadata.url %}
+  <link rel="canonical" href="{{ metadata.url | escape | safe }}">
+  <meta property="og:url" content="{{ metadata.url | escape | safe }}">
+  {% endif %}
+  {% if metadata.image %}<meta property="og:image" content="{{ metadata.image | escape | safe }}">{% endif %}
+  {% endif %}
   <link rel="stylesheet" href="/css/bulma.min.css">
   <link rel="stylesheet" href="/css/site.css">
   <link rel="shortcut icon" href= "{{ favicon_path }}" >

@@ -8,6 +8,7 @@ pub struct CommonConfig {
     pub site_name: Option<String>,
     pub default_icatch_path: Option<String>,
     pub favicon_path: Option<String>,
+    pub public_url: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
