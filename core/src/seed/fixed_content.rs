@@ -47,13 +47,7 @@ pub async fn seed_fixed_content(
         created_at: now,
         updated_at: now,
     };
-    match validator.validate() {
-        Ok(_) => {}
-        Err(e) => {
-            println!("{:?}", e);
-            return Err(e.into());
-        }
-    }
+    validator.validate()?;
 
     if active_model.is_changed() {
         if let Some(utc) = Utc::now().with_nanosecond(0) {
