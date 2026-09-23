@@ -1,4 +1,4 @@
-name: Markdown and JavaScript
+name: JavaScript
 
 on:
   pull_request:
@@ -11,7 +11,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: content-checks-${{ github.event.pull_request.number || github.ref }}
+  group: javascript-checks-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -27,16 +27,8 @@ jobs:
       - name: Install pinned JavaScript dependencies
         run: docker compose exec -T --user root web npm ci
 
-      - name: Lint Markdown
-        run: docker compose exec -T --user root web npm run lint:md
-
       - name: Lint JavaScript
         run: docker compose exec -T --user root web npm run lint:js
-
-      - name: Validate and check article front matter
-        run: |
-          docker compose exec -T --user root web cargo test --locked -p rust_blog --bin format_markdown
-          docker compose exec -T --user root web cargo run --locked -p rust_blog --bin format_markdown -- --check content/articles
 
       - name: Export Markdown using an isolated database
         run: docker compose exec -T --user root web sh docker/export-articles.sh
