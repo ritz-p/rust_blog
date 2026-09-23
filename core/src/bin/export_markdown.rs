@@ -216,7 +216,7 @@ mod tests {
             db.execute(backend.build(&statement)).await.unwrap();
         }
         assert!(documents(&db).await.unwrap().is_empty());
-        let matter: FrontMatter = serde_yaml::from_str("title: 'Test: 日本語 --- test'\nslug: ../test\ntable_of_contents: true\ncreated_at: 2026-01-01T00:00:00Z\ntags: [Rust]\ncategories: [Dev]\n").unwrap();
+        let matter: FrontMatter = serde_yaml::from_str("title: 'Test: 日本語 --- test'\nslug: test-export\ntable_of_contents: true\ncreated_at: 2026-01-01T00:00:00Z\ntags: [Rust]\ncategories: [Dev]\n").unwrap();
         let body = "\n# Body\n---\n```rust\nfn main() {}\n```\n";
         let id = seed_article(&db, &matter, body).await.unwrap();
         seed_tag(&db, &matter, id).await.unwrap();

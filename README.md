@@ -142,6 +142,16 @@ seaorm migrate refresh -u "$DATABASE_URL"
 
 ## 記事 Markdown の整形・検証
 
+記事・固定ページの slug は 1〜100 UTF-16 コード単位かつ UTF-8 で 255 バイト以内です。空白のみ・前後の空白、パス区切り、制御文字、Windows で使えないファイル名を拒否します。日本語や内部の空白は使用できます。予約名の判定では拡張子直前の空白も除き、`CON .txt`・`LPT1 .md` なども拒否します。
+seed は入力全体の slug を事前検証し、記事同士・固定ページ同士の重複（大文字小文字を区別しない）をファイル名つきで報告します。記事と固定ページは別の名前空間です。
+slug が不正なファイルと重複に関わる全ファイルは保存せず、その他のファイルを処理してからエラーをまとめて表示します。
+重複判定には Unicode case folding を使い、`Σ` と `ς`、`Straße` と `STRASSE` も同一キーとして扱います。保存する slug 自体は変更しません。Windows の予約名には `COM¹`・`LPT²` などの上付き数字や拡張子つきの名前も含みます。
+比較キーは case folding の前後で NFD 正規化し、`é` と `e`＋結合アクセントのような正準等価な表記も重複として扱います。固定ページの `post` は使用できますが、記事の出力先である `posts` は予約名です。
+Windows での衝突も防ぐため、比較キーには大文字変換も適用し、`I`・`i`・`ı` を同一扱いにします。各 OS のファイルシステムと完全に同じ比較ではなく、移植性のために保守的に重複を拒否します。`CONIN$`・`CONOUT$` も予約名です。
+既存 DB の同じ slug は通常どおり更新します。固定ページでは `posts`・`tags`・`js` などの既存ルートや出力ファイル名も使えません。
+整形 CLI も記事 slug の形式・入力内の重複を検証します。静的 export は DB 内の記事・固定ページの slug を出力先の初期化前に検証します。
+整形 CLI は書き込み前に全入力の重複を確認し、重複に関わるファイルはすべて変更せず、その他の正常なファイルを整形します。
+
 ```bash
 docker compose exec web cargo run -p rust_blog --bin format_markdown -- content/articles
 docker compose exec web cargo run -p rust_blog --bin format_markdown -- --check content/articles

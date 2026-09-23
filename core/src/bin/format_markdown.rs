@@ -1,7 +1,11 @@
 use anyhow::{Context, Result, bail, ensure};
 use rust_blog::seed::article::seed;
 use serde_yaml::{Mapping, Value};
-use std::{fs, path::PathBuf};
+use std::{
+    collections::{HashMap, HashSet},
+    fs,
+    path::PathBuf,
+};
 use walkdir::WalkDir;
 
 const ORDER: &[&str] = &[
@@ -69,8 +73,7 @@ fn validate_title(title: &str) -> Result<()> {
 }
 
 fn validate_slug(slug: &str) -> Result<()> {
-    ensure!(!slug.trim().is_empty(), "slug must not be blank");
-    validate_length("slug", slug, 100)
+    rust_blog::slug::validate(slug, 100)
 }
 
 fn validate_created_at(created_at: Option<&str>) -> Result<()> {
@@ -301,13 +304,56 @@ fn process_with_writer(
 ) -> Result<()> {
     let mut errors = Vec::new();
     let paths = collect_paths(roots, &mut errors);
-    let mut succeeded = 0;
+    let mut groups: HashMap<String, Vec<PathBuf>> = HashMap::new();
+    let mut prepared = Vec::new();
     for path in paths {
-        let result = (|| -> Result<()> {
+        let result = (|| -> Result<_> {
             let text = fs::read_to_string(&path).context("read")?;
             let document = parse(&text).context("parse")?;
+            if let Some(slug) = document
+                .matter
+                .get(Value::String("slug".into()))
+                .and_then(Value::as_str)
+            {
+                groups
+                    .entry(rust_blog::slug::collision_key(slug))
+                    .or_default()
+                    .push(path.clone());
+            }
             validate(&document.matter).context("validate")?;
             let formatted = render(&document, &format(&document.matter)).context("format")?;
+            Ok((text, formatted))
+        })();
+        prepared.push((path, result));
+    }
+    let mut duplicates = HashSet::new();
+    let mut duplicate_groups: Vec<_> = groups
+        .into_iter()
+        .filter(|(_, paths)| paths.len() > 1)
+        .collect();
+    duplicate_groups.sort_by(|a, b| a.0.cmp(&b.0));
+    for (slug, paths) in duplicate_groups {
+        let names = paths
+            .iter()
+            .map(|path| path.display().to_string())
+            .collect::<Vec<_>>()
+            .join(", ");
+        errors.push(format!("duplicate slug {slug:?}: {names}"));
+        duplicates.extend(paths);
+    }
+    let mut succeeded = 0;
+    for (path, result) in prepared {
+        let (text, formatted) = match result {
+            Ok(value) => value,
+            Err(error) => {
+                errors.push(format!("{}: {error:#}", path.display()));
+                continue;
+            }
+        };
+        if duplicates.contains(&path) {
+            continue;
+        }
+        let result = (|| -> Result<()> {
             if text != formatted {
                 ensure!(!check, "formatting required");
                 write(&path, &formatted).context("write")?;
@@ -329,6 +375,57 @@ fn process_with_writer(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn duplicate_groups_are_never_written_and_other_files_continue() {
+        for (slugs, invalid_title) in [
+            (["foo", "FOO", "Foo"], false),
+            (["Σ", "ς", "σ"], false),
+            (["é", "e\u{301}", "É"], false),
+            (["I", "ı", "i"], false),
+            (["foo", "FOO", "Foo"], true),
+        ] {
+            let root = std::env::temp_dir().join(format!(
+                "format-duplicates-{}-{}",
+                std::process::id(),
+                chrono::Utc::now().timestamp_nanos_opt().unwrap()
+            ));
+            fs::create_dir_all(&root).unwrap();
+            let input = "---\nslug: unique\ntitle: Test\ntags: []\ncategories: []\n---\nbody\n";
+            let mut originals = Vec::new();
+            for (index, slug) in slugs.into_iter().enumerate() {
+                let path = root.join(format!("{index}.md"));
+                let mut text = input.replace("slug: unique", &format!("slug: {slug}"));
+                if invalid_title && index == 0 {
+                    text = text.replace("title: Test\n", "");
+                }
+                fs::write(&path, &text).unwrap();
+                originals.push((path, text));
+            }
+            let good = root.join("good.md");
+            fs::write(&good, input).unwrap();
+            for check in [true, false] {
+                let error = process(vec![root.clone()], check).unwrap_err().to_string();
+                assert!(error.contains("duplicate slug"), "{error}");
+                for (path, text) in &originals {
+                    assert!(error.contains(path.to_str().unwrap()), "{error}");
+                    assert_eq!(fs::read_to_string(path).unwrap(), *text);
+                }
+                if invalid_title {
+                    assert!(error.contains("title"), "{error}");
+                }
+                assert_eq!(
+                    fs::read_to_string(&good).unwrap(),
+                    if check {
+                        input.to_string()
+                    } else {
+                        checked_format(input).unwrap()
+                    }
+                );
+            }
+            fs::remove_dir_all(root).unwrap();
+        }
+    }
 
     #[test]
     fn collects_field_errors_independently() {
@@ -383,7 +480,8 @@ mod tests {
         let locked = root.join("a.md");
         let good = root.join("b.md");
         let input = "---\nslug: test\ntitle: Test\ntags: []\ncategories: []\n---\nbody\n";
-        fs::write(&locked, input).unwrap();
+        let locked_input = input.replace("slug: test", "slug: locked");
+        fs::write(&locked, &locked_input).unwrap();
         fs::write(&good, input).unwrap();
         let mut attempts = Vec::new();
         let result = process_with_writer(vec![root.clone()], false, |path, text| {
@@ -399,7 +497,7 @@ mod tests {
         });
         assert!(result.unwrap_err().to_string().contains("a.md: write"));
         assert_eq!(attempts, ["a.md", "b.md"]);
-        assert_eq!(fs::read_to_string(&locked).unwrap(), input);
+        assert_eq!(fs::read_to_string(&locked).unwrap(), locked_input);
         assert_eq!(
             fs::read_to_string(&good).unwrap(),
             checked_format(input).unwrap()

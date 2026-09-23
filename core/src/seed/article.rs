@@ -12,13 +12,16 @@ pub async fn seed_article(
     front_matter: &FrontMatter,
     body: &str,
 ) -> Result<i32, anyhow::Error> {
-    let active_model: ActiveModel = prepare(db, front_matter, body).await?;
+    crate::slug::validate(&front_matter.slug, 100)?;
     validate(front_matter, body)?;
+    crate::slug::validate_database_collision(db, "article", &front_matter.slug).await?;
+    let active_model: ActiveModel = prepare(db, front_matter, body).await?;
     let article_id = upsert(db, active_model).await?;
     Ok(article_id)
 }
 
 pub async fn delete_article_by_slug(db: &DatabaseConnection, slug: &str) -> Result<(), DbErr> {
+    crate::slug::validate(slug, 100).map_err(|error| DbErr::Custom(error.to_string()))?;
     if slug.trim().is_empty() {
         return Err(DbErr::Custom("slug is empty".into()));
     }
@@ -241,7 +244,11 @@ mod tests {
                 last_insert_id: 1,
                 rows_affected: 1,
             }])
-            .append_query_results([Vec::<article::Model>::new(), vec![returned.clone()]])
+            .append_query_results([
+                Vec::<article::Model>::new(),
+                Vec::<article::Model>::new(),
+                vec![returned.clone()],
+            ])
             .into_connection();
 
         let article_id = seed_article(&db, &front_matter, "body")
@@ -261,7 +268,7 @@ mod tests {
                 last_insert_id: 0,
                 rows_affected: 1,
             }])
-            .append_query_results([vec![existing], vec![returned]])
+            .append_query_results([vec![existing.clone()], vec![existing], vec![returned]])
             .into_connection();
 
         let article_id = seed_article(&db, &front_matter, "new body")
@@ -300,7 +307,11 @@ mod tests {
                 last_insert_id: 1,
                 rows_affected: 1,
             }])
-            .append_query_results([Vec::<article::Model>::new(), vec![returned.clone()]])
+            .append_query_results([
+                Vec::<article::Model>::new(),
+                Vec::<article::Model>::new(),
+                vec![returned.clone()],
+            ])
             .into_connection();
 
         let article_id = seed_article(&db, &front_matter, &body)
