@@ -1,7 +1,7 @@
 use anyhow::{Result, ensure};
 use std::{collections::HashMap, path::PathBuf};
 
-fn collision_key(slug: &str) -> String {
+pub(crate) fn collision_key(slug: &str) -> String {
     caseless::default_case_fold_str(slug)
 }
 

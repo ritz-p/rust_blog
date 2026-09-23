@@ -1,14 +1,23 @@
+use anyhow::Context;
 use rust_blog::seed::run_all;
-use sea_orm::{Database, DatabaseConnection, DbErr};
+use sea_orm::Database;
+use std::process::ExitCode;
 
 #[rocket::main]
-async fn main() -> anyhow::Result<()> {
-    let db = connect_db().await?;
-    run_all(db).await?;
-    Ok(())
+async fn main() -> ExitCode {
+    match run().await {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(error) => {
+            eprintln!("{error:#}");
+            ExitCode::FAILURE
+        }
+    }
 }
 
-async fn connect_db() -> Result<DatabaseConnection, DbErr> {
-    let url = std::env::var("DATABASE_URL").expect("DATABASE URL must be set");
-    Database::connect(&url).await
+async fn run() -> anyhow::Result<()> {
+    let url = std::env::var("DATABASE_URL").context("DATABASE_URL must be set")?;
+    let db = Database::connect(&url)
+        .await
+        .context("connect to database")?;
+    run_all(db).await
 }

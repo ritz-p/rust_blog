@@ -1,5 +1,5 @@
 use anyhow::{Context, Result, bail, ensure};
-use rust_blog::{seed::article::seed, utils::front_matter::FrontMatter};
+use rust_blog::seed::article::seed;
 use serde_yaml::{Mapping, Value};
 use std::{fs, path::PathBuf};
 use walkdir::WalkDir;
@@ -112,30 +112,88 @@ fn validate_categories(categories: &[String]) -> Result<()> {
     validate_names("categories", categories)
 }
 
-fn validate_fields(source: &Mapping) -> Result<()> {
-    for key in source.keys() {
-        ensure!(
-            key.as_str()
-                .is_some_and(|key| ORDER.contains(&key) || key == "date"),
-            "unknown front matter field: {key:?}"
-        );
-    }
-    Ok(())
+fn validate_field<T: serde::de::DeserializeOwned>(
+    source: &Mapping,
+    field: &str,
+    default: Option<Value>,
+    validate: impl FnOnce(T) -> Result<()>,
+) -> Result<()> {
+    let value = source
+        .get(Value::String(field.into()))
+        .cloned()
+        .or(default)
+        .with_context(|| format!("{field}: required field is missing"))?;
+    let value = serde_yaml::from_value(value).with_context(|| format!("{field}: invalid type"))?;
+    validate(value).with_context(|| field.to_string())
 }
 
 fn validate(source: &Mapping) -> Result<()> {
-    validate_fields(source)?;
-    let matter: FrontMatter = serde_yaml::from_value(Value::Mapping(source.clone()))?;
-    validate_title(&matter.title)?;
-    validate_slug(&matter.slug)?;
-    validate_created_at(matter.created_at.as_deref())?;
-    validate_excerpt(matter.excerpt.as_deref())?;
-    validate_icatch_path(matter.icatch_path.as_deref())?;
-    validate_tags(&matter.tags)?;
-    validate_categories(&matter.categories)?;
+    let mut errors = Vec::new();
+    for key in source.keys() {
+        if !key
+            .as_str()
+            .is_some_and(|key| ORDER.contains(&key) || key == "date")
+        {
+            errors.push(format!("unknown front matter field: {key:?}"));
+        }
+    }
+    let date_field = if source.contains_key(Value::String("date".into())) {
+        "date"
+    } else {
+        "created_at"
+    };
+    if date_field == "date" && source.contains_key(Value::String("created_at".into())) {
+        errors.push("created_at and date must not both be specified".into());
+    }
+    for result in [
+        validate_field(source, "title", None, |value: String| {
+            validate_title(&value)
+        }),
+        validate_field(source, "slug", None, |value: String| validate_slug(&value)),
+        validate_field(
+            source,
+            date_field,
+            Some(Value::Null),
+            |value: Option<String>| validate_created_at(value.as_deref()),
+        ),
+        validate_field(
+            source,
+            "excerpt",
+            Some(Value::Null),
+            |value: Option<String>| validate_excerpt(value.as_deref()),
+        ),
+        validate_field(
+            source,
+            "icatch_path",
+            Some(Value::Null),
+            |value: Option<String>| validate_icatch_path(value.as_deref()),
+        ),
+        validate_field(source, "tags", None, |value: Vec<String>| {
+            validate_tags(&value)
+        }),
+        validate_field(source, "categories", None, |value: Vec<String>| {
+            validate_categories(&value)
+        }),
+        validate_field(
+            source,
+            "deleted",
+            Some(Value::Bool(false)),
+            |_: bool| Ok(()),
+        ),
+        validate_field(
+            source,
+            "table_of_contents",
+            Some(Value::Bool(false)),
+            |_: bool| Ok(()),
+        ),
+    ] {
+        if let Err(error) = result {
+            errors.push(format!("{error:#}"));
+        }
+    }
+    ensure!(errors.is_empty(), "{}", errors.join("; "));
     Ok(())
 }
-
 fn format(source: &Mapping) -> Mapping {
     let mut entries: Vec<_> = source.clone().into_iter().collect();
     entries.sort_by_key(|(key, _)| {
@@ -160,33 +218,56 @@ fn render(document: &Document<'_>, matter: &Mapping) -> Result<String> {
     ))
 }
 
-fn collect_paths(roots: Vec<PathBuf>) -> Result<Vec<PathBuf>> {
+fn collect_paths(roots: Vec<PathBuf>, errors: &mut Vec<String>) -> Vec<PathBuf> {
     let mut paths = Vec::new();
     for root in roots {
-        let metadata = fs::metadata(&root).with_context(|| root.display().to_string())?;
-        if metadata.is_file() {
-            if root.extension().is_some_and(|extension| extension == "md") {
-                paths.push(fs::canonicalize(&root).with_context(|| root.display().to_string())?);
-            }
-        } else if metadata.is_dir() {
-            let root = fs::canonicalize(&root).with_context(|| root.display().to_string())?;
-            for entry in WalkDir::new(root).follow_links(false) {
-                let entry = entry?;
-                if entry.file_type().is_file()
-                    && entry.path().extension().is_some_and(|x| x == "md")
-                {
-                    paths.push(entry.into_path());
+        let result = (|| -> Result<()> {
+            let metadata = fs::metadata(&root)?;
+            let canonical = fs::canonicalize(&root)?;
+            if metadata.is_file() {
+                if root.extension().is_some_and(|extension| extension == "md") {
+                    paths.push(canonical);
+                }
+            } else if metadata.is_dir() {
+                for entry in WalkDir::new(canonical).follow_links(false) {
+                    match entry {
+                        Ok(entry)
+                            if entry.file_type().is_file()
+                                && entry.path().extension().is_some_and(|x| x == "md") =>
+                        {
+                            paths.push(entry.into_path())
+                        }
+                        Ok(_) => {}
+                        Err(error) => {
+                            errors.push(format!("{}: traversal: {error}", root.display()))
+                        }
+                    }
                 }
             }
+            Ok(())
+        })();
+        if let Err(error) = result {
+            errors.push(format!("{}: {error:#}", root.display()));
         }
     }
     paths.sort();
     paths.dedup();
-    ensure!(!paths.is_empty(), "no Markdown files found");
-    Ok(paths)
+    if paths.is_empty() {
+        errors.push("no Markdown files found".into());
+    }
+    paths
 }
 
-fn main() -> Result<()> {
+fn main() -> std::process::ExitCode {
+    match run() {
+        Ok(()) => std::process::ExitCode::SUCCESS,
+        Err(error) => {
+            eprintln!("{error:#}");
+            std::process::ExitCode::FAILURE
+        }
+    }
+}
+fn run() -> Result<()> {
     let mut check = false;
     let mut roots = Vec::new();
     for arg in std::env::args().skip(1) {
@@ -205,48 +286,122 @@ fn main() -> Result<()> {
     if roots.is_empty() {
         roots.push("content/articles".into());
     }
-    let paths = collect_paths(roots)?;
-    let mut pending = Vec::new();
+    process(roots, check)
+}
+
+fn process(roots: Vec<PathBuf>, check: bool) -> Result<()> {
     let mut errors = Vec::new();
+    let paths = collect_paths(roots, &mut errors);
     let mut slugs = rust_blog::slug::SlugRegistry::default();
+    let mut succeeded = 0;
     for path in paths {
-        let result = fs::read_to_string(&path)
-            .map_err(anyhow::Error::from)
-            .and_then(|text| {
-                let document = parse(&text)?;
-                validate(&document.matter)?;
-                let slug = document
-                    .matter
-                    .get(Value::String("slug".into()))
-                    .and_then(Value::as_str)
-                    .context("slug must be a string")?;
-                slugs.insert(slug, path.clone())?;
-                let formatted = render(&document, &format(&document.matter))?;
-                Ok((text, formatted))
-            });
+        let result = (|| -> Result<()> {
+            let text = fs::read_to_string(&path).context("read")?;
+            let document = parse(&text).context("parse")?;
+            validate(&document.matter).context("validate")?;
+            let slug = document
+                .matter
+                .get(Value::String("slug".into()))
+                .and_then(Value::as_str)
+                .context("slug must be a string")?;
+            slugs.insert(slug, path.clone())?;
+            let formatted = render(&document, &format(&document.matter)).context("format")?;
+            if text != formatted {
+                ensure!(!check, "formatting required");
+                fs::write(&path, formatted).context("write")?;
+            }
+            Ok(())
+        })();
         match result {
-            Ok((text, formatted)) if text != formatted => pending.push((path, formatted)),
-            Ok(_) => {}
+            Ok(()) => succeeded += 1,
             Err(error) => errors.push(format!("{}: {error:#}", path.display())),
         }
     }
-    ensure!(errors.is_empty(), "{}", errors.join("\n"));
-    if check {
-        for (path, _) in &pending {
-            eprintln!("{}: formatting required", path.display());
-        }
-        ensure!(pending.is_empty(), "front matter formatting required");
-    } else {
-        for (path, formatted) in pending {
-            fs::write(&path, formatted).with_context(|| path.display().to_string())?;
-        }
-    }
+    println!(
+        "Markdown completed: {succeeded} file(s) succeeded, {} error(s)",
+        errors.len()
+    );
+    ensure!(errors.is_empty(), "Markdown errors:\n{}", errors.join("\n"));
     Ok(())
 }
-
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn collects_field_errors_independently() {
+        let source = serde_yaml::from_str(
+            "slug: ''\ntags: false\ncategories: []\ncreated_at: yesterday\nextra: true\n",
+        )
+        .unwrap();
+        let error = validate(&source).unwrap_err().to_string();
+        for field in ["title", "slug", "tags", "created_at", "extra"] {
+            assert!(error.contains(field), "{error}");
+        }
+    }
+
+    #[test]
+    fn continues_after_discovery_and_validation_errors() {
+        let root = std::env::temp_dir().join(format!(
+            "format-errors-{}-{}",
+            std::process::id(),
+            chrono::Utc::now().timestamp_nanos_opt().unwrap()
+        ));
+        fs::create_dir_all(&root).unwrap();
+        let good = root.join("good.md");
+        let broken = root.join("broken.md");
+        let input = "---\nslug: test\ntitle: Test\ntags: []\ncategories: []\n---\nbody\n";
+        fs::write(&good, input).unwrap();
+        fs::write(&broken, "broken").unwrap();
+        let roots = vec![root.join("missing"), root.clone()];
+        let error = process(roots.clone(), true).unwrap_err().to_string();
+        for expected in ["missing", "broken.md", "good.md: formatting required"] {
+            assert!(error.contains(expected), "{error}");
+        }
+        assert_eq!(fs::read_to_string(&good).unwrap(), input);
+        let error = process(roots, false).unwrap_err().to_string();
+        assert!(error.contains("missing") && error.contains("broken.md"));
+        assert_eq!(
+            fs::read_to_string(&good).unwrap(),
+            checked_format(input).unwrap()
+        );
+        assert_eq!(fs::read_to_string(&broken).unwrap(), "broken");
+        assert!(process(vec![good], true).is_ok());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn continues_after_write_failure() {
+        use std::os::unix::fs::PermissionsExt;
+        let root = std::env::temp_dir().join(format!(
+            "format-write-{}-{}",
+            std::process::id(),
+            chrono::Utc::now().timestamp_nanos_opt().unwrap()
+        ));
+        fs::create_dir_all(&root).unwrap();
+        let locked = root.join("a.md");
+        let good = root.join("b.md");
+        let input = "---\nslug: test\ntitle: Test\ntags: []\ncategories: []\n---\nbody\n";
+        fs::write(&locked, input.replace("slug: test", "slug: locked")).unwrap();
+        fs::write(&good, input).unwrap();
+        fs::set_permissions(&locked, fs::Permissions::from_mode(0o444)).unwrap();
+        let result = process(vec![root.clone()], false);
+        fs::set_permissions(&locked, fs::Permissions::from_mode(0o644)).unwrap();
+        assert!(result.unwrap_err().to_string().contains("a.md: write"));
+        assert_eq!(
+            fs::read_to_string(&good).unwrap(),
+            checked_format(input).unwrap()
+        );
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    fn collect_paths(roots: Vec<PathBuf>) -> Result<Vec<PathBuf>> {
+        let mut errors = Vec::new();
+        let paths = super::collect_paths(roots, &mut errors);
+        ensure!(errors.is_empty(), "{}", errors.join("\n"));
+        Ok(paths)
+    }
 
     fn checked_format(text: &str) -> Result<String> {
         let document = parse(text)?;
