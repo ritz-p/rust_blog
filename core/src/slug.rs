@@ -17,6 +17,7 @@ pub fn validate(slug: &str, max: usize) -> Result<()> {
         (1..=max).contains(&slug.encode_utf16().count()),
         "slug must contain 1 to {max} UTF-16 code units"
     );
+    ensure!(slug.len() <= 255, "slug must not exceed 255 UTF-8 bytes");
     ensure!(
         !slug.trim().is_empty() && slug.trim() == slug,
         "slug must not be blank or have surrounding whitespace"
@@ -31,7 +32,12 @@ pub fn validate(slug: &str, max: usize) -> Result<()> {
             .any(|c| c.is_control() || "/\\:*?\"<>|".contains(c)),
         "slug contains a path separator, control character, or unsupported filename character"
     );
-    let stem = slug.split('.').next().unwrap_or(slug).to_ascii_uppercase();
+    let stem = slug
+        .split('.')
+        .next()
+        .unwrap_or(slug)
+        .trim_end_matches(' ')
+        .to_ascii_uppercase();
     let device = matches!(
         stem.as_str(),
         "CON" | "PRN" | "AUX" | "NUL" | "CONIN$" | "CONOUT$"
@@ -127,6 +133,42 @@ impl SlugRegistry {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn enforces_utf8_component_limit_in_addition_to_utf16_limit() {
+        let boundary = "日".repeat(85);
+        assert_eq!(boundary.len(), 255);
+        assert!(validate(&boundary, 100).is_ok());
+        assert!(validate_fixed(&boundary).is_ok());
+        for slug in [format!("{boundary}a"), "日".repeat(100)] {
+            assert!(slug.encode_utf16().count() <= 100);
+            assert!(
+                validate(&slug, 100)
+                    .unwrap_err()
+                    .to_string()
+                    .contains("255 UTF-8 bytes")
+            );
+            assert!(validate_fixed(&slug).is_err());
+        }
+        assert!(validate(&"a".repeat(101), 100).is_err());
+        assert!(validate(&"😀".repeat(50), 100).is_ok());
+    }
+
+    #[test]
+    fn ignores_spaces_before_extensions_when_checking_devices() {
+        for stem in [
+            "CON", "con", "PRN", "AUX", "NUL", "LPT1", "COM9", "COM¹", "LPT²", "CONIN$", "CONOUT$",
+        ] {
+            for spaces in [" ", "  "] {
+                let slug = format!("{stem}{spaces}.txt");
+                assert!(validate(&slug, 100).is_err(), "{slug}");
+                assert!(validate_fixed(&slug).is_err(), "{slug}");
+            }
+        }
+        for slug in ["report .txt", "CON notes.txt", "LPT10 .md"] {
+            assert!(validate(slug, 100).is_ok(), "{slug}");
+        }
+    }
 
     #[test]
     fn rejects_console_devices_without_rejecting_ordinary_dollar_names() {
