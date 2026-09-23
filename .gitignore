@@ -3,3 +3,4 @@ migration/target
 blog.db
 dist/*
 /markdown_output/
+/node_modules/
