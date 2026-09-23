@@ -370,6 +370,7 @@ mod tests {
         for (slugs, invalid_title) in [
             (["foo", "FOO", "Foo"], false),
             (["Σ", "ς", "σ"], false),
+            (["é", "e\u{301}", "É"], false),
             (["foo", "FOO", "Foo"], true),
         ] {
             let root = std::env::temp_dir().join(format!(

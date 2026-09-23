@@ -3326,6 +3326,7 @@ dependencies = [
  "tera",
  "toml 0.9.8",
  "two-face",
+ "unicode-normalization",
  "walkdir",
 ]
 

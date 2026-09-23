@@ -1,8 +1,10 @@
 use anyhow::{Result, ensure};
+use caseless::Caseless;
 use std::{collections::HashMap, path::PathBuf};
+use unicode_normalization::UnicodeNormalization;
 
 pub fn collision_key(slug: &str) -> String {
-    caseless::default_case_fold_str(slug)
+    slug.nfd().default_case_fold().nfd().collect()
 }
 
 pub fn validate(slug: &str, max: usize) -> Result<()> {
@@ -43,7 +45,6 @@ pub fn validate_fixed(slug: &str) -> Result<()> {
     ensure!(
         ![
             "posts",
-            "post",
             "page",
             "archive",
             "tags",
@@ -121,6 +122,31 @@ mod tests {
     use super::*;
 
     #[test]
+    fn canonical_keys_preserve_distinct_accents_and_compatibility_forms() {
+        for (a, b) in [
+            ("é", "e\u{301}"),
+            ("É", "e\u{301}"),
+            ("\u{1f80}", "α\u{313}\u{345}"),
+            ("a\u{345}\u{300}", "a\u{300}\u{345}"),
+        ] {
+            assert_eq!(collision_key(a), collision_key(b));
+            assert_eq!(collision_key(&collision_key(a)), collision_key(a));
+        }
+        assert_ne!(collision_key("é"), collision_key("e"));
+        assert_ne!(collision_key("①"), collision_key("1"));
+    }
+
+    #[test]
+    fn post_is_a_valid_fixed_page_but_posts_is_reserved() {
+        for slug in ["post", "POST", "Post"] {
+            assert!(validate_fixed(slug).is_ok());
+        }
+        for slug in ["posts", "POSTS", "poſts"] {
+            assert!(validate_fixed(slug).is_err());
+        }
+    }
+
+    #[test]
     fn rejects_superscript_windows_devices_with_optional_extensions() {
         for prefix in ["COM", "com", "LPT", "lpt"] {
             for suffix in ["¹", "²", "³"] {
@@ -137,8 +163,14 @@ mod tests {
 
     #[test]
     fn registry_uses_full_unicode_case_folding() {
-        for (original, equivalent) in [("Σ", "ς"), ("σ", "ς"), ("Straße", "STRASSE"), ("ﬀ", "ff")]
-        {
+        for (original, equivalent) in [
+            ("Σ", "ς"),
+            ("σ", "ς"),
+            ("Straße", "STRASSE"),
+            ("ﬀ", "ff"),
+            ("é", "e\u{301}"),
+            ("E\u{301}", "É"),
+        ] {
             let mut registry = SlugRegistry::default();
             registry.insert(original, "a.md").unwrap();
             registry.insert(original, "a.md").unwrap();
@@ -159,7 +191,12 @@ mod tests {
             ))
             .await
             .unwrap();
-            for (original, equivalent) in [("Σ", "ς"), ("Straße", "STRASSE"), ("ﬀ", "ff")] {
+            for (original, equivalent) in [
+                ("Σ", "ς"),
+                ("Straße", "STRASSE"),
+                ("ﬀ", "ff"),
+                ("é", "e\u{301}"),
+            ] {
                 db.execute(Statement::from_sql_and_values(
                     db.get_database_backend(),
                     format!("INSERT INTO {table} VALUES (?)"),
