@@ -83,11 +83,7 @@ fn validate_input_slugs(
     ] {
         let mut groups: HashMap<String, Vec<PathBuf>> = HashMap::new();
         for path in markdown_files(directory).flatten() {
-            let slug = if fixed {
-                parse_markdown_to_fixed_content_matter(&path).map(|(matter, _)| matter.slug)
-            } else {
-                parse_markdown_to_front_matter(&path).map(|(matter, _)| matter.slug)
-            };
+            let slug = markdown::parse_markdown_slug(&path);
             if let Ok(slug) = slug {
                 let validation = if fixed {
                     crate::slug::validate_fixed(&slug)
@@ -197,6 +193,11 @@ mod tests {
             std::fs::write(articles.join(file), format!("---\ntitle: Test\nslug: {slug}\ndate: 2026-01-01\ntags: []\ncategories: []\n---\nbody")).unwrap();
         }
         std::fs::write(
+            articles.join("00-duplicate-b.md"),
+            "---\nslug: ς\ntags: false\ncategories: []\n---\nbody",
+        )
+        .unwrap();
+        std::fs::write(
             articles.join("01-invalid.md"),
             "---\ntitle: ''\nslug: invalid\ndate: 2026-01-01\ntags: []\ncategories: []\n---\nbody",
         )
@@ -276,6 +277,33 @@ mod slug_tests {
         );
         std::fs::remove_file(articles.join("b.md")).unwrap();
         assert!(validate_input_slugs(&config).is_empty());
+        for directory in [&articles, &fixed] {
+            for invalid in [
+                document.replace("title: Test\n", ""),
+                document.replace("title: Test", "title: []"),
+            ] {
+                std::fs::write(directory.join("b.md"), invalid).unwrap();
+                let errors = validate_input_slugs(&config);
+                for name in ["a.md", "b.md"] {
+                    assert!(
+                        errors
+                            .get(&directory.join(name))
+                            .unwrap()
+                            .contains("duplicate slug")
+                    );
+                }
+                std::fs::remove_file(directory.join("b.md")).unwrap();
+            }
+        }
+        std::fs::write(
+            articles.join("b.md"),
+            document.replace("tags: []", "tags: false"),
+        )
+        .unwrap();
+        let errors = validate_input_slugs(&config);
+        assert!(errors.contains_key(&articles.join("a.md")));
+        assert!(errors.contains_key(&articles.join("b.md")));
+        std::fs::remove_file(articles.join("b.md")).unwrap();
         std::fs::write(
             fixed.join("a.md"),
             document.replace("slug: same", "slug: tags"),

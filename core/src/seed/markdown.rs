@@ -21,6 +21,17 @@ pub fn markdown_files(
         })
 }
 
+pub(super) fn parse_markdown_slug(path: &std::path::Path) -> anyhow::Result<String> {
+    use anyhow::Context;
+    let text = fs::read_to_string(path)?;
+    let (yaml, _) = split_front_matter(&text)?;
+    let matter: serde_yaml::Mapping = serde_yaml::from_str(yaml)?;
+    let slug = matter
+        .get(serde_yaml::Value::String("slug".into()))
+        .context("slug is missing")?;
+    serde_yaml::from_value(slug.clone()).context("slug must be a string")
+}
+
 pub fn parse_markdown_to_front_matter(
     path: &std::path::Path,
 ) -> Result<(FrontMatter, String), Box<dyn std::error::Error>> {
