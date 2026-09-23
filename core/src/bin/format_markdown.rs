@@ -291,6 +291,14 @@ fn run() -> Result<()> {
 }
 
 fn process(roots: Vec<PathBuf>, check: bool) -> Result<()> {
+    process_with_writer(roots, check, |path, text| fs::write(path, text))
+}
+
+fn process_with_writer(
+    roots: Vec<PathBuf>,
+    check: bool,
+    mut write: impl FnMut(&std::path::Path, &str) -> std::io::Result<()>,
+) -> Result<()> {
     let mut errors = Vec::new();
     let paths = collect_paths(roots, &mut errors);
     let mut succeeded = 0;
@@ -302,7 +310,7 @@ fn process(roots: Vec<PathBuf>, check: bool) -> Result<()> {
             let formatted = render(&document, &format(&document.matter)).context("format")?;
             if text != formatted {
                 ensure!(!check, "formatting required");
-                fs::write(&path, formatted).context("write")?;
+                write(&path, &formatted).context("write")?;
             }
             Ok(())
         })();
@@ -364,10 +372,8 @@ mod tests {
         fs::remove_dir_all(root).unwrap();
     }
 
-    #[cfg(unix)]
     #[test]
     fn continues_after_write_failure() {
-        use std::os::unix::fs::PermissionsExt;
         let root = std::env::temp_dir().join(format!(
             "format-write-{}-{}",
             std::process::id(),
@@ -379,10 +385,21 @@ mod tests {
         let input = "---\nslug: test\ntitle: Test\ntags: []\ncategories: []\n---\nbody\n";
         fs::write(&locked, input).unwrap();
         fs::write(&good, input).unwrap();
-        fs::set_permissions(&locked, fs::Permissions::from_mode(0o444)).unwrap();
-        let result = process(vec![root.clone()], false);
-        fs::set_permissions(&locked, fs::Permissions::from_mode(0o644)).unwrap();
+        let mut attempts = Vec::new();
+        let result = process_with_writer(vec![root.clone()], false, |path, text| {
+            attempts.push(path.file_name().unwrap().to_string_lossy().into_owned());
+            if path.file_name() == locked.file_name() {
+                Err(std::io::Error::new(
+                    std::io::ErrorKind::PermissionDenied,
+                    "simulated write failure",
+                ))
+            } else {
+                fs::write(path, text)
+            }
+        });
         assert!(result.unwrap_err().to_string().contains("a.md: write"));
+        assert_eq!(attempts, ["a.md", "b.md"]);
+        assert_eq!(fs::read_to_string(&locked).unwrap(), input);
         assert_eq!(
             fs::read_to_string(&good).unwrap(),
             checked_format(input).unwrap()

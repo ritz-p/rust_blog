@@ -1,0 +1,16 @@
+{
+  "globs": ["**/*.md"],
+  "ignores": ["node_modules/**", "dist/**", "target/**", "migration/target/**", "markdown_output/**"],
+  "config": {
+    "default": false,
+    "MD011": true,
+    "MD018": true,
+    "MD019": true,
+    "MD020": true,
+    "MD021": true,
+    "MD023": true,
+    "MD037": true,
+    "MD039": true,
+    "MD042": true
+  }
+}
