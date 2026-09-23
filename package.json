@@ -1,0 +1,20 @@
+{
+  "name": "rust-blog-checks",
+  "private": true,
+  "scripts": {
+    "lint:js": "eslint core/assets tests/frontend eslint.config.mjs",
+    "lint:md": "markdownlint-cli2",
+    "test:js": "node --test tests/frontend/*.test.cjs",
+    "check": "npm run lint:js && npm run lint:md && npm run test:js"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "eslint": "10.11.0",
+    "globals": "17.12.0",
+    "jsdom": "30.1.1",
+    "markdownlint-cli2": "0.23.3"
+  }
+}

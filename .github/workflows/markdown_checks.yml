@@ -1,0 +1,40 @@
+name: Markdown
+
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: markdown-checks-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Start development container
+        run: docker compose up -d web
+
+      - name: Install pinned Markdown lint dependencies
+        run: docker compose exec -T --user root web npm ci
+
+      - name: Lint Markdown
+        run: docker compose exec -T --user root web npm run lint:md
+
+      - name: Validate and check article front matter
+        run: |
+          docker compose exec -T --user root web cargo test --locked -p rust_blog --bin format_markdown
+          docker compose exec -T --user root web cargo run --locked -p rust_blog --bin format_markdown -- --check content/articles
+
+      - name: Stop containers
+        if: always()
+        run: docker compose down

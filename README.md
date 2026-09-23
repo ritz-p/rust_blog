@@ -40,6 +40,22 @@ docker compose exec web sea-orm-cli generate entity -o core/src/entity --with-se
 docker compose exec web cargo test -p rust_blog
 ```
 
+Markdown・JavaScript の CI は master 向け PR と master への push で実行します。
+ワークフローは `markdown_checks.yml` と `javascript_checks.yml` に分かれており、それぞれ独立して実行します。静的 export・配信確認は JavaScript 側で実行します。
+Markdown のリンク・見出しなどの lint、記事 front matter の検証・整形チェック、JavaScript の lint、検索とナビゲーションの DOM テストを行います。
+静的 export は一時 DB から生成し、nginx 経由で HTML・JavaScript・検索インデックス・記事の配信も確認します。
+
+```bash
+docker compose exec web npm ci
+docker compose exec web npm run check
+docker compose exec web cargo run -p rust_blog --bin format_markdown -- --check content/articles
+docker compose exec web sh docker/export-articles.sh
+docker compose up -d --force-recreate static
+docker compose exec -e STATIC_SITE_URL=http://static web npm run test:js
+```
+
+`npm run check` のみでは静的配信テストをスキップします。配信も確認する場合は上記の export・static 起動後に `STATIC_SITE_URL` を指定してください。
+
 ## 静的出力
 
 ```bash

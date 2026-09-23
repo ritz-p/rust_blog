@@ -1,0 +1,46 @@
+name: JavaScript
+
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: javascript-checks-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Start development container
+        run: docker compose up -d web
+
+      - name: Install pinned JavaScript dependencies
+        run: docker compose exec -T --user root web npm ci
+
+      - name: Lint JavaScript
+        run: docker compose exec -T --user root web npm run lint:js
+
+      - name: Export Markdown using an isolated database
+        run: docker compose exec -T --user root web sh docker/export-articles.sh
+
+      - name: Start static preview
+        run: |
+          docker compose up -d --force-recreate static
+          docker compose exec -T web node -e 'async function wait() { for (let attempt = 0; attempt < 30; attempt++) { try { if ((await fetch("http://static/")).ok) return; } catch {} await new Promise(resolve => setTimeout(resolve, 1000)); } throw new Error("static preview did not become ready"); } wait().catch(error => { console.error(error); process.exitCode = 1; });'
+
+      - name: Test navigation, search and static preview
+        run: docker compose exec -T -e STATIC_SITE_URL=http://static web npm run test:js
+
+      - name: Stop containers
+        if: always()
+        run: docker compose down
