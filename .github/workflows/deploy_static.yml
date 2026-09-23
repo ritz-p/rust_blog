@@ -1,6 +1,8 @@
 name: Export articles and deploy
 
 on:
+  schedule:
+    - cron: "7,22,37,52 * * * *"
   workflow_dispatch:
     inputs:
       deploy:
@@ -26,6 +28,7 @@ concurrency:
 
 jobs:
   export:
+    if: ${{ github.event_name != 'schedule' || vars.STATIC_SCHEDULE_ENABLED == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -60,7 +63,7 @@ jobs:
         run: docker compose down
 
   deploy:
-    if: ${{ inputs.deploy }}
+    if: ${{ (github.event_name == 'workflow_dispatch' && inputs.deploy) || (github.event_name == 'schedule' && vars.STATIC_SCHEDULE_ENABLED == 'true') }}
     needs: export
     runs-on: ubuntu-latest
     steps:
