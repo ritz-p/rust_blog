@@ -12,66 +12,6 @@ pub struct ArticleMetadata {
     pub image: Option<String>,
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn metadata_uses_plain_text_encoded_urls_and_image_fallback() {
-        let mut article = article::Model {
-            id: 1,
-            title: "A \"title\" <&>".into(),
-            slug: "日本語 #1".into(),
-            excerpt: Some("**Summary**\n\n[link](https://example.org)".into()),
-            content: "本文".repeat(200),
-            created_at: chrono::Utc::now(),
-            updated_at: chrono::Utc::now(),
-            icatch_path: None,
-            table_of_contents: false,
-        };
-        let mut config = CommonConfig {
-            articles_per_page: 10,
-            site_name: None,
-            default_icatch_path: Some("/image/default.png".into()),
-            favicon_path: None,
-            public_url: Some("https://example.com/".into()),
-        };
-        let metadata = article_metadata(&article, &config, false);
-        assert_eq!(metadata.description, "Summary link");
-        assert_eq!(
-            metadata.url.as_deref(),
-            Some("https://example.com/posts/%E6%97%A5%E6%9C%AC%E8%AA%9E%20%231")
-        );
-        assert_eq!(
-            metadata.image.as_deref(),
-            Some("https://example.com/image/default.png")
-        );
-        assert!(
-            article_metadata(&article, &config, true)
-                .url
-                .unwrap()
-                .ends_with('/')
-        );
-        article.excerpt = None;
-        assert_eq!(
-            article_metadata(&article, &config, false)
-                .description
-                .chars()
-                .count(),
-            160
-        );
-        config.public_url = None;
-        let metadata = article_metadata(&article, &config, false);
-        assert!(metadata.url.is_none());
-        assert!(metadata.image.is_none());
-        article.icatch_path = Some("https://cdn.example.com/image.png".into());
-        assert_eq!(
-            article_metadata(&article, &config, false).image,
-            article.icatch_path
-        );
-    }
-}
-
 pub fn article_metadata(
     article: &article::Model,
     config: &CommonConfig,
@@ -121,5 +61,79 @@ pub fn article_metadata(
             )
         }),
         image,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn metadata_uses_plain_text_encoded_urls_and_image_fallback() {
+        let mut article = article::Model {
+            id: 1,
+            title: "A \"title\" <&>".into(),
+            slug: "日本語 #1".into(),
+            excerpt: Some("**Summary**\n\n[link](https://example.org)".into()),
+            content: "本文".repeat(200),
+            created_at: chrono::Utc::now(),
+            updated_at: chrono::Utc::now(),
+            icatch_path: None,
+            table_of_contents: false,
+        };
+        let mut config = CommonConfig {
+            articles_per_page: 10,
+            site_name: None,
+            default_icatch_path: Some("/image/default.png".into()),
+            favicon_path: None,
+            public_url: Some("https://example.com/".into()),
+        };
+        let metadata = article_metadata(&article, &config, false);
+        for autoescape in [false, true] {
+            let context = tera::Context::from_serialize(serde_json::json!({
+                "metadata": &metadata, "site_name": "Test", "favicon_path": ""
+            }))
+            .unwrap();
+            let html = tera::Tera::one_off(
+                include_str!("../../../templates/partial/base.html.tera"),
+                &context,
+                autoescape,
+            )
+            .unwrap();
+            assert!(html.contains("A &quot;title&quot; &lt;&amp;&gt;"), "{html}");
+            assert!(!html.contains("&amp;quot;"));
+        }
+        assert_eq!(metadata.description, "Summary link");
+        assert_eq!(
+            metadata.url.as_deref(),
+            Some("https://example.com/posts/%E6%97%A5%E6%9C%AC%E8%AA%9E%20%231")
+        );
+        assert_eq!(
+            metadata.image.as_deref(),
+            Some("https://example.com/image/default.png")
+        );
+        assert!(
+            article_metadata(&article, &config, true)
+                .url
+                .unwrap()
+                .ends_with('/')
+        );
+        article.excerpt = None;
+        assert_eq!(
+            article_metadata(&article, &config, false)
+                .description
+                .chars()
+                .count(),
+            160
+        );
+        config.public_url = None;
+        let metadata = article_metadata(&article, &config, false);
+        assert!(metadata.url.is_none());
+        assert!(metadata.image.is_none());
+        article.icatch_path = Some("https://cdn.example.com/image.png".into());
+        assert_eq!(
+            article_metadata(&article, &config, false).image,
+            article.icatch_path
+        );
     }
 }
