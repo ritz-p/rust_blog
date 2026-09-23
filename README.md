@@ -135,7 +135,9 @@ docker compose exec web cargo run -p rust_blog --bin format_markdown -- --check 
 明示指定したシンボリックリンクはリンク先を処理します。ディレクトリ配下のリンクはたどりません。
 UTF-8 BOM 付きファイルにも対応し、BOM と改行形式を保持します。
 必須項目は `title`、`slug`、`tags`、`categories`（配列は空でも可）。
-型・文字数・日時・未知の項目を検証し、不正なファイルがある場合は書き換えません。
+型・文字数・日時・未知の項目を検証します。不正なファイルは書き換えず、正常なファイルの整形を続けます。
+探索・読み書き・検証のエラーは最後にファイル名つきでまとめて表示し、非ゼロで終了します。
+`--check` では書き換えず、検証エラーと未整形のファイルをまとめて報告します。
 順序は `title`, `slug`, `deleted`, `table_of_contents`, `created_at`, `excerpt`, `icatch_path`, `tags`, `categories`。
 `date` は名前を保持し、`created_at` と同じ位置に並べます。省略された任意項目は追加しません。
 YAML のコメントや引用形式は正規化されますが、本文は保持します。
