@@ -4,7 +4,12 @@ use std::{collections::HashMap, path::PathBuf};
 use unicode_normalization::UnicodeNormalization;
 
 pub fn collision_key(slug: &str) -> String {
-    slug.nfd().default_case_fold().nfd().collect()
+    slug.nfd()
+        .default_case_fold()
+        .flat_map(char::to_uppercase)
+        .default_case_fold()
+        .nfd()
+        .collect()
 }
 
 pub fn validate(slug: &str, max: usize) -> Result<()> {
@@ -27,15 +32,17 @@ pub fn validate(slug: &str, max: usize) -> Result<()> {
         "slug contains a path separator, control character, or unsupported filename character"
     );
     let stem = slug.split('.').next().unwrap_or(slug).to_ascii_uppercase();
-    let device = matches!(stem.as_str(), "CON" | "PRN" | "AUX" | "NUL")
-        || ["COM", "LPT"].iter().any(|prefix| {
-            stem.strip_prefix(prefix).is_some_and(|n| {
-                matches!(
-                    n,
-                    "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "¹" | "²" | "³"
-                )
-            })
-        });
+    let device = matches!(
+        stem.as_str(),
+        "CON" | "PRN" | "AUX" | "NUL" | "CONIN$" | "CONOUT$"
+    ) || ["COM", "LPT"].iter().any(|prefix| {
+        stem.strip_prefix(prefix).is_some_and(|n| {
+            matches!(
+                n,
+                "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "¹" | "²" | "³"
+            )
+        })
+    });
     ensure!(!device, "slug is a reserved filename");
     Ok(())
 }
@@ -122,9 +129,30 @@ mod tests {
     use super::*;
 
     #[test]
+    fn rejects_console_devices_without_rejecting_ordinary_dollar_names() {
+        for slug in [
+            "CONIN$",
+            "conin$",
+            "CONOUT$",
+            "ConOut$",
+            "CONIN$.txt",
+            "conout$.md",
+        ] {
+            assert!(validate(slug, 100).is_err(), "{slug}");
+            assert!(validate_fixed(slug).is_err(), "{slug}");
+        }
+        for slug in ["console$", "my-CONIN$", "CONOUT$-notes"] {
+            assert!(validate(slug, 100).is_ok(), "{slug}");
+        }
+    }
+
+    #[test]
     fn canonical_keys_preserve_distinct_accents_and_compatibility_forms() {
         for (a, b) in [
             ("é", "e\u{301}"),
+            ("I", "ı"),
+            ("i", "ı"),
+            ("î", "ı\u{302}"),
             ("É", "e\u{301}"),
             ("\u{1f80}", "α\u{313}\u{345}"),
             ("a\u{345}\u{300}", "a\u{300}\u{345}"),
@@ -167,6 +195,8 @@ mod tests {
             ("Σ", "ς"),
             ("σ", "ς"),
             ("Straße", "STRASSE"),
+            ("I", "ı"),
+            ("ı", "i"),
             ("ﬀ", "ff"),
             ("é", "e\u{301}"),
             ("E\u{301}", "É"),
@@ -194,6 +224,7 @@ mod tests {
             for (original, equivalent) in [
                 ("Σ", "ς"),
                 ("Straße", "STRASSE"),
+                ("I", "ı"),
                 ("ﬀ", "ff"),
                 ("é", "e\u{301}"),
             ] {

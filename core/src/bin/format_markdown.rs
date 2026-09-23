@@ -382,6 +382,7 @@ mod tests {
             (["foo", "FOO", "Foo"], false),
             (["Σ", "ς", "σ"], false),
             (["é", "e\u{301}", "É"], false),
+            (["I", "ı", "i"], false),
             (["foo", "FOO", "Foo"], true),
         ] {
             let root = std::env::temp_dir().join(format!(
@@ -479,7 +480,8 @@ mod tests {
         let locked = root.join("a.md");
         let good = root.join("b.md");
         let input = "---\nslug: test\ntitle: Test\ntags: []\ncategories: []\n---\nbody\n";
-        fs::write(&locked, input.replace("slug: test", "slug: locked")).unwrap();
+        let locked_input = input.replace("slug: test", "slug: locked");
+        fs::write(&locked, &locked_input).unwrap();
         fs::write(&good, input).unwrap();
         let mut attempts = Vec::new();
         let result = process_with_writer(vec![root.clone()], false, |path, text| {
@@ -495,7 +497,7 @@ mod tests {
         });
         assert!(result.unwrap_err().to_string().contains("a.md: write"));
         assert_eq!(attempts, ["a.md", "b.md"]);
-        assert_eq!(fs::read_to_string(&locked).unwrap(), input);
+        assert_eq!(fs::read_to_string(&locked).unwrap(), locked_input);
         assert_eq!(
             fs::read_to_string(&good).unwrap(),
             checked_format(input).unwrap()
