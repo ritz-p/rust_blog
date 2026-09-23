@@ -69,6 +69,9 @@ async fn run_with_config(
         errors.len()
     );
     ensure!(errors.is_empty(), "Seed errors:\n{}", errors.join("\n"));
+    taxonomy::prune(db)
+        .await
+        .context("remove unused taxonomy")?;
     Ok(())
 }
 

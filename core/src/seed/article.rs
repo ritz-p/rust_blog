@@ -3,7 +3,10 @@ use crate::entity::{article, article::ActiveModel, article_tag};
 use crate::entity::{article_category, category, tag};
 use crate::utils;
 use sea_orm::ActiveValue::Set;
-use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, DbErr, EntityTrait, QueryFilter};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, DatabaseConnection, DbErr, EntityTrait, QueryFilter,
+    TransactionTrait,
+};
 use seed::{prepare, upsert, validate};
 use utils::front_matter::FrontMatter;
 
@@ -38,6 +41,12 @@ pub async fn seed_tag(
     front_matter: &FrontMatter,
     article_id: i32,
 ) -> Result<(), DbErr> {
+    let tx = db.begin().await?;
+    let db = &tx;
+    article_tag::Entity::delete_many()
+        .filter(article_tag::Column::ArticleId.eq(article_id))
+        .exec(db)
+        .await?;
     for tag_name in &front_matter.tags {
         let tag_slug = tag_name.to_lowercase();
         let existing = tag::Entity::find()
@@ -73,6 +82,8 @@ pub async fn seed_tag(
             .await?;
         }
     }
+    super::taxonomy::remove_unused(db, "tag", "article_tag", "tag_id").await?;
+    tx.commit().await?;
     Ok(())
 }
 
@@ -81,6 +92,12 @@ pub async fn seed_category(
     front_matter: &FrontMatter,
     article_id: i32,
 ) -> Result<(), DbErr> {
+    let tx = db.begin().await?;
+    let db = &tx;
+    article_category::Entity::delete_many()
+        .filter(article_category::Column::ArticleId.eq(article_id))
+        .exec(db)
+        .await?;
     for category_name in &front_matter.categories {
         let category_slug = category_name.to_lowercase();
         let existing = category::Entity::find()
@@ -116,11 +133,100 @@ pub async fn seed_category(
             .await?;
         }
     }
+    super::taxonomy::remove_unused(db, "category", "article_category", "category_id").await?;
+    tx.commit().await?;
     Ok(())
 }
 
 #[cfg(test)]
 mod tests {
+    #[rocket::async_test]
+    async fn taxonomy_sync_removes_stale_links_preserves_shared_entries_and_rolls_back() {
+        use sea_orm::{ConnectionTrait, Database, Statement};
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        for (table, relation, column) in [
+            ("tag", "article_tag", "tag_id"),
+            ("category", "article_category", "category_id"),
+        ] {
+            for sql in [
+                format!(
+                    "CREATE TABLE {table} (id INTEGER PRIMARY KEY, name TEXT NOT NULL UNIQUE, slug TEXT NOT NULL UNIQUE)"
+                ),
+                format!(
+                    "CREATE TABLE {relation} (article_id INTEGER, {column} INTEGER REFERENCES {table}(id), PRIMARY KEY(article_id, {column}))"
+                ),
+                format!(
+                    "CREATE TRIGGER reject_{table} BEFORE INSERT ON {table} WHEN NEW.slug = 'reject' BEGIN SELECT RAISE(FAIL, 'rejected'); END;"
+                ),
+            ] {
+                db.execute(Statement::from_string(DbBackend::Sqlite, sql))
+                    .await
+                    .unwrap();
+            }
+        }
+        let mut matter = build_front_matter_from_title_and_slug("Test", "test");
+        matter.tags = vec!["Shared".into()];
+        matter.categories = matter.tags.clone();
+        super::seed_tag(&db, &matter, 2).await.unwrap();
+        super::seed_category(&db, &matter, 2).await.unwrap();
+        matter.tags.push("Removed".into());
+        matter.categories = matter.tags.clone();
+        super::seed_tag(&db, &matter, 1).await.unwrap();
+        super::seed_category(&db, &matter, 1).await.unwrap();
+        matter.tags = vec!["New".into(), "reject".into()];
+        matter.categories = matter.tags.clone();
+        assert!(super::seed_tag(&db, &matter, 1).await.is_err());
+        assert!(super::seed_category(&db, &matter, 1).await.is_err());
+        for relation in ["article_tag", "article_category"] {
+            let rows = db
+                .query_all(Statement::from_string(
+                    DbBackend::Sqlite,
+                    format!("SELECT * FROM {relation} WHERE article_id = 1"),
+                ))
+                .await
+                .unwrap();
+            assert_eq!(rows.len(), 2);
+        }
+        let matter: FrontMatter = serde_yaml::from_str("title: Test\nslug: test\n").unwrap();
+        for _ in 0..2 {
+            super::seed_tag(&db, &matter, 1).await.unwrap();
+            super::seed_category(&db, &matter, 1).await.unwrap();
+        }
+        for (table, relation) in [("tag", "article_tag"), ("category", "article_category")] {
+            let rows = db
+                .query_all(Statement::from_string(
+                    DbBackend::Sqlite,
+                    format!("SELECT slug FROM {table}"),
+                ))
+                .await
+                .unwrap();
+            assert_eq!(rows.len(), 1);
+            assert_eq!(rows[0].try_get::<String>("", "slug").unwrap(), "shared");
+            let rows = db
+                .query_all(Statement::from_string(
+                    DbBackend::Sqlite,
+                    format!("SELECT article_id FROM {relation}"),
+                ))
+                .await
+                .unwrap();
+            assert_eq!(rows.len(), 1);
+            assert_eq!(rows[0].try_get::<i32>("", "article_id").unwrap(), 2);
+        }
+        super::seed_tag(&db, &matter, 2).await.unwrap();
+        super::seed_category(&db, &matter, 2).await.unwrap();
+        for table in ["tag", "category"] {
+            assert!(
+                db.query_all(Statement::from_string(
+                    DbBackend::Sqlite,
+                    format!("SELECT * FROM {table}")
+                ))
+                .await
+                .unwrap()
+                .is_empty()
+            );
+        }
+    }
+
     #[rocket::async_test]
     async fn reseed_updates_table_of_contents_in_both_directions() {
         use sea_orm::{ConnectionTrait, Database, EntityTrait, Schema};

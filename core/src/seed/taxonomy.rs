@@ -1,6 +1,26 @@
 use sea_orm::{ConnectionTrait, DatabaseConnection, DbBackend, Statement, TransactionTrait};
 use std::collections::HashMap;
 
+pub(super) async fn remove_unused(
+    db: &impl ConnectionTrait,
+    table: &str,
+    relation: &str,
+    column: &str,
+) -> Result<(), sea_orm::DbErr> {
+    db.execute(Statement::from_string(DbBackend::Sqlite,
+        format!("DELETE FROM {table} WHERE NOT EXISTS (SELECT 1 FROM {relation} WHERE {relation}.{column} = {table}.id)"),
+    )).await?;
+    Ok(())
+}
+
+pub async fn prune(db: &DatabaseConnection) -> anyhow::Result<()> {
+    let tx = db.begin().await?;
+    remove_unused(&tx, "tag", "article_tag", "tag_id").await?;
+    remove_unused(&tx, "category", "article_category", "category_id").await?;
+    tx.commit().await?;
+    Ok(())
+}
+
 pub async fn normalize(db: &DatabaseConnection) -> anyhow::Result<()> {
     let tx = db.begin().await?;
     for (table, relation, column) in [

@@ -13,7 +13,9 @@ pub struct FrontMatter {
     pub created_at: Option<String>,
     pub excerpt: Option<String>,
     pub icatch_path: Option<String>,
+    #[serde(default)]
     pub tags: Vec<String>,
+    #[serde(default)]
     pub categories: Vec<String>,
 }
 
