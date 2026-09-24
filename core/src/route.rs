@@ -71,6 +71,7 @@ pub async fn launch(
             site_name: config_map.get("site_name").cloned(),
             default_icatch_path: config_map.get("default_icatch_path").cloned(),
             favicon_path: config_map.get("favicon_path").cloned(),
+            public_url: config_map.get("public_url").cloned(),
         })
         .attach(SecurityHeaders)
         .attach(Template::fairing())

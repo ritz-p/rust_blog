@@ -238,6 +238,7 @@ mod tests {
                     site_name: Some("Test Blog".to_string()),
                     default_icatch_path: Some("/default.png".to_string()),
                     favicon_path: Some("/favicon.ico".to_string()),
+                    public_url: None,
                 })
                 .attach(Template::fairing())
                 .mount("/", routes![index, index_archive, index_archive_page]);

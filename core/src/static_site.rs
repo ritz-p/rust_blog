@@ -59,6 +59,7 @@ pub async fn export_site(
         site_name: config_map.get("site_name").cloned(),
         default_icatch_path: config_map.get("default_icatch_path").cloned(),
         favicon_path: config_map.get("favicon_path").cloned(),
+        public_url: config_map.get("public_url").cloned(),
     };
     let tera = load_templates(&paths.templates_dir)?;
 
@@ -314,6 +315,10 @@ async fn export_article_pages(
 
         let mut ctx = base_context(config);
         ctx.insert("title", &article.title);
+        ctx.insert(
+            "metadata",
+            &crate::utils::metadata::article_metadata(article, config, true),
+        );
         let content = markdown_to_html(&article.content);
         let content = if article.table_of_contents {
             toc(&content)
@@ -1015,6 +1020,7 @@ mod tests {
             site_name: None,
             default_icatch_path: None,
             favicon_path: None,
+            public_url: Some("https://example.com".into()),
         };
         super::export_search_index(&db, &config, &root)
             .await
@@ -1186,6 +1192,7 @@ mod tests {
             site_name: Some("Test Blog".to_owned()),
             default_icatch_path: None,
             favicon_path: None,
+            public_url: Some("https://example.com".into()),
         };
         let templates = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../templates");
         let tera = load_templates(&templates).expect("failed to load templates");
@@ -1200,6 +1207,11 @@ mod tests {
             .expect("failed to export article");
         let html = fs::read_to_string(output.0.join("posts/highlighted-rust/index.html"))
             .expect("missing exported article");
+        assert!(
+            html.replace("&#x2F;", "/")
+                .contains("rel=\"canonical\" href=\"https://example.com/posts/highlighted-rust/\"")
+        );
+        assert!(html.contains("property=\"og:title\" content=\"Highlighted Rust\""));
         assert!(html.contains("href=\"/posts/highlighted-rust/\""));
         assert!(html.contains("href=\"/css/site.css\""));
         let content = html
