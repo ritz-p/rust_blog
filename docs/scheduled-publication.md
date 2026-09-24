@@ -12,7 +12,7 @@ Seed stores future articles in the database. Export excludes them from article p
 
 ## GitHub Actions
 
-The `Export articles and deploy` workflow checks every 15 minutes (at minutes 7, 22, 37 and 52 UTC). To enable scheduled publication after merging into the default branch:
+The `Export articles and deploy` workflow runs weekly on Mondays at 09:07 JST (00:07 UTC). To enable scheduled publication after merging into the default branch:
 
 1. Configure `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` secrets and the existing Wrangler deployment configuration.
 2. Set the repository Actions variable `STATIC_SCHEDULE_ENABLED` to `true`.
@@ -20,7 +20,9 @@ The `Export articles and deploy` workflow checks every 15 minutes (at minutes 7,
 
 Each run seeds a fresh database from Markdown, exports the currently published articles, and deploys only after successful export. Setting the variable to `false` disables scheduled runs. Manual runs retain the existing `deploy` checkbox, which defaults to false.
 
-Publication happens on the next successful deployment after the article date, not at an exact second. GitHub Actions can delay scheduled runs; build and deployment time are additional. See [GitHub's scheduling guidance](https://docs.github.com/en/actions/how-tos/troubleshoot-workflows). Scheduled workflows run on the default branch. No scheduled deployment is enabled merely by pushing the feature branch.
+Both the static site and database artifacts are retained for 7 days, including manual runs, to limit Actions artifact storage usage.
+
+Publication happens on the next successful deployment after the article date, so the weekly schedule can add up to a week of waiting. Run the workflow manually with `deploy` enabled when earlier publication is needed. GitHub Actions can delay scheduled runs; build and deployment time are additional. See [GitHub's scheduling guidance](https://docs.github.com/en/actions/how-tos/troubleshoot-workflows). Scheduled workflows run on the default branch. No scheduled deployment is enabled merely by pushing the feature branch.
 
 ## Separate content repositories and other hosts
 
