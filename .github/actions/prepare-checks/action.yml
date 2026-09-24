@@ -1,0 +1,26 @@
+name: Prepare container and cached tools
+description: Build CI image and reuse tools only for identical Rust build inputs
+runs:
+  using: composite
+  steps:
+    - uses: docker/setup-buildx-action@v3
+    - uses: docker/build-push-action@v6
+      with:
+        context: .
+        file: docker/ci.Dockerfile
+        tags: rust-blog-ci:local
+        load: true
+        cache-from: type=gha,scope=checks-image
+        cache-to: type=gha,mode=max,scope=checks-image
+    - uses: actions/cache@v4
+      id: tools
+      with:
+        path: .ci-tools
+        key: checks-tools-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock', '**/Cargo.toml', 'rust-toolchain.toml', '.cargo/**', 'core/src/**', 'core/assets/**', 'migration/src/**', 'templates/**', 'docker/ci.Dockerfile', 'docker/build-check-tools.sh', '.github/actions/prepare-checks/action.yml') }}
+    - name: Start CI container
+      shell: bash
+      run: docker compose up -d --no-build web
+    - name: Build checks tools on cache miss
+      if: steps.tools.outputs.cache-hit != 'true'
+      shell: bash
+      run: docker compose exec -T web sh docker/build-check-tools.sh

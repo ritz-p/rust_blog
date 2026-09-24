@@ -1,0 +1,7 @@
+services:
+  web:
+    image: rust-blog-ci:local
+    build:
+      context: .
+      dockerfile: docker/ci.Dockerfile
+    user: "0:0"
