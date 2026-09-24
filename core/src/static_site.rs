@@ -958,6 +958,97 @@ fn is_reserved_root_dir(name: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
+    #[rocket::async_test]
+    async fn scheduled_articles_are_stored_and_reexported_only_when_due() {
+        use crate::{
+            entity::{article, article_category, article_tag, category, fixed_content, tag},
+            seed::article::{seed_article, seed_category, seed_tag},
+            utils::front_matter::FrontMatter,
+        };
+        use sea_orm::{ConnectionTrait, Database, EntityTrait, Schema};
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        let backend = db.get_database_backend();
+        let schema = Schema::new(backend);
+        for table in [
+            schema.create_table_from_entity(article::Entity),
+            schema.create_table_from_entity(tag::Entity),
+            schema.create_table_from_entity(category::Entity),
+            schema.create_table_from_entity(article_tag::Entity),
+            schema.create_table_from_entity(article_category::Entity),
+            schema.create_table_from_entity(fixed_content::Entity),
+        ] {
+            db.execute(backend.build(&table)).await.unwrap();
+        }
+        let root = temp_export_dir();
+        let out = root.join("dist");
+        let paths = super::ExportPaths {
+            templates_dir: PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../templates"),
+            content_dir: root.join("content"),
+        };
+        let mut matter = FrontMatter::new(
+            "Scheduled secret title".into(),
+            "scheduled".into(),
+            false,
+            None,
+            None,
+            None,
+            vec!["Rust".into()],
+            vec!["Dev".into()],
+        );
+        // Moving the date across now exercises the next scheduled export without sleeping.
+        for (date, published) in [
+            ("2999-01-01T09:00:00+09:00", false),
+            ("2020-01-01T09:00:00+09:00", true),
+            ("2999-01-01T09:00:00+09:00", false),
+        ] {
+            matter.created_at = Some(date.into());
+            let id = seed_article(&db, &matter, "Scheduled secret body")
+                .await
+                .unwrap();
+            seed_tag(&db, &matter, id).await.unwrap();
+            seed_category(&db, &matter, id).await.unwrap();
+            assert!(
+                article::Entity::find_by_id(id)
+                    .one(&db)
+                    .await
+                    .unwrap()
+                    .is_some()
+            );
+            super::export_site(&db, &Default::default(), &out, &paths)
+                .await
+                .unwrap();
+            assert_eq!(out.join("posts/scheduled/index.html").exists(), published);
+            assert_eq!(out.join("archive/2020/01/index.html").exists(), published);
+            assert!(!out.join("archive/2999/01/index.html").exists());
+            for path in ["index.html", "search-index.json"] {
+                let text = fs::read_to_string(out.join(path)).unwrap();
+                assert_eq!(text.contains("Scheduled secret title"), published, "{path}");
+            }
+            for path in ["tag/rust/index.html", "category/dev/index.html"] {
+                assert_eq!(out.join(path).exists(), published);
+                if published {
+                    assert!(
+                        fs::read_to_string(out.join(path))
+                            .unwrap()
+                            .contains("Scheduled secret title")
+                    );
+                }
+            }
+            if !published {
+                for entry in walkdir::WalkDir::new(&out)
+                    .into_iter()
+                    .map(Result::unwrap)
+                    .filter(|entry| entry.file_type().is_file())
+                {
+                    let text = fs::read_to_string(entry.path()).unwrap();
+                    assert!(!text.contains("Scheduled secret title"));
+                    assert!(!text.contains("Scheduled secret body"));
+                }
+            }
+        }
+        fs::remove_dir_all(root).unwrap();
+    }
+
     use super::build_redirects_file;
     use std::{
         fs,

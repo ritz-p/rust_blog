@@ -1,6 +1,9 @@
 name: Export articles and deploy
 
 on:
+  schedule:
+    # Mondays at 09:07 JST (00:07 UTC).
+    - cron: "7 0 * * 1"
   workflow_dispatch:
     inputs:
       deploy:
@@ -26,6 +29,7 @@ concurrency:
 
 jobs:
   export:
+    if: ${{ github.event_name != 'schedule' || vars.STATIC_SCHEDULE_ENABLED == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -46,6 +50,7 @@ jobs:
         with:
           name: static-site
           path: ${{ env.EXPORT_OUTPUT_DIR }}
+          retention-days: 7
           if-no-files-found: error
 
       - name: Upload export database
@@ -53,6 +58,7 @@ jobs:
         with:
           name: static-site-database
           path: ${{ env.EXPORT_DATABASE_PATH }}
+          retention-days: 7
           if-no-files-found: error
 
       - name: Stop containers
@@ -60,7 +66,7 @@ jobs:
         run: docker compose down
 
   deploy:
-    if: ${{ inputs.deploy }}
+    if: ${{ (github.event_name == 'workflow_dispatch' && inputs.deploy) || (github.event_name == 'schedule' && vars.STATIC_SCHEDULE_ENABLED == 'true') }}
     needs: export
     runs-on: ubuntu-latest
     steps:
