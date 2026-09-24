@@ -51,6 +51,10 @@ pub async fn export_site(
 ) -> Result<()> {
     let out_dir = out_dir.as_ref();
     validate_content_slugs(db).await?;
+    let redirects = crate::redirects::RedirectMap::load(config_map)?;
+    if !redirects.articles.is_empty() || !redirects.pages.is_empty() {
+        redirects.validate_database(db).await?;
+    }
     reset_output_dir(out_dir)?;
     write_static_assets(out_dir, &paths.content_dir, config_map)?;
 
@@ -72,6 +76,9 @@ pub async fn export_site(
     export_category_pages(&tera, db, &config, out_dir).await?;
     export_error_page(&tera, &config, out_dir, "404", "404.html")?;
     write_cloudflare_support_files(out_dir)?;
+    if !redirects.articles.is_empty() || !redirects.pages.is_empty() {
+        redirects.write_static(db, out_dir).await?;
+    }
 
     Ok(())
 }

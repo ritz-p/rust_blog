@@ -1,6 +1,7 @@
 pub mod domain;
 pub mod entity;
 pub mod entity_extension;
+pub mod redirects;
 pub mod repository;
 pub mod seed;
 pub mod slug;

@@ -15,7 +15,7 @@ use rocket_dyn_templates::{Template, context};
 use sea_orm::DatabaseConnection;
 use serde_json::json;
 
-#[get("/posts/<slug>")]
+#[get("/posts/<slug>", rank = 2)]
 pub async fn article_detail(
     config: &State<CommonConfig>,
     db: &State<DatabaseConnection>,

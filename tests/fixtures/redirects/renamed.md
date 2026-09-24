@@ -1,0 +1,11 @@
+---
+title: Renamed article
+slug: "new-記事"
+date: 2020-01-01
+tags: []
+categories: []
+---
+
+# Renamed article
+
+This Markdown fixture verifies redirects after changing an article slug.
