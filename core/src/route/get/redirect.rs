@@ -210,9 +210,11 @@ mod tests {
         let id = rust_blog::seed::article::seed_article(&db, &matter, &body)
             .await
             .unwrap();
-        let map =
-            RedirectMap::parse(&std::fs::read_to_string(fixture.join("redirects.toml")).unwrap())
-                .unwrap();
+        let map = RedirectMap::parse(
+            &std::fs::read_to_string(fixture.join("tests/fixtures/redirects/redirects.toml"))
+                .unwrap(),
+        )
+        .unwrap();
         let client = Client::tracked(
             rocket::build()
                 .manage(db)

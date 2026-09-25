@@ -146,6 +146,31 @@ mod tests {
     use super::*;
 
     #[rocket::async_test]
+    async fn shipped_map_does_not_require_test_content() {
+        use sea_orm::{ConnectionTrait, Schema};
+        let config = HashMap::from([(
+            "redirect_map_path".into(),
+            Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../redirects.toml")
+                .to_string_lossy()
+                .into_owned(),
+        )]);
+        let map = RedirectMap::load(&config).unwrap();
+        let db = sea_orm::Database::connect("sqlite::memory:").await.unwrap();
+        let backend = db.get_database_backend();
+        let schema = Schema::new(backend);
+        for table in [
+            schema.create_table_from_entity(crate::entity::article::Entity),
+            schema.create_table_from_entity(crate::entity::fixed_content::Entity),
+        ] {
+            db.execute(backend.build(&table)).await.unwrap();
+        }
+        assert!(map.articles.is_empty());
+        assert!(map.pages.is_empty());
+        map.validate_database(&db).await.unwrap();
+    }
+
+    #[rocket::async_test]
     async fn renamed_markdown_exports_redirects_and_hides_future_targets() {
         use crate::entity::{article, article_category, article_tag, category, fixed_content, tag};
         use sea_orm::{ConnectionTrait, Database, Schema, Set};
@@ -170,8 +195,10 @@ mod tests {
         let id = crate::seed::article::seed_article(&db, &matter, &body)
             .await
             .unwrap();
-        let map = RedirectMap::parse(&fs::read_to_string(fixture.join("redirects.toml")).unwrap())
-            .unwrap();
+        let map = RedirectMap::parse(
+            &fs::read_to_string(fixture.join("tests/fixtures/redirects/redirects.toml")).unwrap(),
+        )
+        .unwrap();
         map.validate_database(&db).await.unwrap();
         assert!(
             RedirectMap::parse("[articles]\nold = 'missing'")
@@ -192,7 +219,7 @@ mod tests {
         let config = HashMap::from([(
             "redirect_map_path".into(),
             fixture
-                .join("redirects.toml")
+                .join("tests/fixtures/redirects/redirects.toml")
                 .to_string_lossy()
                 .into_owned(),
         )]);
