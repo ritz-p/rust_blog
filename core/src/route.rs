@@ -83,6 +83,8 @@ pub async fn launch(
                 index_archive,
                 index_archive_page,
                 article_detail,
+                get::discovery::sitemap,
+                get::discovery::robots,
                 bulma_css,
                 site_css,
                 nav_js,
