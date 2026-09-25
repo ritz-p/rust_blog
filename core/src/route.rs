@@ -56,15 +56,16 @@ impl Fairing for SecurityHeaders {
     }
 }
 
-#[expect(
-    clippy::result_large_err,
-    reason = "Preserve Rocket's error type at the application startup boundary"
-)]
 pub async fn launch(
     db: DatabaseConnection,
     config_map: HashMap<String, String>,
-) -> Result<Rocket<Ignite>, rocket::Error> {
+) -> anyhow::Result<Rocket<Ignite>> {
+    let redirects = rust_blog::redirects::RedirectMap::load(&config_map)?;
+    if !redirects.articles.is_empty() || !redirects.pages.is_empty() {
+        redirects.validate_database(&db).await?;
+    }
     rocket::build()
+        .manage(redirects)
         .manage(db)
         .manage(CommonConfig {
             articles_per_page: crate::utils::config::articles_per_page(&config_map),
@@ -83,6 +84,8 @@ pub async fn launch(
                 index_archive,
                 index_archive_page,
                 article_detail,
+                get::redirect::article_redirect,
+                get::redirect::page_redirect,
                 get::discovery::sitemap,
                 get::discovery::robots,
                 bulma_css,
@@ -128,4 +131,5 @@ pub async fn launch(
         )
         .launch()
         .await
+        .map_err(Into::into)
 }

@@ -4,5 +4,6 @@ pub mod discovery;
 pub mod error;
 pub mod fixed_content;
 pub mod index;
+pub mod redirect;
 pub mod static_asset;
 pub mod tag;

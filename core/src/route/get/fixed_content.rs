@@ -13,7 +13,7 @@ use crate::{
     },
 };
 
-#[get("/<slug>")]
+#[get("/<slug>", rank = 2)]
 pub async fn fixed_content_detail(
     config: &State<CommonConfig>,
     db: &State<DatabaseConnection>,

@@ -12,6 +12,7 @@ COPY core/Cargo.toml core/Cargo.toml
 COPY migration/Cargo.toml migration/Cargo.toml
 COPY Rocket.toml Rocket.toml
 COPY blog_config.toml blog_config.toml
+COPY redirects.toml redirects.toml
 COPY core/src core/src
 COPY core/assets core/assets
 COPY templates templates
@@ -37,6 +38,7 @@ COPY --from=builder /app/target/release/migration /app/migration
 COPY --from=builder /app/templates /app/templates
 COPY --from=builder /app/content /app/content
 COPY --from=builder /app/blog_config.toml /app/blog_config.toml
+COPY --from=builder /app/redirects.toml /app/redirects.toml
 COPY --from=builder /app/Rocket.toml /app/Rocket.toml
 COPY prod/entrypoint.sh /app/entrypoint.sh
 
