@@ -7,6 +7,9 @@ on:
     branches: [master]
   workflow_dispatch:
 
+env:
+  COMPOSE_FILE: docker-compose.yml:docker-compose.ci.yml
+
 permissions:
   contents: read
 
@@ -21,8 +24,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Start development container
-        run: docker compose up -d web
+      - uses: ./.github/actions/prepare-checks
 
       - name: Install pinned Markdown lint dependencies
         run: docker compose exec -T --user root web npm ci
@@ -32,8 +34,7 @@ jobs:
 
       - name: Validate and check article front matter
         run: |
-          docker compose exec -T --user root web cargo test --locked -p rust_blog --bin format_markdown
-          docker compose exec -T --user root web cargo run --locked -p rust_blog --bin format_markdown -- --check content/articles
+          docker compose exec -T --user root web .ci-tools/format_markdown --check content/articles
 
       - name: Stop containers
         if: always()

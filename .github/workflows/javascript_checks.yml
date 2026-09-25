@@ -7,6 +7,9 @@ on:
     branches: [master]
   workflow_dispatch:
 
+env:
+  COMPOSE_FILE: docker-compose.yml:docker-compose.ci.yml
+
 permissions:
   contents: read
 
@@ -23,8 +26,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Start development container
-        run: docker compose up -d web
+      - uses: ./.github/actions/prepare-checks
 
       - name: Install pinned JavaScript dependencies
         run: docker compose exec -T --user root web npm ci
@@ -33,7 +35,7 @@ jobs:
         run: docker compose exec -T --user root web npm run lint:js
 
       - name: Export Markdown using an isolated database
-        run: docker compose exec -T --user root web sh docker/export-articles.sh
+        run: docker compose exec -T -e RUST_BLOG_TOOLS_DIR=.ci-tools web sh docker/export-articles.sh
 
       - name: Start static preview
         run: |
