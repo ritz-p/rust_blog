@@ -1,5 +1,6 @@
 pub mod article;
 pub mod category;
+pub mod discovery;
 pub mod error;
 pub mod fixed_content;
 pub mod index;

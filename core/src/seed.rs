@@ -1,5 +1,6 @@
 pub mod article;
 pub mod config;
+mod file_timestamp;
 pub mod fixed_content;
 pub mod markdown;
 mod taxonomy;
@@ -19,6 +20,7 @@ pub async fn run_all(db: DatabaseConnection) -> Result<()> {
         &db,
         &load_env(),
         std::env::var("RUST_BLOG_REQUIRE_CREATED_AT").as_deref() == Ok("1"),
+        std::env::var("RUST_BLOG_FILE_TIMESTAMPS").as_deref() == Ok("1"),
     )
     .await
 }
@@ -27,6 +29,7 @@ async fn run_with_config(
     db: &DatabaseConnection,
     config: &PathConfig,
     require_created_at: bool,
+    file_timestamps: bool,
 ) -> Result<()> {
     let mut errors = Vec::new();
     let mut succeeded = 0;
@@ -54,9 +57,9 @@ async fn run_with_config(
                 continue;
             }
             let result = if article {
-                seed_article_file(db, &path, require_created_at).await
+                seed_article_file(db, &path, require_created_at, file_timestamps).await
             } else {
-                seed_fixed_file(db, &path).await
+                seed_fixed_file(db, &path, file_timestamps).await
             };
             match result {
                 Ok(()) => succeeded += 1,
@@ -123,6 +126,7 @@ async fn seed_article_file(
     db: &DatabaseConnection,
     path: &Path,
     require_created_at: bool,
+    file_timestamps: bool,
 ) -> Result<()> {
     let (matter, body) =
         parse_markdown_to_front_matter(path).map_err(|error| anyhow::anyhow!("parse: {error}"))?;
@@ -136,6 +140,9 @@ async fn seed_article_file(
         !require_created_at || matter.created_at.is_some(),
         "static export requires created_at (or date) in article front matter"
     );
+    let timestamp = file_timestamps
+        .then(|| file_timestamp::updated_at(path))
+        .transpose()?;
     let id = seed_article(db, &matter, &body)
         .await
         .context("save article")?;
@@ -147,15 +154,42 @@ async fn seed_article_file(
         errors.push(format!("save categories: {error:#}"));
     }
     ensure!(errors.is_empty(), "{}", errors.join("; "));
+    if let Some(timestamp) = timestamp {
+        use sea_orm::{EntityTrait, Set};
+        crate::entity::article::Entity::update(crate::entity::article::ActiveModel {
+            id: Set(id),
+            updated_at: Set(timestamp),
+            ..Default::default()
+        })
+        .exec(db)
+        .await?;
+    }
     Ok(())
 }
 
-async fn seed_fixed_file(db: &DatabaseConnection, path: &Path) -> Result<()> {
+async fn seed_fixed_file(
+    db: &DatabaseConnection,
+    path: &Path,
+    file_timestamps: bool,
+) -> Result<()> {
     let (matter, body) = parse_markdown_to_fixed_content_matter(path)
         .map_err(|error| anyhow::anyhow!("parse: {error}"))?;
-    seed_fixed_content(db, &matter, &body)
+    let timestamp = file_timestamps
+        .then(|| file_timestamp::updated_at(path))
+        .transpose()?;
+    let id = seed_fixed_content(db, &matter, &body)
         .await
         .context("save fixed page")?;
+    if let Some(timestamp) = timestamp {
+        use sea_orm::{EntityTrait, Set};
+        crate::entity::fixed_content::Entity::update(crate::entity::fixed_content::ActiveModel {
+            id: Set(id),
+            updated_at: Set(timestamp),
+            ..Default::default()
+        })
+        .exec(db)
+        .await?;
+    }
     Ok(())
 }
 
@@ -164,6 +198,42 @@ mod tests {
     use super::*;
     use crate::entity::{article, article_category, article_tag, category, tag};
     use sea_orm::{ConnectionTrait, Database, EntityTrait, Schema, Statement};
+
+    #[rocket::async_test]
+    async fn file_timestamp_survives_fresh_export_databases() {
+        let root = std::env::temp_dir().join(format!(
+            "seed-file-time-{}-{}",
+            std::process::id(),
+            chrono::Utc::now().timestamp_nanos_opt().unwrap()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let path = root.join("article.md");
+        std::fs::write(
+            &path,
+            "---\ntitle: Test\nslug: stable\ndate: 2020-01-01\ntags: []\ncategories: []\n---\nbody",
+        )
+        .unwrap();
+        let expected = file_timestamp::updated_at(&path).unwrap();
+        for _ in 0..2 {
+            let db = Database::connect("sqlite::memory:").await.unwrap();
+            let backend = db.get_database_backend();
+            let schema = Schema::new(backend);
+            for table in [
+                schema.create_table_from_entity(article::Entity),
+                schema.create_table_from_entity(tag::Entity),
+                schema.create_table_from_entity(category::Entity),
+                schema.create_table_from_entity(article_tag::Entity),
+                schema.create_table_from_entity(article_category::Entity),
+            ] {
+                db.execute(backend.build(&table)).await.unwrap();
+            }
+            seed_article_file(&db, &path, true, true).await.unwrap();
+            let saved = article::Entity::find().one(&db).await.unwrap().unwrap();
+            assert_eq!(saved.updated_at, expected);
+            assert!(saved.created_at < saved.updated_at);
+        }
+        std::fs::remove_dir_all(root).unwrap();
+    }
 
     #[rocket::async_test]
     async fn collects_errors_and_seeds_later_files() {
@@ -222,7 +292,7 @@ mod tests {
             fixed_content_path: root.join("missing-fixed").to_str().unwrap().into(),
             article_path: articles.to_str().unwrap().into(),
         };
-        let error = run_with_config(&db, &config, true)
+        let error = run_with_config(&db, &config, true, false)
             .await
             .unwrap_err()
             .to_string();

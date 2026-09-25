@@ -7,6 +7,7 @@ export DATABASE_URL="sqlite://$export_db_dir/blog.db?mode=rwc"
 export CONFIG_TOML_PATH="${RUST_BLOG_CONFIG_PATH:-${CONFIG_TOML_PATH:-blog_config.toml}}"
 export RUST_BLOG_CONFIG_PATH="$CONFIG_TOML_PATH"
 export RUST_BLOG_REQUIRE_CREATED_AT=1
+export RUST_BLOG_FILE_TIMESTAMPS=1
 
 if [ -n "${RUST_BLOG_TOOLS_DIR:-}" ]; then
     "$RUST_BLOG_TOOLS_DIR/migration" up

@@ -1,3 +1,4 @@
+pub mod discovery;
 pub mod domain;
 pub mod entity;
 pub mod entity_extension;

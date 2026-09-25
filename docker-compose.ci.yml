@@ -3,5 +3,5 @@ services:
     image: rust-blog-ci:local
     build:
       context: .
-      dockerfile: docker/ci.Dockerfile
+      dockerfile: ci/Dockerfile
     user: "0:0"

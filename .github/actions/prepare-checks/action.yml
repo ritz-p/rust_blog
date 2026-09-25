@@ -7,7 +7,7 @@ runs:
     - uses: docker/build-push-action@v6
       with:
         context: .
-        file: docker/ci.Dockerfile
+        file: ci/Dockerfile
         tags: rust-blog-ci:local
         load: true
         cache-from: type=gha,scope=checks-image
@@ -16,7 +16,7 @@ runs:
       id: tools
       with:
         path: .ci-tools
-        key: checks-tools-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock', '**/Cargo.toml', 'rust-toolchain.toml', '.cargo/**', 'core/src/**', 'core/assets/**', 'migration/src/**', 'templates/**', 'docker/ci.Dockerfile', 'docker/build-check-tools.sh', '.github/actions/prepare-checks/action.yml') }}
+        key: checks-tools-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock', '**/Cargo.toml', 'rust-toolchain.toml', '.cargo/**', 'core/src/**', 'core/assets/**', 'migration/src/**', 'templates/**', 'ci/Dockerfile', 'docker/build-check-tools.sh', '.github/actions/prepare-checks/action.yml') }}
     - name: Start CI container
       shell: bash
       run: docker compose up -d --no-build web
