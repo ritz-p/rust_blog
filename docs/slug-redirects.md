@@ -18,4 +18,4 @@ Values are slugs, not paths or external URLs. Chains are flattened to their fina
 
 The server returns HTTP 308 for mapped URLs. Static export prepends 308 rules to `_redirects` and creates small HTML redirect pages for hosts such as the Nginx preview that do not interpret `_redirects`. Both slash and non-slash URLs are supported on Cloudflare. Static targets end in `/`; server targets do not. Future articles are not redirect targets until their publication date.
 
-The Markdown fixture in `tests/fixtures/redirects/renamed.md` is parsed and seeded by regression tests to verify encoded destinations, chained redirects and publication filtering.
+The Markdown fixture in `content/articles/32.md` is parsed and seeded by regression tests to verify encoded destinations, chained redirects and publication filtering.

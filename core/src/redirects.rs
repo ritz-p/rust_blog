@@ -162,10 +162,11 @@ mod tests {
         ] {
             db.execute(backend.build(&table)).await.unwrap();
         }
-        let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("../tests/fixtures/redirects");
-        let (mut matter, body) =
-            crate::seed::markdown::parse_markdown_to_front_matter(&fixture.join("renamed.md"))
-                .unwrap();
+        let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        let (mut matter, body) = crate::seed::markdown::parse_markdown_to_front_matter(
+            &fixture.join("content/articles/32.md"),
+        )
+        .unwrap();
         let id = crate::seed::article::seed_article(&db, &matter, &body)
             .await
             .unwrap();

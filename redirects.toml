@@ -1,7 +1,8 @@
 # Map previous slugs to current slugs (not full URLs).
 # Remove or rename the original article/page before adding a redirect.
 [articles]
-# "old-article" = "new-article"
+old-article = "new-記事"
+older-article = "old-article"
 
 [pages]
 # "old-about" = "about"
