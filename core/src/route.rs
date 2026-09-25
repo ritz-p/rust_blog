@@ -86,6 +86,8 @@ pub async fn launch(
                 article_detail,
                 get::redirect::article_redirect,
                 get::redirect::page_redirect,
+                get::discovery::sitemap,
+                get::discovery::robots,
                 bulma_css,
                 site_css,
                 nav_js,

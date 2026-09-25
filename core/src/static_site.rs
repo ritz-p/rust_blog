@@ -55,6 +55,11 @@ pub async fn export_site(
     if !redirects.articles.is_empty() || !redirects.pages.is_empty() {
         redirects.validate_database(db).await?;
     }
+    let origin = crate::discovery::site_origin(config_map.get("public_url").map(String::as_str))?;
+    let sitemap = match origin.as_deref() {
+        Some(origin) => Some(crate::discovery::sitemap(db, origin, true).await?),
+        None => None,
+    };
     reset_output_dir(out_dir)?;
     write_static_assets(out_dir, &paths.content_dir, config_map)?;
 
@@ -78,6 +83,13 @@ pub async fn export_site(
     write_cloudflare_support_files(out_dir)?;
     if !redirects.articles.is_empty() || !redirects.pages.is_empty() {
         redirects.write_static(db, out_dir).await?;
+    }
+    fs::write(
+        out_dir.join("robots.txt"),
+        crate::discovery::robots(origin.as_deref()),
+    )?;
+    if let Some(sitemap) = sitemap {
+        fs::write(out_dir.join("sitemap.xml"), sitemap)?;
     }
 
     Ok(())
@@ -1021,9 +1033,31 @@ mod tests {
                     .unwrap()
                     .is_some()
             );
-            super::export_site(&db, &Default::default(), &out, &paths)
+            let config = std::collections::HashMap::from([(
+                "public_url".into(),
+                "https://example.com".into(),
+            )]);
+            super::export_site(&db, &config, &out, &paths)
                 .await
                 .unwrap();
+            let sitemap = fs::read_to_string(out.join("sitemap.xml")).unwrap();
+            assert_eq!(
+                sitemap.contains("<loc>https://example.com/posts/scheduled/</loc>"),
+                published
+            );
+            assert_eq!(
+                sitemap.contains("<loc>https://example.com/tag/rust/</loc>"),
+                published
+            );
+            assert_eq!(
+                sitemap.contains("<loc>https://example.com/category/dev/</loc>"),
+                published
+            );
+            assert!(
+                fs::read_to_string(out.join("robots.txt"))
+                    .unwrap()
+                    .contains("Sitemap: https://example.com/sitemap.xml")
+            );
             assert_eq!(out.join("posts/scheduled/index.html").exists(), published);
             assert_eq!(out.join("archive/2020/01/index.html").exists(), published);
             assert!(!out.join("archive/2999/01/index.html").exists());

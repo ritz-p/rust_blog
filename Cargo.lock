@@ -3327,6 +3327,7 @@ dependencies = [
  "toml 0.9.8",
  "two-face",
  "unicode-normalization",
+ "url",
  "walkdir",
 ]
 
