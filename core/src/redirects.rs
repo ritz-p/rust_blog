@@ -34,29 +34,34 @@ impl RedirectMap {
 
     pub fn parse(text: &str) -> Result<Self> {
         let mut map: Self = toml::from_str(text)?;
+        let mut errors = Vec::new();
         for (entries, fixed) in [(&mut map.articles, false), (&mut map.pages, true)] {
             let mut names = HashSet::new();
             for (source, target) in entries.iter() {
                 for slug in [source, target] {
-                    if fixed {
-                        crate::slug::validate_fixed(slug)?;
+                    let result = if fixed {
+                        crate::slug::validate_fixed(slug)
                     } else {
-                        crate::slug::validate(slug, 100)?;
+                        crate::slug::validate(slug, 100)
+                    };
+                    if let Err(error) = result {
+                        errors.push(format!(
+                            "{source} -> {target}: invalid slug {slug}: {error}"
+                        ));
                     }
                 }
-                ensure!(
-                    names.insert(crate::slug::collision_key(source)),
-                    "duplicate redirect source: {source}"
-                );
+                if !names.insert(crate::slug::collision_key(source)) {
+                    errors.push(format!("duplicate redirect source: {source}"));
+                }
             }
             let original = entries.clone();
             for (source, target) in entries.iter_mut() {
                 let mut seen = HashSet::from([crate::slug::collision_key(source)]);
                 loop {
-                    ensure!(
-                        seen.insert(crate::slug::collision_key(target)),
-                        "redirect cycle at {source}"
-                    );
+                    if !seen.insert(crate::slug::collision_key(target)) {
+                        errors.push(format!("redirect cycle at {source}"));
+                        break;
+                    }
                     match original.get(target) {
                         Some(next) => *target = next.clone(),
                         None => break,
@@ -64,10 +69,16 @@ impl RedirectMap {
                 }
             }
         }
+        ensure!(
+            errors.is_empty(),
+            "redirect validation errors:\n{}",
+            errors.join("\n")
+        );
         Ok(map)
     }
 
     pub async fn validate_database(&self, db: &DatabaseConnection) -> Result<()> {
+        let mut errors = Vec::new();
         for (map, slugs) in [
             (
                 &self.articles,
@@ -93,16 +104,21 @@ impl RedirectMap {
                 .map(|s| crate::slug::collision_key(s))
                 .collect();
             for (source, target) in map {
-                ensure!(
-                    !keys.contains(&crate::slug::collision_key(source)),
-                    "redirect source still exists: {source}"
-                );
-                ensure!(
-                    slugs.contains(target),
-                    "redirect target does not exist: {target}"
-                );
+                if keys.contains(&crate::slug::collision_key(source)) {
+                    errors.push(format!("redirect source still exists: {source}"));
+                }
+                if !slugs.contains(target) {
+                    errors.push(format!(
+                        "{source}: redirect target does not exist: {target}"
+                    ));
+                }
             }
         }
+        ensure!(
+            errors.is_empty(),
+            "redirect database errors:\n{}",
+            errors.join("\n")
+        );
         Ok(())
     }
 
