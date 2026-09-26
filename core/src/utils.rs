@@ -69,7 +69,7 @@ mod tests {
         let html = markdown_to_html(md);
 
         assert!(
-            html.contains("<h1>Title</h1>"),
+            html.contains("<h1 id=\"heading-title\">Title</h1>"),
             "Header should be converted to <h1>"
         );
         assert!(
