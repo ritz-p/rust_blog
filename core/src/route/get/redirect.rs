@@ -202,17 +202,19 @@ mod tests {
         db.execute(backend.build(&Schema::new(backend).create_table_from_entity(article::Entity)))
             .await
             .unwrap();
-        let fixture =
-            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../tests/fixtures/redirects");
-        let (matter, body) =
-            rust_blog::seed::markdown::parse_markdown_to_front_matter(&fixture.join("renamed.md"))
-                .unwrap();
+        let fixture = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        let (matter, body) = rust_blog::seed::markdown::parse_markdown_to_front_matter(
+            &fixture.join("content/articles/32.md"),
+        )
+        .unwrap();
         let id = rust_blog::seed::article::seed_article(&db, &matter, &body)
             .await
             .unwrap();
-        let map =
-            RedirectMap::parse(&std::fs::read_to_string(fixture.join("redirects.toml")).unwrap())
-                .unwrap();
+        let map = RedirectMap::parse(
+            &std::fs::read_to_string(fixture.join("tests/fixtures/redirects/redirects.toml"))
+                .unwrap(),
+        )
+        .unwrap();
         let client = Client::tracked(
             rocket::build()
                 .manage(db)

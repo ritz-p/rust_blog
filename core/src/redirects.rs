@@ -145,6 +145,24 @@ impl RedirectMap {
 mod tests {
     use super::*;
 
+    #[test]
+    fn shipped_map_excludes_test_aliases() {
+        let config = HashMap::from([(
+            "redirect_map_path".into(),
+            Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../redirects.toml")
+                .to_string_lossy()
+                .into_owned(),
+        )]);
+        let map = RedirectMap::load(&config).unwrap();
+        for alias in ["old-article", "older-article"] {
+            assert!(
+                !map.articles.contains_key(alias),
+                "test alias must not be shipped in the production map: {alias}"
+            );
+        }
+    }
+
     #[rocket::async_test]
     async fn renamed_markdown_exports_redirects_and_hides_future_targets() {
         use crate::entity::{article, article_category, article_tag, category, fixed_content, tag};
@@ -162,15 +180,18 @@ mod tests {
         ] {
             db.execute(backend.build(&table)).await.unwrap();
         }
-        let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("../tests/fixtures/redirects");
-        let (mut matter, body) =
-            crate::seed::markdown::parse_markdown_to_front_matter(&fixture.join("renamed.md"))
-                .unwrap();
+        let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        let (mut matter, body) = crate::seed::markdown::parse_markdown_to_front_matter(
+            &fixture.join("content/articles/32.md"),
+        )
+        .unwrap();
         let id = crate::seed::article::seed_article(&db, &matter, &body)
             .await
             .unwrap();
-        let map = RedirectMap::parse(&fs::read_to_string(fixture.join("redirects.toml")).unwrap())
-            .unwrap();
+        let map = RedirectMap::parse(
+            &fs::read_to_string(fixture.join("tests/fixtures/redirects/redirects.toml")).unwrap(),
+        )
+        .unwrap();
         map.validate_database(&db).await.unwrap();
         assert!(
             RedirectMap::parse("[articles]\nold = 'missing'")
@@ -191,7 +212,7 @@ mod tests {
         let config = HashMap::from([(
             "redirect_map_path".into(),
             fixture
-                .join("redirects.toml")
+                .join("tests/fixtures/redirects/redirects.toml")
                 .to_string_lossy()
                 .into_owned(),
         )]);
