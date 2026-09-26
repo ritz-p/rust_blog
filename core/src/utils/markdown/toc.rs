@@ -1,8 +1,17 @@
-use std::cell::RefCell;
+use std::{cell::RefCell, collections::HashSet};
+use unicode_normalization::UnicodeNormalization;
 
 use lol_html::{RewriteStrSettings, element, rewrite_str, text};
 
 pub fn toc(input: &str) -> String {
+    decorate(input, true)
+}
+
+pub(super) fn anchors(input: &str) -> String {
+    decorate(input, false)
+}
+
+fn decorate(input: &str, with_toc: bool) -> String {
     let headings = RefCell::new(Vec::<(u8, String, String)>::new());
     let selector = "h1, h2, h3, h4, h5, h6";
     let result = rewrite_str(
@@ -11,7 +20,6 @@ pub fn toc(input: &str) -> String {
             .append_element_content_handler(element!(selector, |el| {
                 let mut headings = headings.borrow_mut();
                 let id = format!("toc-heading-{}", headings.len() + 1);
-                el.set_attribute("id", &id)?;
                 let level = el.tag_name().as_bytes()[1] - b'0';
                 headings.push((level, id, String::new()));
                 Ok(())
@@ -43,15 +51,55 @@ pub fn toc(input: &str) -> String {
                 }
             )),
     );
-    let Ok(content) = result else {
+    let Ok(_) = result else {
         return input.to_owned();
     };
     let mut headings = headings.into_inner();
     if headings.is_empty() {
         return input.to_owned();
     }
-    for (_, _, label) in &mut headings {
+    let mut used = HashSet::new();
+    for (_, id, label) in &mut headings {
         *label = html_escape::decode_html_entities(label).into_owned();
+        let slug = label
+            .nfc()
+            .flat_map(char::to_lowercase)
+            .map(|c| if c.is_alphanumeric() { c } else { '-' })
+            .collect::<String>();
+        let slug = slug
+            .split('-')
+            .filter(|s| !s.is_empty())
+            .collect::<Vec<_>>()
+            .join("-");
+        let base = format!(
+            "heading-{}",
+            if slug.is_empty() { "section" } else { &slug }
+        );
+        *id = base.clone();
+        let mut suffix = 2;
+        while !used.insert(id.clone()) {
+            *id = format!("{base}-{suffix}");
+            suffix += 1;
+        }
+    }
+    let mut index = 0;
+    let content = rewrite_str(
+        input,
+        RewriteStrSettings::new().append_element_content_handler(element!(selector, |el| {
+            el.set_attribute("id", &headings[index].1)?;
+            index += 1;
+            if with_toc {
+                el.before(
+                    &format!("<span id=\"toc-heading-{index}\"></span>"),
+                    lol_html::html_content::ContentType::Html,
+                );
+            }
+            Ok(())
+        })),
+    )
+    .unwrap_or_else(|_| input.to_owned());
+    if !with_toc {
+        return content;
     }
     let mut output = format!(
         "<nav class=\"table-of-contents\" aria-label=\"目次\"><div class=\"toc-header\"><span class=\"toc-title\">目次</span><span class=\"toc-count\">{}項目</span></div>",
@@ -109,9 +157,26 @@ mod tests {
         assert!(nav.contains(">HTML &amp; heading</a>"));
         assert!(!nav.contains("&amp;amp;"));
         assert_eq!(
-            body.replace(" id=\"toc-heading-1\"", "")
-                .replace(" id=\"toc-heading-2\"", ""),
+            body.replace("<span id=\"toc-heading-1\"></span>", "")
+                .replace("<span id=\"toc-heading-2\"></span>", ""),
             rendered
         );
+    }
+
+    #[test]
+    fn heading_links_survive_unrelated_insertions_and_disambiguate_duplicates() {
+        let original = markdown_to_html("## **日本語** & text\n\n## Same\n\n## Same\n\n## Same-2");
+        let edited = markdown_to_html(
+            "## New heading\n\n## **日本語** & text\n\n## Same\n\n## Same\n\n## Same-2",
+        );
+        for id in [
+            "heading-日本語-text",
+            "heading-same",
+            "heading-same-2",
+            "heading-same-2-2",
+        ] {
+            assert_eq!(original.matches(&format!("id=\"{id}\"")).count(), 1);
+            assert_eq!(edited.matches(&format!("id=\"{id}\"")).count(), 1);
+        }
     }
 }
