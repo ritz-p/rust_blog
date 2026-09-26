@@ -21,3 +21,6 @@ The server returns HTTP 308 for mapped URLs. Static export prepends 308 rules to
 The Markdown fixture in `content/articles/32.md` is parsed and seeded by regression tests to verify encoded destinations, chained redirects and publication filtering.
 
 Test aliases live in `tests/fixtures/redirects/redirects.toml`; the production map is empty by default. To preview these aliases locally, seed `content/articles`, then set `redirect_map_path = "tests/fixtures/redirects/redirects.toml"` under `[common]` in your local `blog_config.toml`. Restart the server, or rerun export and `docker compose up -d --force-recreate static`. Remove this local setting before deploying: production startup runs migrations but does not seed the test articles.
+# Preflight CLI
+
+Run `docker compose exec web cargo run -p rust_blog --bin validate_redirects -- --map redirects.toml` before restarting the server or exporting. The CLI uses `DATABASE_URL` unless `--database-url` is supplied, forces SQLite read-only mode, and never runs migrations or changes content. `--syntax-only` checks slugs, duplicate sources and cycles without opening the database. A missing map or database is an error; validation failures exit nonzero and include all independently detectable issues in the current validation phase. Invalid TOML syntax and database connection/query failures stop that phase.
