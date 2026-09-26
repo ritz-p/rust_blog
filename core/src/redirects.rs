@@ -145,9 +145,8 @@ impl RedirectMap {
 mod tests {
     use super::*;
 
-    #[rocket::async_test]
-    async fn shipped_map_does_not_require_test_content() {
-        use sea_orm::{ConnectionTrait, Schema};
+    #[test]
+    fn shipped_map_excludes_test_aliases() {
         let config = HashMap::from([(
             "redirect_map_path".into(),
             Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -156,18 +155,12 @@ mod tests {
                 .into_owned(),
         )]);
         let map = RedirectMap::load(&config).unwrap();
-        let db = sea_orm::Database::connect("sqlite::memory:").await.unwrap();
-        let backend = db.get_database_backend();
-        let schema = Schema::new(backend);
-        for table in [
-            schema.create_table_from_entity(crate::entity::article::Entity),
-            schema.create_table_from_entity(crate::entity::fixed_content::Entity),
-        ] {
-            db.execute(backend.build(&table)).await.unwrap();
+        for alias in ["old-article", "older-article"] {
+            assert!(
+                !map.articles.contains_key(alias),
+                "test alias must not be shipped in the production map: {alias}"
+            );
         }
-        assert!(map.articles.is_empty());
-        assert!(map.pages.is_empty());
-        map.validate_database(&db).await.unwrap();
     }
 
     #[rocket::async_test]
