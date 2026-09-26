@@ -12,7 +12,7 @@ use fixed_content::seed_fixed_content;
 use markdown::{
     markdown_files, parse_markdown_to_fixed_content_matter, parse_markdown_to_front_matter,
 };
-use sea_orm::DatabaseConnection;
+use sea_orm::{DatabaseConnection, TransactionTrait};
 use std::path::Path;
 
 pub async fn run_all(db: DatabaseConnection) -> Result<()> {
@@ -143,28 +143,42 @@ async fn seed_article_file(
     let timestamp = file_timestamps
         .then(|| file_timestamp::updated_at(path))
         .transpose()?;
-    let id = seed_article(db, &matter, &body)
-        .await
-        .context("save article")?;
-    let mut errors = Vec::new();
-    if let Err(error) = seed_tag(db, &matter, id).await {
-        errors.push(format!("save tags: {error:#}"));
+    let tx = db.begin().await.context("begin article transaction")?;
+    let result: Result<()> = async {
+        let db = &tx;
+        let id = seed_article(db, &matter, &body)
+            .await
+            .context("save article")?;
+        let mut errors = Vec::new();
+        if let Err(error) = seed_tag(db, &matter, id).await {
+            errors.push(format!("save tags: {error:#}"));
+        }
+        if let Err(error) = seed_category(db, &matter, id).await {
+            errors.push(format!("save categories: {error:#}"));
+        }
+        ensure!(errors.is_empty(), "{}", errors.join("; "));
+        if let Some(timestamp) = timestamp {
+            use sea_orm::{EntityTrait, Set};
+            crate::entity::article::Entity::update(crate::entity::article::ActiveModel {
+                id: Set(id),
+                updated_at: Set(timestamp),
+                ..Default::default()
+            })
+            .exec(db)
+            .await?;
+        }
+        Ok(())
     }
-    if let Err(error) = seed_category(db, &matter, id).await {
-        errors.push(format!("save categories: {error:#}"));
+    .await;
+    match result {
+        Ok(()) => tx.commit().await.context("commit article transaction"),
+        Err(error) => {
+            tx.rollback()
+                .await
+                .with_context(|| format!("rollback article transaction after {error:#}"))?;
+            Err(error)
+        }
     }
-    ensure!(errors.is_empty(), "{}", errors.join("; "));
-    if let Some(timestamp) = timestamp {
-        use sea_orm::{EntityTrait, Set};
-        crate::entity::article::Entity::update(crate::entity::article::ActiveModel {
-            id: Set(id),
-            updated_at: Set(timestamp),
-            ..Default::default()
-        })
-        .exec(db)
-        .await?;
-    }
-    Ok(())
 }
 
 async fn seed_fixed_file(
@@ -198,6 +212,88 @@ mod tests {
     use super::*;
     use crate::entity::{article, article_category, article_tag, category, tag};
     use sea_orm::{ConnectionTrait, Database, EntityTrait, Schema, Statement};
+
+    #[rocket::async_test]
+    async fn relation_failure_rolls_back_article_and_all_relations() {
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        let backend = db.get_database_backend();
+        let schema = Schema::new(backend);
+        for table in [
+            schema.create_table_from_entity(article::Entity),
+            schema.create_table_from_entity(tag::Entity),
+            schema.create_table_from_entity(category::Entity),
+            schema.create_table_from_entity(article_tag::Entity),
+            schema.create_table_from_entity(article_category::Entity),
+        ] {
+            db.execute(backend.build(&table)).await.unwrap();
+        }
+        let root = std::env::temp_dir().join(format!(
+            "seed-rollback-{}-{}",
+            std::process::id(),
+            chrono::Utc::now().timestamp_nanos_opt().unwrap()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let path = root.join("article.md");
+        let document = |slug: &str, title: &str, tag: &str, category: &str| {
+            format!(
+                "---\ntitle: {title}\nslug: {slug}\ndate: 2020-01-01\ntags: [{tag}]\ncategories: [{category}]\n---\nbody"
+            )
+        };
+        std::fs::write(
+            &path,
+            document("existing", "Before", "old-tag", "old-category"),
+        )
+        .unwrap();
+        seed_article_file(&db, &path, true, false).await.unwrap();
+        let before = article::Entity::find().one(&db).await.unwrap().unwrap();
+        db.execute(Statement::from_string(backend, "CREATE TRIGGER reject_category BEFORE INSERT ON category WHEN NEW.slug = 'reject' BEGIN SELECT RAISE(FAIL, 'rejected category'); END;")).await.unwrap();
+        for slug in ["existing", "new"] {
+            std::fs::write(&path, document(slug, "After", "new-tag", "reject")).unwrap();
+            let error = seed_article_file(&db, &path, true, true).await.unwrap_err();
+            assert!(format!("{error:#}").contains("rejected category"));
+            assert_eq!(
+                article::Entity::find().all(&db).await.unwrap(),
+                vec![before.clone()]
+            );
+            assert_eq!(
+                tag::Entity::find()
+                    .all(&db)
+                    .await
+                    .unwrap()
+                    .iter()
+                    .map(|tag| tag.slug.as_str())
+                    .collect::<Vec<_>>(),
+                vec!["old-tag"]
+            );
+            assert_eq!(
+                category::Entity::find()
+                    .all(&db)
+                    .await
+                    .unwrap()
+                    .iter()
+                    .map(|category| category.slug.as_str())
+                    .collect::<Vec<_>>(),
+                vec!["old-category"]
+            );
+            assert_eq!(article_tag::Entity::find().all(&db).await.unwrap().len(), 1);
+            assert_eq!(
+                article_category::Entity::find()
+                    .all(&db)
+                    .await
+                    .unwrap()
+                    .len(),
+                1
+            );
+        }
+        std::fs::write(
+            &path,
+            document("later", "Valid", "next-tag", "next-category"),
+        )
+        .unwrap();
+        seed_article_file(&db, &path, true, false).await.unwrap();
+        assert_eq!(article::Entity::find().all(&db).await.unwrap().len(), 2);
+        std::fs::remove_dir_all(root).unwrap();
+    }
 
     #[rocket::async_test]
     async fn file_timestamp_survives_fresh_export_databases() {

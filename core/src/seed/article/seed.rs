@@ -17,14 +17,14 @@ use entity_extension::article::ArticleValidator;
 use garde::Report;
 use garde::Validate;
 use sea_orm::{
-    ActiveModelTrait, ActiveValue, ColumnTrait, DatabaseConnection, DbErr, EntityTrait,
+    ActiveModelTrait, ActiveValue, ColumnTrait, ConnectionTrait, DbErr, EntityTrait,
     IntoActiveModel, QueryFilter, Set,
 };
 use std::default::Default;
 use utils::front_matter::FrontMatter;
 
 pub async fn prepare(
-    db: &DatabaseConnection,
+    db: &impl ConnectionTrait,
     front_matter: &FrontMatter,
     body: &str,
 ) -> Result<ActiveModel, DbErr> {
@@ -128,7 +128,10 @@ pub fn validate(front_matter: &FrontMatter, body: &str) -> Result<(), Report> {
     validator.validate()
 }
 
-pub async fn upsert(db: &DatabaseConnection, mut active_model: ActiveModel) -> Result<i32, DbErr> {
+pub async fn upsert(
+    db: &impl ConnectionTrait,
+    mut active_model: ActiveModel,
+) -> Result<i32, DbErr> {
     if active_model.is_changed()
         && let Some(utc) = Utc::now().with_nanosecond(0)
     {
