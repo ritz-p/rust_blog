@@ -83,11 +83,11 @@ pub fn validate_fixed(slug: &str) -> Result<()> {
 }
 
 pub(crate) async fn validate_database_collision(
-    db: &sea_orm::DatabaseConnection,
+    db: &impl sea_orm::ConnectionTrait,
     table: &str,
     slug: &str,
 ) -> Result<()> {
-    use sea_orm::{ConnectionTrait, Statement};
+    use sea_orm::Statement;
     ensure!(
         matches!(table, "article" | "fixed_content"),
         "unsupported slug namespace"
