@@ -1,3 +1,5 @@
+mod output;
+
 use std::{
     collections::HashMap,
     fs,
@@ -60,7 +62,8 @@ pub async fn export_site(
         Some(origin) => Some(crate::discovery::sitemap(db, origin, true).await?),
         None => None,
     };
-    reset_output_dir(out_dir)?;
+    let output = output::StagedOutput::new(out_dir)?;
+    let out_dir = output.path();
     write_static_assets(out_dir, &paths.content_dir, config_map)?;
 
     let config = CommonConfig {
@@ -92,7 +95,7 @@ pub async fn export_site(
         fs::write(out_dir.join("sitemap.xml"), sitemap)?;
     }
 
-    Ok(())
+    output.publish()
 }
 
 async fn validate_content_slugs(db: &DatabaseConnection) -> Result<()> {
@@ -729,15 +732,6 @@ fn normalize_template_name(path: &Path) -> String {
         .or_else(|| raw.strip_suffix(".tera"))
         .unwrap_or(&raw)
         .to_string()
-}
-
-fn reset_output_dir(out_dir: &Path) -> Result<()> {
-    if out_dir.exists() {
-        fs::remove_dir_all(out_dir)
-            .with_context(|| format!("failed to clear output dir {:?}", out_dir))?;
-    }
-    fs::create_dir_all(out_dir)?;
-    Ok(())
 }
 
 fn write_static_assets(
