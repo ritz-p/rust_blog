@@ -1,0 +1,64 @@
+%YAML 1.2
+---
+name: PowerShell
+file_extensions: [ps1, psm1, psd1, powershell, pwsh]
+scope: source.powershell
+contexts:
+  main:
+    - match: '<#'
+      scope: punctuation.definition.comment.begin.powershell
+      push: block-comment
+    - match: '#.*$'
+      scope: comment.line.number-sign.powershell
+    - match: '@"\s*$'
+      scope: punctuation.definition.string.begin.powershell
+      push: here-double
+    - match: "@'\\s*$"
+      scope: punctuation.definition.string.begin.powershell
+      push: here-single
+    - match: '"'
+      scope: punctuation.definition.string.begin.powershell
+      push: double-string
+    - match: "'"
+      scope: punctuation.definition.string.begin.powershell
+      push: single-string
+    - include: variables
+    - match: '(?i)\b(if|else|elseif|switch|foreach|for|while|do|until|function|filter|class|param|return|try|catch|finally|throw|break|continue|begin|process|end|in)\b'
+      scope: keyword.control.powershell
+    - match: '(?i)-(eq|ne|gt|ge|lt|le|and|or|not|match|replace|contains|in|is|as|join|split)\b|[|=+*/%!<>-]'
+      scope: keyword.operator.powershell
+    - match: '\b\d+(?:\.\d+)?\b'
+      scope: constant.numeric.powershell
+    - match: '\b[A-Za-z]+-[A-Za-z][A-Za-z0-9-]*\b'
+      scope: support.function.powershell
+  variables:
+    - match: '(?i)\$(true|false|null)\b'
+      scope: constant.language.powershell
+    - match: '\$(?:\{[^}]+\}|[\w:?]+)'
+      scope: variable.other.powershell
+  double-string:
+    - meta_scope: string.quoted.double.powershell
+    - match: '`.'
+      scope: constant.character.escape.powershell
+    - match: '"'
+      pop: true
+    - include: variables
+  single-string:
+    - meta_scope: string.quoted.single.powershell
+    - match: "''"
+      scope: constant.character.escape.powershell
+    - match: "'"
+      pop: true
+  here-double:
+    - meta_scope: string.quoted.double.heredoc.powershell
+    - match: '^"@'
+      pop: true
+    - include: variables
+  here-single:
+    - meta_scope: string.quoted.single.heredoc.powershell
+    - match: "^'@"
+      pop: true
+  block-comment:
+    - meta_scope: comment.block.powershell
+    - match: '#>'
+      pop: true

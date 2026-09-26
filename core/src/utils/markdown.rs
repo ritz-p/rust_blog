@@ -5,7 +5,7 @@ use pulldown_cmark::{CodeBlockKind, Event, Options, Parser, Tag, html};
 use std::sync::LazyLock;
 use syntect::{
     html::{ClassStyle, ClassedHTMLGenerator},
-    parsing::{SyntaxReference, SyntaxSet},
+    parsing::{SyntaxDefinition, SyntaxReference, SyntaxSet},
     util::LinesWithEndings,
 };
 pub use toc::toc;
@@ -13,7 +13,18 @@ pub use toc::toc;
 use to_text::{end_tag, is_strikethrough, start_tag};
 
 static SYNTAX_SET: LazyLock<SyntaxSet> = LazyLock::new(SyntaxSet::load_defaults_newlines);
-static EXTRA_SYNTAX_SET: LazyLock<SyntaxSet> = LazyLock::new(two_face::syntax::extra_newlines);
+static EXTRA_SYNTAX_SET: LazyLock<SyntaxSet> = LazyLock::new(|| {
+    let mut builder = two_face::syntax::extra_newlines().into_builder();
+    builder.add(
+        SyntaxDefinition::load_from_str(
+            include_str!("../../assets/syntaxes/PowerShell.sublime-syntax"),
+            true,
+            None,
+        )
+        .expect("embedded PowerShell syntax must be valid"),
+    );
+    builder.build()
+});
 
 pub fn markdown_to_html(input: &str) -> String {
     let mut options = Options::empty();
@@ -141,6 +152,26 @@ pub fn markdown_to_text(markdown: &str) -> String {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn highlights_powershell_and_preserves_source() {
+        let code = "# 日本語コメント\n$names = @(\"世界 <tag> & value\")\n$names | ForEach-Object { Write-Output \"Hello, $_\" }\n$text = @\"\nNames: $names\n\"@\n<# block comment #>\n";
+        for language in ["powershell", "pwsh", "ps1"] {
+            let html = super::markdown_to_html(&format!("```{language}\n{code}```\n"));
+            for class in [
+                "syntax-powershell",
+                "syntax-comment",
+                "syntax-string",
+                "syntax-variable",
+                "syntax-operator",
+            ] {
+                assert!(html.contains(class), "missing {class}: {language}");
+            }
+            assert_eq!(
+                without_spans(&html),
+                super::markdown_to_html(&format!("```\n{code}```\n"))
+            );
+        }
+    }
     #[test]
     fn toc_is_opt_in_and_omitted_without_headings() {
         let input = "## 見出し\n\nbody";
