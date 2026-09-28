@@ -176,6 +176,7 @@ async fn export_search_index(
             "url": static_article_url(&article.slug),
             "excerpt": article.excerpt.as_deref().map(markdown_to_text).unwrap_or_else(|| cut_out_string(&markdown_to_text(&article.content), 100)),
             "text": crate::utils::search::article_text(article),
+            "body": markdown_to_text(&article.content),
             "icatch_path": article.icatch_path.as_ref().or(config.default_icatch_path.as_ref()),
             "created_at": utc_to_jst(article.created_at),
             "updated_at": utc_to_jst(article.updated_at),
