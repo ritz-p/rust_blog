@@ -525,3 +525,11 @@
   color: #57606a;
   font-style: italic;
 }
+.code-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1rem;
+  font-size: 0.875rem;
+}

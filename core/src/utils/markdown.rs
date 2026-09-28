@@ -26,6 +26,7 @@ pub fn markdown_to_html(input: &str) -> String {
     let mut events = Vec::new();
     while let Some(event) = parser.next() {
         if let Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced(info))) = &event {
+            let language = info.split_whitespace().next().unwrap_or_default();
             let syntax = info.split_whitespace().next().and_then(|language| {
                 let language = match language {
                     "bash" => "sh",
@@ -40,26 +41,36 @@ pub fn markdown_to_html(input: &str) -> String {
                             .map(|syntax| (syntax, &*EXTRA_SYNTAX_SET))
                     })
             });
-            if let Some((syntax, syntax_set)) = syntax {
-                let mut code = String::new();
-                for event in parser.by_ref() {
-                    match event {
-                        Event::Text(text) => code.push_str(&text),
-                        Event::End(Tag::CodeBlock(_)) => break,
-                        _ => (),
-                    }
+            let mut code = String::new();
+            for event in parser.by_ref() {
+                match event {
+                    Event::Text(text) => code.push_str(&text),
+                    Event::End(Tag::CodeBlock(_)) => break,
+                    _ => (),
                 }
-                if let Some(highlighted) = highlight_code(&code, syntax, syntax_set) {
-                    events.push(Event::Html(highlighted.into()));
-                } else {
-                    events.push(event.clone());
-                    events.push(Event::Text(code.into()));
-                    events.push(Event::End(Tag::CodeBlock(CodeBlockKind::Fenced(
-                        info.clone(),
-                    ))));
-                }
-                continue;
             }
+            let rendered = syntax
+                .and_then(|(syntax, set)| highlight_code(&code, syntax, set))
+                .unwrap_or_else(|| {
+                    format!(
+                        "<pre><code>{}</code></pre>\n",
+                        html_escape::encode_text(&code)
+                    )
+                });
+            let rendered = if language.is_empty() {
+                rendered
+            } else {
+                rendered.replacen(
+                    "<code>",
+                    &format!(
+                        "<code data-language=\"{}\">",
+                        html_escape::encode_double_quoted_attribute(language)
+                    ),
+                    1,
+                )
+            };
+            events.push(Event::Html(rendered.into()));
+            continue;
         }
         events.push(event);
     }
@@ -90,6 +101,7 @@ fn highlight_code(code: &str, syntax: &SyntaxReference, syntax_set: &SyntaxSet) 
 fn sanitize_html(html: &str) -> String {
     Builder::default()
         .add_tag_attributes("span", &["class"])
+        .add_tag_attributes("code", &["data-language"])
         .clean(html)
         .to_string()
 }
@@ -201,7 +213,10 @@ mod tests {
             ("js", "function greet() { return \"hello\"; } // comment\n"),
         ] {
             let html = markdown_to_html(&format!("```{language}\n{code}```\n"));
-            assert!(html.starts_with("<pre><code><span"), "{language}: {html}");
+            assert!(
+                html.starts_with("<pre><code data-language=") && html.contains("<span"),
+                "{language}: {html}"
+            );
             for scope in ["syntax-keyword", "syntax-string", "syntax-comment"] {
                 assert!(
                     html.split('"')
@@ -299,17 +314,25 @@ mod tests {
     }
 
     #[test]
-    fn leaves_plain_code_blocks_unchanged() {
+    fn preserves_plain_code_text() {
         for markdown in [
             "```not-a-language\n<x> & value\n```\n",
             "```\n<x> & value\n```\n",
             "    <x> & value\n",
         ] {
             assert_eq!(
-                markdown_to_html(markdown),
+                without_spans(&markdown_to_html(markdown)),
                 "<pre><code>&lt;x&gt; &amp; value\n</code></pre>\n"
             );
         }
+    }
+
+    #[test]
+    fn unknown_language_metadata_is_escaped_and_does_not_create_attributes() {
+        let html = markdown_to_html("```unknown\"onmouseover=bad\n<x> & value\n```\n");
+        assert!(html.contains("data-language=\"unknown&quot;onmouseover=bad\""));
+        assert!(!html.contains(" onmouseover="));
+        assert!(html.contains("&lt;x&gt; &amp; value"));
     }
 
     #[test]

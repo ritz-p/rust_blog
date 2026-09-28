@@ -1345,7 +1345,7 @@ mod tests {
         );
         assert!(html.contains("property=\"og:title\" content=\"Highlighted Rust\""));
         assert!(html.contains("href=\"/posts/highlighted-rust/\""));
-        assert!(html.contains("href=\"/css/site.css\""));
+        assert!(html.contains("href=\"/css/site.css?v=code-copy-1\""));
         let content = html
             .split("<div class=\"content is-medium\">")
             .nth(1)
@@ -1353,7 +1353,10 @@ mod tests {
             .split("</div>")
             .next()
             .unwrap();
-        assert!(content.contains("<pre><code><span"), "{content}");
+        assert!(
+            content.contains("<pre><code data-language=") && content.contains("<span"),
+            "{content}"
+        );
         assert!(content.contains("</code></pre>"));
         assert!(content.contains("&lt;script&gt; &amp; hello"), "{content}");
         assert!(!content.contains("<script>"));
