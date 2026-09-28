@@ -1,0 +1,7 @@
+[
+  {"file":"posts/21/index.html","href":"/image/intentionally-missing-test-image.png","reason":"missing target","note":"Intentional missing-image fixture in content/articles/21.md"},
+  {"file":"posts/21/index.html","href":"/image/intentionally-missing-long-alt-image.png","reason":"missing target","note":"Intentional long-alt fixture in content/articles/21.md"},
+  {"file":"posts/10/index.html","href":"#note","reason":"missing fragment","note":"Issue #193: footnote target IDs are removed by sanitization"},
+  {"file":"posts/10/index.html","href":"#detail","reason":"missing fragment","note":"Issue #193: footnote target IDs are removed by sanitization"},
+  {"file":"posts/46/index.html","href":"#note","reason":"missing fragment","note":"Issue #193: footnote target IDs are removed by sanitization"}
+]
