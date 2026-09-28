@@ -38,7 +38,9 @@
 
 - `docker build -f prod/Dockerfile -t rust-blog-prod-local .`
 - `docker run --rm -p 8080:8080 -v "${PWD}/data:/data" rust-blog-prod-local`
-- `docker run --rm -v "${PWD}/data:/data" -v "${PWD}/dist:/app/dist" rust-blog-prod-local export`
+- `docker run --rm -v "${PWD}/data:/data" -v "${PWD}/artifact:/export" rust-blog-prod-local export /export/dist`
+
+export はディレクトリを rename して切り替えるため、出力先そのものではなく親ディレクトリをマウントする。この例のホスト側出力先は `artifact/dist/`。
 
 ## Editing Notes
 
