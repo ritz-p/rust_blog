@@ -23,7 +23,7 @@
 - 静的 export:
   - `docker compose exec web cargo run -p rust_blog --bin export`
 - 静的 preview:
-  - `docker compose up -d static`
+  - `docker compose up -d --force-recreate static`
   - `http://localhost:8081/` で確認
 
 ## Production Container Checks
@@ -47,3 +47,4 @@ export はディレクトリを rename して切り替えるため、出力先�
 - テンプレートや静的アセットを変更したら、必要に応じて `export` を再実行して `static` で確認する。
 - サーバーモードと静的出力モードで URL 形式が異なる箇所があるため、片方だけで確認して完了にしない。
 - `dist/` は生成物として扱う。必要なときだけ再生成する。
+- export 成功後は `static` を `--force-recreate` で再作成する。出力ディレクトリを置き換えるため、既存コンテナの bind mount は古いディレクトリを参照し続ける。
