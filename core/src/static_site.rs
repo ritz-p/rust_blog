@@ -1345,7 +1345,7 @@ mod tests {
         );
         assert!(html.contains("property=\"og:title\" content=\"Highlighted Rust\""));
         assert!(html.contains("href=\"/posts/highlighted-rust/\""));
-        assert!(html.contains("href=\"/css/site.css\""));
+        assert!(html.contains("href=\"/css/site.css?v=powershell-variables-1\""));
         let content = html
             .split("<div class=\"content is-medium\">")
             .nth(1)
