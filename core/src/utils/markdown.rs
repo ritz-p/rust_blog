@@ -65,7 +65,18 @@ pub fn markdown_to_html(input: &str) -> String {
         events.push(event);
     }
 
-    let (events, replacements) = footnotes::prepare(events, input);
+    let mut rendered = String::new();
+    html::push_html(&mut rendered, events.iter().cloned());
+    let sanitized = sanitize_html(&rendered);
+    if !events.iter().any(|event| {
+        matches!(
+            event,
+            Event::FootnoteReference(_) | Event::Start(Tag::FootnoteDefinition(_))
+        )
+    }) {
+        return sanitized;
+    }
+    let (events, replacements) = footnotes::prepare(events, &sanitized);
     let mut html_output = String::new();
     html::push_html(&mut html_output, events.into_iter());
 

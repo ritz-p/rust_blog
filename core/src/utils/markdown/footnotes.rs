@@ -3,7 +3,7 @@ use std::collections::HashMap;
 
 pub(super) fn prepare<'a>(
     events: Vec<Event<'a>>,
-    input: &str,
+    sanitized: &str,
 ) -> (Vec<Event<'a>>, Vec<(String, String)>) {
     let mut notes: HashMap<String, (usize, usize)> = HashMap::new();
     for event in &events {
@@ -13,7 +13,7 @@ pub(super) fn prepare<'a>(
         }
     }
     let mut prefix = "BLOGFOOTNOTEMARKER".to_owned();
-    while input.contains(&prefix) {
+    while sanitized.contains(&prefix) {
         prefix.push('X');
     }
     let mut replacements = Vec::new();
@@ -56,6 +56,36 @@ pub(super) fn prepare<'a>(
 #[cfg(test)]
 mod tests {
     use crate::utils::markdown::markdown_to_html;
+
+    #[test]
+    fn decoded_user_text_never_becomes_a_generated_footnote() {
+        for text in [
+            "BLOGFOOTNOTE&#77;ARKER0END",
+            "BLOGFOOTNOTE&#x4d;ARKER0END",
+            "<div>BLOGFOOTNOTE&#77;ARKER0END</div>",
+            "BLOGFOOTNOTE<custom></custom>MARKER0END",
+        ] {
+            let html = markdown_to_html(&format!(
+                "{text}\n\nActual[^note] and again[^note]\n\n[^note]: definition\n"
+            ));
+            assert!(html.contains("BLOGFOOTNOTEMARKER0END"), "{text}: {html}");
+            for reference in 1..=2 {
+                assert_eq!(
+                    html.matches(&format!("id=\"footnote-ref-1-{reference}\""))
+                        .count(),
+                    1,
+                    "{text}"
+                );
+                assert_eq!(
+                    html.matches(&format!("href=\"#footnote-ref-1-{reference}\""))
+                        .count(),
+                    1,
+                    "{text}"
+                );
+            }
+            assert!(html.contains("Actual<sup id=\"footnote-ref-1-1\""));
+        }
+    }
 
     #[test]
     fn repeated_footnotes_have_distinct_backlinks_and_preserve_sanitization() {
