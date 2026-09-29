@@ -188,6 +188,7 @@ async fn render_index(
         "index",
         context! {
             site_name: &config.site_name,
+            feed_url: rust_blog::discovery::site_origin(config.public_url.as_deref()).ok().flatten().map(|_| "/feed.xml"),
             favicon_path: &config.favicon_path,
             tags_url: "/tags",
             categories_url: "/categories",

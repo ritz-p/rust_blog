@@ -5,6 +5,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}{{ site_name | default(value="My Blog") }}{% endblock title %}</title>
+  {% if feed_url is defined and feed_url %}<link rel="alternate" type="application/atom+xml" title="Atom feed" href="{{ feed_url }}">{% endif %}
   {% if metadata is defined %}
   <meta name="description" content="{{ metadata.description | escape | safe }}">
   <meta property="og:type" content="article">

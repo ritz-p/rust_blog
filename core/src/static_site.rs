@@ -60,6 +60,21 @@ pub async fn export_site(
         Some(origin) => Some(crate::discovery::sitemap(db, origin, true).await?),
         None => None,
     };
+    let feed = match origin.as_deref() {
+        Some(origin) => Some(
+            crate::feed::atom(
+                db,
+                origin,
+                config_map
+                    .get("site_name")
+                    .map(String::as_str)
+                    .unwrap_or("Blog"),
+                true,
+            )
+            .await?,
+        ),
+        None => None,
+    };
     reset_output_dir(out_dir)?;
     write_static_assets(out_dir, &paths.content_dir, config_map)?;
 
@@ -90,6 +105,9 @@ pub async fn export_site(
     )?;
     if let Some(sitemap) = sitemap {
         fs::write(out_dir.join("sitemap.xml"), sitemap)?;
+    }
+    if let Some(feed) = feed {
+        fs::write(out_dir.join("feed.xml"), feed)?;
     }
 
     Ok(())
@@ -681,6 +699,13 @@ async fn latest_articles_json(db: &DatabaseConnection) -> Result<Vec<serde_json:
 
 fn base_context(config: &CommonConfig) -> Context {
     let mut ctx = Context::new();
+    ctx.insert(
+        "feed_url",
+        &crate::discovery::site_origin(config.public_url.as_deref())
+            .ok()
+            .flatten()
+            .map(|_| "/feed.xml"),
+    );
     ctx.insert("site_name", &config.site_name);
     ctx.insert("favicon_path", &config.favicon_path);
     ctx.insert("year", &Utc::now().year());
@@ -788,6 +813,10 @@ fn build_headers_file() -> String {
         "",
         "/icon/*",
         "  Cache-Control: public, max-age=31556952, immutable",
+        "",
+        "/feed.xml",
+        "  Content-Type: application/atom+xml; charset=utf-8",
+        "  Cache-Control: public, max-age=0, must-revalidate",
         "",
     ]
     .join("\n")
@@ -1041,6 +1070,11 @@ mod tests {
                 .await
                 .unwrap();
             let sitemap = fs::read_to_string(out.join("sitemap.xml")).unwrap();
+            let feed = fs::read_to_string(out.join("feed.xml")).unwrap();
+            assert_eq!(feed.contains("<entry>"), published);
+            if published {
+                assert!(feed.contains("href=\"https://example.com/posts/scheduled/\""));
+            }
             assert_eq!(
                 sitemap.contains("<loc>https://example.com/posts/scheduled/</loc>"),
                 published

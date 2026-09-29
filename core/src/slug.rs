@@ -73,6 +73,7 @@ pub fn validate_fixed(slug: &str) -> Result<()> {
             "search-index.json",
             "sitemap.xml",
             "robots.txt",
+            "feed.xml",
             "_headers",
             "_redirects"
         ]
