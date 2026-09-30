@@ -1,5 +1,4 @@
 use std::{cell::RefCell, collections::HashMap};
-use unicode_normalization::UnicodeNormalization;
 
 use lol_html::{RewriteStrSettings, element, rewrite_str, text};
 
@@ -62,18 +61,18 @@ fn decorate(input: &str, with_toc: bool) -> String {
     for (_, id, label) in &mut headings {
         *label = html_escape::decode_html_entities(label).into_owned();
         let slug = label
-            .nfc()
-            .flat_map(char::to_lowercase)
-            .map(|c| if c.is_alphanumeric() { c } else { '-' })
+            .chars()
+            .map(|c| {
+                if c.is_alphanumeric() {
+                    c.to_string()
+                } else {
+                    format!("_{:x}_", u32::from(c))
+                }
+            })
             .collect::<String>();
-        let slug = slug
-            .split('-')
-            .filter(|s| !s.is_empty())
-            .collect::<Vec<_>>()
-            .join("-");
         let base = format!(
             "heading-{}",
-            if slug.is_empty() { "section" } else { &slug }
+            if slug.is_empty() { "_empty_" } else { &slug }
         );
         let occurrence = occurrences.entry(base.clone()).or_insert(0);
         *occurrence += 1;
@@ -171,10 +170,10 @@ mod tests {
             "## New heading\n\n## **日本語** & text\n\n## Same\n\n## Same\n\n## Same-2",
         );
         for id in [
-            "heading-日本語-text",
-            "heading-same",
-            "heading-same-2",
-            "heading-same--2",
+            "heading-日本語_20__26__20_text",
+            "heading-Same",
+            "heading-Same_2d_2",
+            "heading-Same--2",
         ] {
             assert_eq!(original.matches(&format!("id=\"{id}\"")).count(), 1);
             assert_eq!(edited.matches(&format!("id=\"{id}\"")).count(), 1);
@@ -190,12 +189,39 @@ mod tests {
             "## Same\n\n## Same\n\n## Same-2",
         ] {
             let edited = markdown_to_html(markdown);
-            for id in ["heading-same", "heading-same--2"] {
+            for id in ["heading-Same", "heading-Same--2"] {
                 let heading = format!("<h2 id=\"{id}\">Same</h2>");
                 assert!(original.contains(&heading));
                 assert!(edited.contains(&heading));
             }
-            assert!(edited.contains("<h2 id=\"heading-same-2\">Same-2</h2>"));
+            assert!(edited.contains("<h2 id=\"heading-Same_2d_2\">Same-2</h2>"));
+        }
+    }
+
+    #[test]
+    fn distinct_labels_keep_ids_when_slug_collisions_are_inserted() {
+        for (label, other, id, other_id) in [
+            ("A+B", "A/B", "heading-A_2b_B", "heading-A_2f_B"),
+            ("API", "api", "heading-API", "heading-api"),
+            ("A B", "A-B", "heading-A_20_B", "heading-A_2d_B"),
+            ("A+B", "A_2b_B", "heading-A_2b_B", "heading-A_5f_2b_5f_B"),
+            ("é", "e\u{301}", "heading-é", "heading-e_301_"),
+        ] {
+            let original = markdown_to_html(&format!("## {label}\n\n## {label}"));
+            for markdown in [
+                format!("## {other}\n\n## {label}\n\n## {label}"),
+                format!("## {label}\n\n## {other}\n\n## {label}"),
+                format!("## {label}\n\n## {label}\n\n## {other}"),
+            ] {
+                let edited = markdown_to_html(&markdown);
+                for stable_id in [id.to_owned(), format!("{id}--2")] {
+                    let heading = format!("<h2 id=\"{stable_id}\">{label}</h2>");
+                    assert!(original.contains(&heading));
+                    assert!(edited.contains(&heading));
+                    assert_eq!(edited.matches(&format!("id=\"{stable_id}\"")).count(), 1);
+                }
+                assert!(edited.contains(&format!("<h2 id=\"{other_id}\">{other}</h2>")));
+            }
         }
     }
 }
