@@ -409,11 +409,14 @@
   background: #eaf1fb;
 }
 
-.content [id^="toc-heading-"] {
+.content [id^="toc-heading-"],
+.content [id^="heading-"] {
   scroll-margin-top: 1.5rem;
 }
 
-.content [id^="toc-heading-"]:target {
+.content [id^="toc-heading-"]:target,
+.content [id^="heading-"]:target,
+.content span[id^="toc-heading-"]:target + :is(h1,h2,h3,h4,h5,h6) {
   text-decoration: underline;
   text-decoration-color: #8db3ec;
   text-underline-offset: 0.25em;

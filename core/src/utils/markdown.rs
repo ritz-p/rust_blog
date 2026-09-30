@@ -85,7 +85,7 @@ pub fn markdown_to_html(input: &str) -> String {
             Event::FootnoteReference(_) | Event::Start(Tag::FootnoteDefinition(_))
         )
     }) {
-        return sanitized;
+        return toc::anchors(&sanitized);
     }
     let (events, replacements) = footnotes::prepare(events, &sanitized);
     let mut html_output = String::new();
@@ -95,7 +95,7 @@ pub fn markdown_to_html(input: &str) -> String {
     for (marker, html) in replacements {
         output = output.replace(&marker, &html);
     }
-    output
+    toc::anchors(&output)
 }
 
 fn highlight_code(code: &str, syntax: &SyntaxReference, syntax_set: &SyntaxSet) -> Option<String> {
@@ -204,13 +204,17 @@ mod tests {
         let input = "## 同名\n\n#### **深い** `code` [link](https://example.com)\n\n## 同名\n\n末尾\n====\n\n```bash\n# not a heading\n```";
         let html = super::toc(&super::markdown_to_html(input));
         let toc = html.split("</nav>").next().unwrap();
-        assert!(toc.contains("<a href=\"#toc-heading-1\">同名</a><ol><li><a href=\"#toc-heading-2\">深い code link</a>"));
+        assert!(toc.contains("<a href=\"#heading-同名\">同名</a><ol><li><a href=\"#heading-深い_20_code_20_link\">深い code link</a>"));
         for i in 1..=4 {
             assert_eq!(html.matches(&format!("id=\"toc-heading-{i}\"")).count(), 1);
-            assert_eq!(
-                toc.matches(&format!("href=\"#toc-heading-{i}\"")).count(),
-                1
-            );
+        }
+        for id in [
+            "heading-同名",
+            "heading-深い_20_code_20_link",
+            "heading-同名--2",
+            "heading-末尾",
+        ] {
+            assert_eq!(toc.matches(&format!("href=\"#{id}\"")).count(), 1);
         }
         assert!(!toc.contains("not a heading"));
         assert_eq!(toc.matches("<ol>").count(), toc.matches("</ol>").count());
