@@ -503,6 +503,7 @@
 }
 
 .content pre code .syntax-constant,
+.content pre code .syntax-variable,
 .content pre code .syntax-support {
   color: #0550ae;
 }
