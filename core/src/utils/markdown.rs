@@ -1,3 +1,4 @@
+mod footnotes;
 pub mod to_text;
 mod toc;
 use ammonia::Builder;
@@ -75,10 +76,26 @@ pub fn markdown_to_html(input: &str) -> String {
         events.push(event);
     }
 
+    let mut rendered = String::new();
+    html::push_html(&mut rendered, events.iter().cloned());
+    let sanitized = sanitize_html(&rendered);
+    if !events.iter().any(|event| {
+        matches!(
+            event,
+            Event::FootnoteReference(_) | Event::Start(Tag::FootnoteDefinition(_))
+        )
+    }) {
+        return sanitized;
+    }
+    let (events, replacements) = footnotes::prepare(events, &sanitized);
     let mut html_output = String::new();
     html::push_html(&mut html_output, events.into_iter());
 
-    sanitize_html(&html_output)
+    let mut output = sanitize_html(&html_output);
+    for (marker, html) in replacements {
+        output = output.replace(&marker, &html);
+    }
+    output
 }
 
 fn highlight_code(code: &str, syntax: &SyntaxReference, syntax_set: &SyntaxSet) -> Option<String> {
