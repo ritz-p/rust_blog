@@ -1,4 +1,4 @@
-use std::{cell::RefCell, collections::HashSet};
+use std::{cell::RefCell, collections::HashMap};
 use unicode_normalization::UnicodeNormalization;
 
 use lol_html::{RewriteStrSettings, element, rewrite_str, text};
@@ -58,7 +58,7 @@ fn decorate(input: &str, with_toc: bool) -> String {
     if headings.is_empty() {
         return input.to_owned();
     }
-    let mut used = HashSet::new();
+    let mut occurrences = HashMap::new();
     for (_, id, label) in &mut headings {
         *label = html_escape::decode_html_entities(label).into_owned();
         let slug = label
@@ -75,12 +75,13 @@ fn decorate(input: &str, with_toc: bool) -> String {
             "heading-{}",
             if slug.is_empty() { "section" } else { &slug }
         );
-        *id = base.clone();
-        let mut suffix = 2;
-        while !used.insert(id.clone()) {
-            *id = format!("{base}-{suffix}");
-            suffix += 1;
-        }
+        let occurrence = occurrences.entry(base.clone()).or_insert(0);
+        *occurrence += 1;
+        *id = if *occurrence == 1 {
+            base
+        } else {
+            format!("{base}--{occurrence}")
+        };
     }
     let mut index = 0;
     let content = rewrite_str(
@@ -173,10 +174,28 @@ mod tests {
             "heading-日本語-text",
             "heading-same",
             "heading-same-2",
-            "heading-same-2-2",
+            "heading-same--2",
         ] {
             assert_eq!(original.matches(&format!("id=\"{id}\"")).count(), 1);
             assert_eq!(edited.matches(&format!("id=\"{id}\"")).count(), 1);
+        }
+    }
+
+    #[test]
+    fn duplicate_links_survive_insertion_of_a_suffix_named_heading() {
+        let original = markdown_to_html("## Same\n\n## Same");
+        for markdown in [
+            "## Same-2\n\n## Same\n\n## Same",
+            "## Same\n\n## Same-2\n\n## Same",
+            "## Same\n\n## Same\n\n## Same-2",
+        ] {
+            let edited = markdown_to_html(markdown);
+            for id in ["heading-same", "heading-same--2"] {
+                let heading = format!("<h2 id=\"{id}\">Same</h2>");
+                assert!(original.contains(&heading));
+                assert!(edited.contains(&heading));
+            }
+            assert!(edited.contains("<h2 id=\"heading-same-2\">Same-2</h2>"));
         }
     }
 }

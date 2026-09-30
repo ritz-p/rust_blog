@@ -163,7 +163,7 @@ mod tests {
         for id in [
             "heading-同名",
             "heading-深い-code-link",
-            "heading-同名-2",
+            "heading-同名--2",
             "heading-末尾",
         ] {
             assert_eq!(toc.matches(&format!("href=\"#{id}\"")).count(), 1);

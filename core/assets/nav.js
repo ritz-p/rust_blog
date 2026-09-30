@@ -1,4 +1,21 @@
 document.addEventListener('DOMContentLoaded', () => {
+  const focusLegacyHeading = () => {
+    let id;
+    try {
+      id = decodeURIComponent(window.location.hash.slice(1));
+    } catch {
+      return;
+    }
+    if (!/^toc-heading-\d+$/.test(id)) return;
+    const anchor = document.getElementById(id);
+    const heading = anchor?.nextElementSibling;
+    if (anchor?.tagName !== 'SPAN' || !/^H[1-6]$/.test(heading?.tagName || '')) return;
+    heading.tabIndex = -1;
+    heading.focus({ preventScroll: true });
+    heading.scrollIntoView({ block: 'start' });
+  };
+  window.addEventListener('hashchange', focusLegacyHeading);
+  focusLegacyHeading();
   for (const heading of document.querySelectorAll('.content :is(h1,h2,h3,h4,h5,h6)[id^="heading-"]')) {
     const link = document.createElement('a');
     link.href = `#${heading.id}`;
