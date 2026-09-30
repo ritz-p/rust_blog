@@ -4,14 +4,14 @@ use crate::entity::{article_category, category, tag};
 use crate::utils;
 use sea_orm::ActiveValue::Set;
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, DatabaseConnection, DbErr, EntityTrait, QueryFilter,
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, DbErr, EntityTrait, QueryFilter,
     TransactionTrait,
 };
 use seed::{prepare, upsert, validate};
 use utils::front_matter::FrontMatter;
 
 pub async fn seed_article(
-    db: &DatabaseConnection,
+    db: &impl ConnectionTrait,
     front_matter: &FrontMatter,
     body: &str,
 ) -> Result<i32, anyhow::Error> {
@@ -23,7 +23,7 @@ pub async fn seed_article(
     Ok(article_id)
 }
 
-pub async fn delete_article_by_slug(db: &DatabaseConnection, slug: &str) -> Result<(), DbErr> {
+pub async fn delete_article_by_slug(db: &impl ConnectionTrait, slug: &str) -> Result<(), DbErr> {
     crate::slug::validate(slug, 100).map_err(|error| DbErr::Custom(error.to_string()))?;
     if slug.trim().is_empty() {
         return Err(DbErr::Custom("slug is empty".into()));
@@ -37,7 +37,7 @@ pub async fn delete_article_by_slug(db: &DatabaseConnection, slug: &str) -> Resu
 }
 
 pub async fn seed_tag(
-    db: &DatabaseConnection,
+    db: &(impl ConnectionTrait + TransactionTrait),
     front_matter: &FrontMatter,
     article_id: i32,
 ) -> Result<(), DbErr> {
@@ -88,7 +88,7 @@ pub async fn seed_tag(
 }
 
 pub async fn seed_category(
-    db: &DatabaseConnection,
+    db: &(impl ConnectionTrait + TransactionTrait),
     front_matter: &FrontMatter,
     article_id: i32,
 ) -> Result<(), DbErr> {
