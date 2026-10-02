@@ -133,6 +133,79 @@ mod tests {
     use sea_orm::{DatabaseBackend, MockDatabase};
 
     #[rocket::async_test]
+    async fn confirmation_articles_render_through_server_routes() {
+        use crate::entity::{article_category, article_tag, fixed_content};
+        use sea_orm::{ConnectionTrait, Database, Schema};
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        let backend = db.get_database_backend();
+        let schema = Schema::new(backend);
+        for table in [
+            schema.create_table_from_entity(article::Entity),
+            schema.create_table_from_entity(tag::Entity),
+            schema.create_table_from_entity(category::Entity),
+            schema.create_table_from_entity(article_tag::Entity),
+            schema.create_table_from_entity(article_category::Entity),
+            schema.create_table_from_entity(fixed_content::Entity),
+        ] {
+            db.execute(backend.build(&table)).await.unwrap();
+        }
+        let cases = [
+            31, 33, 34, 35, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49,
+        ];
+        for number in cases {
+            let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join(format!("../content/articles/{number}.md"));
+            let (matter, body) =
+                rust_blog::seed::markdown::parse_markdown_to_front_matter(&path).unwrap();
+            rust_blog::seed::article::seed_article(&db, &matter, &body)
+                .await
+                .unwrap();
+        }
+        let rocket = rocket::custom(rocket::Config::figment().merge((
+            "template_dir",
+            concat!(env!("CARGO_MANIFEST_DIR"), "/../templates"),
+        )))
+        .manage(db)
+        .manage(CommonConfig {
+            articles_per_page: 10,
+            site_name: Some("Fixture tests".into()),
+            default_icatch_path: None,
+            favicon_path: None,
+            public_url: None,
+        })
+        .attach(Template::fairing())
+        .mount("/", routes![article_detail]);
+        let client = Client::tracked(rocket).await.unwrap();
+        for number in cases {
+            let response = client.get(format!("/posts/{number}")).dispatch().await;
+            if number == 37 {
+                assert_eq!(response.status(), Status::NotFound);
+                continue;
+            }
+            assert_eq!(response.status(), Status::Ok, "article {number}");
+            let html = response.into_string().await.unwrap();
+            if [33, 34, 35, 39, 40, 41, 42, 43, 45, 49].contains(&number) {
+                assert!(
+                    html.contains("syntax-"),
+                    "article {number} must be highlighted"
+                );
+            }
+            if [31, 46].contains(&number) {
+                assert!(html.contains("<nav class=\"table-of-contents\""));
+            }
+            if number == 38 {
+                assert!(!html.contains("<nav class=\"table-of-contents\""));
+            }
+            if number == 48 {
+                assert!(html.contains("src=\"/image/fox_girl.png\""));
+            }
+            if number == 47 {
+                assert!(html.contains("本文がない記事"));
+            }
+        }
+    }
+
+    #[rocket::async_test]
     async fn article_renders_highlighted_rust_and_serves_matching_css() {
         let article = article::Model {
             id: 1,
