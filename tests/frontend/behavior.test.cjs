@@ -84,6 +84,18 @@ test('empty results and fetch failures produce visible status messages', async t
   assert.match(failed.document.getElementById('search-status').textContent, /読み込めません/);
 });
 
+test('search highlights late body matches and keeps HTML and Unicode as text', async t => {
+  const body = `${'前文'.repeat(150)} 東京 <img src=x> 😀`;
+  const article = { ...articles[0], body, text: `rust ${body.toLowerCase()}`, excerpt: 'unrelated excerpt' };
+  const { document } = await browser(t, 'search.js', '?q=RUST+東京', async () => ({ ok: true, json: async () => [article] }));
+  const excerpt = document.querySelector('.article-card-excerpt');
+  assert.equal(excerpt.querySelector('mark').textContent, '東京');
+  assert.ok(excerpt.textContent.startsWith('…'));
+  assert.ok(excerpt.textContent.includes('<img src=x> 😀'));
+  assert.equal(excerpt.querySelector('img'), null);
+  assert.equal(document.querySelector('.article-card-title mark').textContent, 'Rust');
+});
+
 test('an empty query does not fetch the search index', async t => {
   await browser(t, 'search.js', '?q=%20', () => assert.fail('unexpected fetch'));
 });

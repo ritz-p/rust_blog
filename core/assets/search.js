@@ -42,6 +42,40 @@ document.addEventListener('DOMContentLoaded', async () => {
     return node;
   }
 
+  function fragments(text, terms, excerpt) {
+    const chars = Array.from(text || '');
+    let folded = '';
+    const origins = [];
+    chars.forEach((ch, index) => {
+      const lower = ch.toLowerCase();
+      origins.push(...Array(lower.length).fill(index));
+      folded += lower;
+    });
+    const matches = Array(chars.length).fill(false);
+    for (const term of terms) {
+      let offset = 0;
+      while ((offset = folded.indexOf(term, offset)) !== -1) {
+        matches.fill(true, origins[offset], origins[offset + term.length - 1] + 1);
+        offset += term.length;
+      }
+    }
+    const start = excerpt ? Math.max(0, matches.indexOf(true) - 40) : 0;
+    const end = excerpt ? Math.min(chars.length, start + 160) : chars.length;
+    const parts = start ? [{ text: '…', matched: false }] : [];
+    for (let i = start; i < end; i++) {
+      if (parts.length && parts.at(-1).matched === matches[i]) parts.at(-1).text += chars[i];
+      else parts.push({ text: chars[i], matched: matches[i] });
+    }
+    if (end < chars.length) parts.push({ text: '…', matched: false });
+    return parts;
+  }
+
+  function appendFragments(node, parts) {
+    for (const part of parts) {
+      node.append(part.matched ? element('mark', '', part.text) : document.createTextNode(part.text));
+    }
+  }
+
   function pageUrl(page) {
     const url = new URL('/', window.location.origin);
     url.searchParams.set('q', query);
@@ -97,11 +131,18 @@ document.addEventListener('DOMContentLoaded', async () => {
       date.append(element('span', 'date-item', `公開日 ${article.created_at}`));
       date.append(element('span', 'date-item date-updated', ` / 更新日 ${article.updated_at}`));
       const title = element('h2', 'article-card-title');
-      const titleLink = element('a', '', article.title);
+      const titleLink = element('a');
+      appendFragments(titleLink, fragments(article.title, terms, false));
       titleLink.href = article.url;
       title.append(titleLink);
       body.append(date, title);
-      if (article.excerpt) body.append(element('p', 'article-card-excerpt', article.excerpt));
+      const bodyParts = fragments(article.body, terms, true);
+      const parts = bodyParts.some(part => part.matched) ? bodyParts : fragments(article.excerpt, terms, true);
+      if (parts.length) {
+        const excerpt = element('p', 'article-card-excerpt');
+        appendFragments(excerpt, parts);
+        body.append(excerpt);
+      }
       card.append(body);
       list.append(card);
     }

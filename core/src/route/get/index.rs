@@ -168,6 +168,16 @@ async fn render_index(
                 None => cut_out_string(&markdown_to_text(&m.content), 100),
             };
             let slug = m.slug;
+            let title_highlights = if search_query.is_empty() {
+                Vec::new()
+            } else {
+                crate::utils::search::fragments(&m.title, search_query, false)
+            };
+            let excerpt_highlights = if search_query.is_empty() {
+                Vec::new()
+            } else {
+                crate::utils::search::excerpt_fragments(&m.content, &excerpt, search_query)
+            };
             let icatch_path = m
                 .icatch_path
                 .clone()
@@ -177,6 +187,8 @@ async fn render_index(
                 "slug":       slug.clone(),
                 "url":        format!("/posts/{}", crate::utils::url_segment(&slug)),
                 "excerpt":    excerpt,
+                "title_highlights": title_highlights,
+                "excerpt_highlights": excerpt_highlights,
                 "icatch_path": icatch_path,
                 "created_at": utc_to_jst(m.created_at),
                 "updated_at": utc_to_jst(m.updated_at),
@@ -299,6 +311,10 @@ mod tests {
                 body.matches("<article class=\"article-card\">").count(),
                 expected
             );
+            if query == "RUST 所有権" {
+                assert!(body.contains("<mark>Rust</mark>"));
+                assert!(body.contains("<mark>所有権</mark>"));
+            }
         }
         let response = client
             .get("/?q=DEC%20body&per=1&year=2025&month=12")
@@ -315,8 +331,17 @@ mod tests {
         assert_eq!(response.status(), Status::Ok);
         let body =
             html_escape::decode_html_entities(&response.into_string().await.unwrap()).into_owned();
-        assert!(body.contains("Dec 1"));
-        assert!(!body.contains("Dec 2"));
+        assert!(
+            body.replace("<mark>", "")
+                .replace("</mark>", "")
+                .contains("Dec 1")
+        );
+        assert!(
+            !body
+                .replace("<mark>", "")
+                .replace("</mark>", "")
+                .contains("Dec 2")
+        );
         assert!(body.contains("/archive/2025/12?q=DEC%20body"));
         let response = client.get("/?q=Rust&year=2025&month=11").dispatch().await;
         assert!(
