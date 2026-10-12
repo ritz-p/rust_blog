@@ -22,7 +22,11 @@ test('confirmation articles preserve code and display conditions through nginx',
         if (![31, 44].includes(number)) assert.ok(rendered[index].querySelector('[class*="syntax-"]'), `highlight ${number}/${index}`);
       }
       if ([31, 46].includes(number)) {
-        for (const link of content.querySelectorAll('nav.table-of-contents a')) {
+        const toc = content.querySelector('nav.table-of-contents');
+        assert.ok(toc, `TOC present ${number}`);
+        const links = toc.querySelectorAll('a');
+        assert.ok(links.length > 0, `TOC links ${number}`);
+        for (const link of links) {
           assert.ok(content.querySelector(`[id="${link.hash.slice(1)}"]`), `TOC target ${number}`);
         }
       }
