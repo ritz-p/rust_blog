@@ -2,9 +2,9 @@ name: JavaScript
 
 on:
   pull_request:
-    branches: [master]
+    branches: [develop]
   push:
-    branches: [master]
+    branches: [develop]
   workflow_dispatch:
 
 env:

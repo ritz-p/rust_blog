@@ -1,5 +1,10 @@
 name: Prepare container and cached tools
-description: Build CI image and reuse tools only for identical Rust build inputs
+description: Build CI image and optionally reuse tools for identical Rust build inputs
+inputs:
+  build-tools:
+    description: Build and cache Markdown and export helper binaries
+    required: false
+    default: "true"
 runs:
   using: composite
   steps:
@@ -13,6 +18,7 @@ runs:
         cache-from: type=gha,scope=checks-image
         cache-to: type=gha,mode=max,scope=checks-image
     - uses: actions/cache@v6
+      if: inputs.build-tools == 'true'
       id: tools
       with:
         path: .ci-tools
@@ -21,6 +27,6 @@ runs:
       shell: bash
       run: docker compose up -d --no-build web
     - name: Build checks tools on cache miss
-      if: steps.tools.outputs.cache-hit != 'true'
+      if: inputs.build-tools == 'true' && steps.tools.outputs.cache-hit != 'true'
       shell: bash
       run: docker compose exec -T web sh docker/build-check-tools.sh

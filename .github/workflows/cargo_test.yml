@@ -3,7 +3,7 @@ name: Cargo Test
 on:
   pull_request:
     branches:
-      - "master"
+      - "develop"
     paths:
       - "**/*.rs"
       - "**/Cargo.toml"
@@ -13,7 +13,15 @@ on:
       - "blog_config.toml"
       - ".cargo/**"
       - "rust-toolchain*"
+      - "ci/Dockerfile"
+      - "docker-compose.yml"
+      - "docker-compose.ci.yml"
+      - ".dockerignore"
+      - ".github/actions/prepare-checks/action.yml"
       - ".github/workflows/cargo_test.yml"
+
+env:
+  COMPOSE_FILE: docker-compose.yml:docker-compose.ci.yml
 
 jobs:
   test:
@@ -23,13 +31,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Install linker dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends clang mold
-
-      - name: Install Rust and cache Cargo
-        uses: actions-rust-lang/setup-rust-toolchain@v2
+      - uses: ./.github/actions/prepare-checks
+        with:
+          build-tools: "false"
 
       - name: Run test
-        run: cargo test --workspace
+        run: docker compose exec -T web cargo test --workspace
+
+      - name: Stop containers
+        if: always()
+        run: docker compose down

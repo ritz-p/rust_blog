@@ -94,10 +94,11 @@ docker compose exec -T -e EXPORT_DATABASE_PATH=artifact/static-export/blog.db we
    トークンをファイルへ書き込む必要はありません。
 4. **Run workflow** で `deploy` をオンにして実行します。
 
-`wrangler.toml` の `rust-blog-static` という名前で Workers Static Assets に公開します。
+`wrangler.toml` の `name`（現在は `test-static-blog`）で Workers Static Assets に公開します。
 同じ名前の Worker がある場合は、そのデプロイが更新されます。
-公開 URL はデプロイステップのログで確認できます。
-初回に workers.dev サブドメインの設定を求められる場合は、Cloudflare ダッシュボードで設定します。
+現在の設定は `workers_dev = false`・`preview_urls = false` です。
+Cloudflare 側で対象 Worker に設定したカスタムドメインや route を確認してアクセスしてください。
+workers.dev で公開する場合は、`workers_dev` の設定とアカウントのサブドメインを別途用意します。
 
 公開先では Rust サーバーや SQLite を動かさず、生成済みファイルを配信します。
 この構成に D1 や Containers の契約は不要です。
