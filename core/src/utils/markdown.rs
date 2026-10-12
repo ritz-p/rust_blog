@@ -1,3 +1,4 @@
+mod footnotes;
 pub mod to_text;
 mod toc;
 use ammonia::Builder;
@@ -5,7 +6,7 @@ use pulldown_cmark::{CodeBlockKind, Event, Options, Parser, Tag, html};
 use std::sync::LazyLock;
 use syntect::{
     html::{ClassStyle, ClassedHTMLGenerator},
-    parsing::{SyntaxReference, SyntaxSet},
+    parsing::{SyntaxDefinition, SyntaxReference, SyntaxSet},
     util::LinesWithEndings,
 };
 pub use toc::toc;
@@ -13,7 +14,18 @@ pub use toc::toc;
 use to_text::{end_tag, is_strikethrough, start_tag};
 
 static SYNTAX_SET: LazyLock<SyntaxSet> = LazyLock::new(SyntaxSet::load_defaults_newlines);
-static EXTRA_SYNTAX_SET: LazyLock<SyntaxSet> = LazyLock::new(two_face::syntax::extra_newlines);
+static EXTRA_SYNTAX_SET: LazyLock<SyntaxSet> = LazyLock::new(|| {
+    let mut builder = two_face::syntax::extra_newlines().into_builder();
+    builder.add(
+        SyntaxDefinition::load_from_str(
+            include_str!("../../assets/syntaxes/PowerShell.sublime-syntax"),
+            true,
+            None,
+        )
+        .expect("embedded PowerShell syntax must be valid"),
+    );
+    builder.build()
+});
 
 pub fn markdown_to_html(input: &str) -> String {
     let mut options = Options::empty();
@@ -64,10 +76,26 @@ pub fn markdown_to_html(input: &str) -> String {
         events.push(event);
     }
 
+    let mut rendered = String::new();
+    html::push_html(&mut rendered, events.iter().cloned());
+    let sanitized = sanitize_html(&rendered);
+    if !events.iter().any(|event| {
+        matches!(
+            event,
+            Event::FootnoteReference(_) | Event::Start(Tag::FootnoteDefinition(_))
+        )
+    }) {
+        return toc::anchors(&sanitized);
+    }
+    let (events, replacements) = footnotes::prepare(events, &sanitized);
     let mut html_output = String::new();
     html::push_html(&mut html_output, events.into_iter());
 
-    sanitize_html(&html_output)
+    let mut output = sanitize_html(&html_output);
+    for (marker, html) in replacements {
+        output = output.replace(&marker, &html);
+    }
+    toc::anchors(&output)
 }
 
 fn highlight_code(code: &str, syntax: &SyntaxReference, syntax_set: &SyntaxSet) -> Option<String> {
@@ -142,6 +170,26 @@ pub fn markdown_to_text(markdown: &str) -> String {
 #[cfg(test)]
 mod tests {
     #[test]
+    fn highlights_powershell_and_preserves_source() {
+        let code = "# 日本語コメント\n$names = @(\"世界 <tag> & value\")\n$names | ForEach-Object { Write-Output \"Hello, $_\" }\n$text = @\"\nNames: $names\n\"@\n<# block comment #>\n";
+        for language in ["powershell", "pwsh", "ps1"] {
+            let html = super::markdown_to_html(&format!("```{language}\n{code}```\n"));
+            for class in [
+                "syntax-powershell",
+                "syntax-comment",
+                "syntax-string",
+                "syntax-variable",
+                "syntax-operator",
+            ] {
+                assert!(html.contains(class), "missing {class}: {language}");
+            }
+            assert_eq!(
+                without_spans(&html),
+                super::markdown_to_html(&format!("```\n{code}```\n"))
+            );
+        }
+    }
+    #[test]
     fn toc_is_opt_in_and_omitted_without_headings() {
         let input = "## 見出し\n\nbody";
         assert!(!super::markdown_to_html(input).contains("table-of-contents"));
@@ -156,13 +204,17 @@ mod tests {
         let input = "## 同名\n\n#### **深い** `code` [link](https://example.com)\n\n## 同名\n\n末尾\n====\n\n```bash\n# not a heading\n```";
         let html = super::toc(&super::markdown_to_html(input));
         let toc = html.split("</nav>").next().unwrap();
-        assert!(toc.contains("<a href=\"#toc-heading-1\">同名</a><ol><li><a href=\"#toc-heading-2\">深い code link</a>"));
+        assert!(toc.contains("<a href=\"#heading-同名\">同名</a><ol><li><a href=\"#heading-深い_20_code_20_link\">深い code link</a>"));
         for i in 1..=4 {
             assert_eq!(html.matches(&format!("id=\"toc-heading-{i}\"")).count(), 1);
-            assert_eq!(
-                toc.matches(&format!("href=\"#toc-heading-{i}\"")).count(),
-                1
-            );
+        }
+        for id in [
+            "heading-同名",
+            "heading-深い_20_code_20_link",
+            "heading-同名--2",
+            "heading-末尾",
+        ] {
+            assert_eq!(toc.matches(&format!("href=\"#{id}\"")).count(), 1);
         }
         assert!(!toc.contains("not a heading"));
         assert_eq!(toc.matches("<ol>").count(), toc.matches("</ol>").count());
