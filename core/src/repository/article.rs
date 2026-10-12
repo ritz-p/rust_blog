@@ -193,6 +193,16 @@ pub async fn get_latest_articles(
     Ok(articles)
 }
 
+pub async fn get_feed_articles(db: &DatabaseConnection) -> Result<Vec<article::Model>, DbErr> {
+    article::Entity::find()
+        .filter(article::Column::CreatedAt.lte(Utc::now()))
+        .order_by_desc(article::Column::CreatedAt)
+        .order_by_asc(article::Column::Slug)
+        .limit(20)
+        .all(db)
+        .await
+}
+
 #[allow(dead_code)]
 pub fn surrounding_articles(articles: &[article::Model], index: usize) -> Vec<&article::Model> {
     if index >= articles.len() {
