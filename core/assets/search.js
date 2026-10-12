@@ -44,12 +44,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   function fragments(text, terms, excerpt) {
     const chars = Array.from(text || '');
-    let folded = '';
+    const folded = (text || '').toLowerCase();
     const origins = [];
+    // Contextual default casing (Σ → ς/σ) preserves UTF-16 lengths, so
+    // per-character lengths can map whole-string lowercase back to its source.
     chars.forEach((ch, index) => {
       const lower = ch.toLowerCase();
       origins.push(...Array(lower.length).fill(index));
-      folded += lower;
     });
     const matches = Array(chars.length).fill(false);
     for (const term of terms) {
