@@ -3,8 +3,11 @@ name: Cargo Clippy
 on:
   pull_request:
     branches:
-      - "master"
+      - "develop"
   workflow_dispatch:
+
+env:
+  COMPOSE_FILE: docker-compose.yml:docker-compose.ci.yml
 
 permissions:
   contents: read
@@ -17,15 +20,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Install Rust
-        uses: actions-rust-lang/setup-rust-toolchain@v2
+      - uses: ./.github/actions/prepare-checks
         with:
-          components: clippy
-
-      - name: Install linker dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends clang mold
+          build-tools: "false"
 
       - name: Run Clippy
-        run: cargo clippy --workspace --all-targets -- -D warnings
+        run: docker compose exec -T web cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Stop containers
+        if: always()
+        run: docker compose down
