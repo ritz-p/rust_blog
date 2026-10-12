@@ -84,6 +84,48 @@ test('empty results and fetch failures produce visible status messages', async t
   assert.match(failed.document.getElementById('search-status').textContent, /読み込めません/);
 });
 
+test('search highlights late body matches and keeps HTML and Unicode as text', async t => {
+  const body = `${'前文'.repeat(150)} 東京 <img src=x> 😀`;
+  const article = { ...articles[0], body, text: `rust ${body.toLowerCase()}`, excerpt: 'unrelated excerpt' };
+  const { document } = await browser(t, 'search.js', '?q=RUST+東京', async () => ({ ok: true, json: async () => [article] }));
+  const excerpt = document.querySelector('.article-card-excerpt');
+  assert.equal(excerpt.querySelector('mark').textContent, '東京');
+  assert.ok(excerpt.textContent.startsWith('…'));
+  assert.ok(excerpt.textContent.includes('<img src=x> 😀'));
+  assert.equal(excerpt.querySelector('img'), null);
+  assert.equal(document.querySelector('.article-card-title mark').textContent, 'Rust');
+});
+
+test('search preserves contextual lowercase in titles and late body snippets', async t => {
+  const title = 'İ 😀 ΟΣ ΟΣΑ ΟΣ\u0301';
+  const body = `${'前文'.repeat(150)} İ 😀 ΟΣ after`;
+  const article = { ...articles[0], title, body, text: `${title}\n${body}`.toLowerCase(), excerpt: 'unrelated excerpt' };
+  const { document } = await browser(t, 'search.js', `?q=${encodeURIComponent('ΟΣ')}`, async () => ({ ok: true, json: async () => [article] }));
+  assert.match(document.getElementById('search-status').textContent, /1件/);
+  const titleLink = document.querySelector('.article-card-title a');
+  assert.equal(titleLink.textContent, title);
+  assert.deepEqual([...titleLink.childNodes].map(node => [node.textContent, node.nodeName === 'MARK']), [
+    ['İ 😀 ', false], ['ΟΣ', true], [' ΟΣΑ ', false], ['ΟΣ', true], ['\u0301', false],
+  ]);
+  const excerpt = document.querySelector('.article-card-excerpt');
+  assert.equal(excerpt.querySelector('mark').textContent, 'ΟΣ');
+  assert.ok(excerpt.textContent.startsWith('…'));
+  assert.ok(excerpt.textContent.includes('İ 😀 ΟΣ after'));
+});
+
+test('search maps lowercase expansions and contextual matches in fallback excerpts', async t => {
+  const title = 'İ 😀 ΟΣ';
+  const body = 'no body match';
+  const article = { ...articles[0], title, body, text: `${title}\n${body}`.toLowerCase(), excerpt: title };
+  const { document } = await browser(t, 'search.js', `?q=${encodeURIComponent('i\u0307 ος')}`, async () => ({ ok: true, json: async () => [article] }));
+  assert.match(document.getElementById('search-status').textContent, /1件/);
+  for (const selector of ['.article-card-title a', '.article-card-excerpt']) {
+    const node = document.querySelector(selector);
+    assert.equal(node.textContent, title);
+    assert.deepEqual([...node.querySelectorAll('mark')].map(mark => mark.textContent), ['İ', 'ΟΣ']);
+  }
+});
+
 test('an empty query does not fetch the search index', async t => {
   await browser(t, 'search.js', '?q=%20', () => assert.fail('unexpected fetch'));
 });
