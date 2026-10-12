@@ -28,11 +28,11 @@ async function browser(t, script, query = '', fetch = undefined) {
   const navigations = [];
   const location = {
     origin: dom.window.location.origin,
-    pathname: '/', search: dom.window.location.search,
+    pathname: '/', search: dom.window.location.search, hash: dom.window.location.hash,
     assign: href => navigations.push(href), replace: href => navigations.push(href),
   };
   const source = readFileSync(path.join(__dirname, '../../core/assets', script), 'utf8');
-  vm.runInNewContext(source, { document, window: { location }, URL, URLSearchParams, fetch });
+  vm.runInNewContext(source, { document, window: { location, addEventListener: dom.window.addEventListener.bind(dom.window) }, URL, URLSearchParams, fetch });
   await handler();
   return { document, navigations };
 }

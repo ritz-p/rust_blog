@@ -104,6 +104,16 @@ docker run --rm -p 8080:8080 -v "$(pwd)/data:/data" rust-blog:prod
 
 Cloudflare 側では、このコンテナを配置したホストへ DNS を向けて Proxy を有効化します。
 
+### 本番コンテナでの静的 export
+
+出力先をディレクトリ単位で切り替えるため、親ディレクトリをマウントします。
+
+```sh
+docker run --rm -v "${PWD}/data:/data" -v "${PWD}/artifact:/export" rust-blog:prod export /export/dist
+```
+
+ホスト側の出力先は `artifact/dist/` です。出力先自体を `/app/dist` にマウントすると Linux のマウントポイントを rename できず失敗します。移行・プレビュー手順は [静的 export の説明](docs/static-deploy.md) を参照してください。
+
 ## SeaOrm について
 
 1. テーブル作成

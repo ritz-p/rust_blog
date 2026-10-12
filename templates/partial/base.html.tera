@@ -19,7 +19,7 @@
   {% if metadata.image %}<meta property="og:image" content="{{ metadata.image | escape | safe }}">{% endif %}
   {% endif %}
   <link rel="stylesheet" href="/css/bulma.min.css">
-  <link rel="stylesheet" href="/css/site.css">
+  <link rel="stylesheet" href="/css/site.css?v=heading-links-3">
   <link rel="shortcut icon" href= "{{ favicon_path }}" >
   {% endblock head %}
 </head>
@@ -55,7 +55,7 @@
     </div>
   </footer>
   {% block scripts %}
-  <script src="/js/nav.js?v=2" defer></script>
+  <script src="/js/nav.js?v=heading-links-3" defer></script>
   {% endblock scripts %}
 </body>
 </html>

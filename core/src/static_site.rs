@@ -1,3 +1,5 @@
+mod output;
+
 use std::{
     collections::HashMap,
     fs,
@@ -75,7 +77,8 @@ pub async fn export_site(
         ),
         None => None,
     };
-    reset_output_dir(out_dir)?;
+    let output = output::StagedOutput::new(out_dir)?;
+    let out_dir = output.path();
     write_static_assets(out_dir, &paths.content_dir, config_map)?;
 
     let config = CommonConfig {
@@ -110,7 +113,7 @@ pub async fn export_site(
         fs::write(out_dir.join("feed.xml"), feed)?;
     }
 
-    Ok(())
+    output.publish()
 }
 
 async fn validate_content_slugs(db: &DatabaseConnection) -> Result<()> {
@@ -756,15 +759,6 @@ fn normalize_template_name(path: &Path) -> String {
         .to_string()
 }
 
-fn reset_output_dir(out_dir: &Path) -> Result<()> {
-    if out_dir.exists() {
-        fs::remove_dir_all(out_dir)
-            .with_context(|| format!("failed to clear output dir {:?}", out_dir))?;
-    }
-    fs::create_dir_all(out_dir)?;
-    Ok(())
-}
-
 fn write_static_assets(
     out_dir: &Path,
     content_dir: &Path,
@@ -1379,7 +1373,7 @@ mod tests {
         );
         assert!(html.contains("property=\"og:title\" content=\"Highlighted Rust\""));
         assert!(html.contains("href=\"/posts/highlighted-rust/\""));
-        assert!(html.contains("href=\"/css/site.css\""));
+        assert!(html.contains("href=\"/css/site.css?v=heading-links-3\""));
         let content = html
             .split("<div class=\"content is-medium\">")
             .nth(1)

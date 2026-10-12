@@ -12,13 +12,7 @@ pub async fn atom(
     title: &str,
     is_static: bool,
 ) -> Result<String> {
-    let mut articles = crate::repository::article::get_all_published_articles(db).await?;
-    articles.sort_by(|a, b| {
-        b.created_at
-            .cmp(&a.created_at)
-            .then_with(|| a.slug.cmp(&b.slug))
-    });
-    articles.truncate(20);
+    let articles = crate::repository::article::get_feed_articles(db).await?;
     let updated = articles
         .iter()
         .map(|article| article.updated_at.max(article.created_at))
@@ -68,7 +62,9 @@ mod tests {
             .unwrap();
         assert!(empty.contains("1970-01-01T00:00:00Z") && !empty.contains("<entry>"));
         for index in 0..25 {
-            let date = chrono::DateTime::from_timestamp(1_600_000_000 + index * 86400, 0).unwrap();
+            // Timestamp ties span the feed limit and differ from insertion order by slug.
+            let date =
+                chrono::DateTime::from_timestamp(1_600_000_000 + (index / 4) * 86400, 0).unwrap();
             article::ActiveModel {
                 title: Set(format!("Title <&> {index}")),
                 slug: Set(format!("記事-{index}")),
@@ -92,6 +88,17 @@ mod tests {
                 .await
                 .unwrap();
             assert_eq!(output.matches("<entry>").count(), 20);
+            let ids: Vec<_> = output
+                .split("<entry><id>")
+                .skip(1)
+                .map(|entry| entry.split("</id>").next().unwrap())
+                .collect();
+            let expected: Vec<_> = [
+                20, 21, 22, 16, 17, 18, 19, 12, 13, 14, 15, 10, 11, 8, 9, 4, 5, 6, 7, 0,
+            ]
+            .map(|index| format!("https://example.com/posts/%E8%A8%98%E4%BA%8B-{index}"))
+            .into();
+            assert_eq!(ids, expected);
             assert!(
                 !output.contains("Title &lt;&amp;&gt; 24")
                     && !output.contains("Title &lt;&amp;&gt; 23")

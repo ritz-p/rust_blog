@@ -1,8 +1,16 @@
-use std::cell::RefCell;
+use std::{cell::RefCell, collections::HashMap};
 
 use lol_html::{RewriteStrSettings, element, rewrite_str, text};
 
 pub fn toc(input: &str) -> String {
+    decorate(input, true)
+}
+
+pub(super) fn anchors(input: &str) -> String {
+    decorate(input, false)
+}
+
+fn decorate(input: &str, with_toc: bool) -> String {
     let headings = RefCell::new(Vec::<(u8, String, String)>::new());
     let selector = "h1, h2, h3, h4, h5, h6";
     let result = rewrite_str(
@@ -11,7 +19,6 @@ pub fn toc(input: &str) -> String {
             .append_element_content_handler(element!(selector, |el| {
                 let mut headings = headings.borrow_mut();
                 let id = format!("toc-heading-{}", headings.len() + 1);
-                el.set_attribute("id", &id)?;
                 let level = el.tag_name().as_bytes()[1] - b'0';
                 headings.push((level, id, String::new()));
                 Ok(())
@@ -43,15 +50,56 @@ pub fn toc(input: &str) -> String {
                 }
             )),
     );
-    let Ok(content) = result else {
+    let Ok(_) = result else {
         return input.to_owned();
     };
     let mut headings = headings.into_inner();
     if headings.is_empty() {
         return input.to_owned();
     }
-    for (_, _, label) in &mut headings {
+    let mut occurrences = HashMap::new();
+    for (_, id, label) in &mut headings {
         *label = html_escape::decode_html_entities(label).into_owned();
+        let slug = label
+            .chars()
+            .map(|c| {
+                if c.is_alphanumeric() {
+                    c.to_string()
+                } else {
+                    format!("_{:x}_", u32::from(c))
+                }
+            })
+            .collect::<String>();
+        let base = format!(
+            "heading-{}",
+            if slug.is_empty() { "_empty_" } else { &slug }
+        );
+        let occurrence = occurrences.entry(base.clone()).or_insert(0);
+        *occurrence += 1;
+        *id = if *occurrence == 1 {
+            base
+        } else {
+            format!("{base}--{occurrence}")
+        };
+    }
+    let mut index = 0;
+    let content = rewrite_str(
+        input,
+        RewriteStrSettings::new().append_element_content_handler(element!(selector, |el| {
+            el.set_attribute("id", &headings[index].1)?;
+            index += 1;
+            if with_toc {
+                el.before(
+                    &format!("<span id=\"toc-heading-{index}\"></span>"),
+                    lol_html::html_content::ContentType::Html,
+                );
+            }
+            Ok(())
+        })),
+    )
+    .unwrap_or_else(|_| input.to_owned());
+    if !with_toc {
+        return content;
     }
     let mut output = format!(
         "<nav class=\"table-of-contents\" aria-label=\"目次\"><div class=\"toc-header\"><span class=\"toc-title\">目次</span><span class=\"toc-count\">{}項目</span></div>",
@@ -109,9 +157,71 @@ mod tests {
         assert!(nav.contains(">HTML &amp; heading</a>"));
         assert!(!nav.contains("&amp;amp;"));
         assert_eq!(
-            body.replace(" id=\"toc-heading-1\"", "")
-                .replace(" id=\"toc-heading-2\"", ""),
+            body.replace("<span id=\"toc-heading-1\"></span>", "")
+                .replace("<span id=\"toc-heading-2\"></span>", ""),
             rendered
         );
+    }
+
+    #[test]
+    fn heading_links_survive_unrelated_insertions_and_disambiguate_duplicates() {
+        let original = markdown_to_html("## **日本語** & text\n\n## Same\n\n## Same\n\n## Same-2");
+        let edited = markdown_to_html(
+            "## New heading\n\n## **日本語** & text\n\n## Same\n\n## Same\n\n## Same-2",
+        );
+        for id in [
+            "heading-日本語_20__26__20_text",
+            "heading-Same",
+            "heading-Same_2d_2",
+            "heading-Same--2",
+        ] {
+            assert_eq!(original.matches(&format!("id=\"{id}\"")).count(), 1);
+            assert_eq!(edited.matches(&format!("id=\"{id}\"")).count(), 1);
+        }
+    }
+
+    #[test]
+    fn duplicate_links_survive_insertion_of_a_suffix_named_heading() {
+        let original = markdown_to_html("## Same\n\n## Same");
+        for markdown in [
+            "## Same-2\n\n## Same\n\n## Same",
+            "## Same\n\n## Same-2\n\n## Same",
+            "## Same\n\n## Same\n\n## Same-2",
+        ] {
+            let edited = markdown_to_html(markdown);
+            for id in ["heading-Same", "heading-Same--2"] {
+                let heading = format!("<h2 id=\"{id}\">Same</h2>");
+                assert!(original.contains(&heading));
+                assert!(edited.contains(&heading));
+            }
+            assert!(edited.contains("<h2 id=\"heading-Same_2d_2\">Same-2</h2>"));
+        }
+    }
+
+    #[test]
+    fn distinct_labels_keep_ids_when_slug_collisions_are_inserted() {
+        for (label, other, id, other_id) in [
+            ("A+B", "A/B", "heading-A_2b_B", "heading-A_2f_B"),
+            ("API", "api", "heading-API", "heading-api"),
+            ("A B", "A-B", "heading-A_20_B", "heading-A_2d_B"),
+            ("A+B", "A_2b_B", "heading-A_2b_B", "heading-A_5f_2b_5f_B"),
+            ("é", "e\u{301}", "heading-é", "heading-e_301_"),
+        ] {
+            let original = markdown_to_html(&format!("## {label}\n\n## {label}"));
+            for markdown in [
+                format!("## {other}\n\n## {label}\n\n## {label}"),
+                format!("## {label}\n\n## {other}\n\n## {label}"),
+                format!("## {label}\n\n## {label}\n\n## {other}"),
+            ] {
+                let edited = markdown_to_html(&markdown);
+                for stable_id in [id.to_owned(), format!("{id}--2")] {
+                    let heading = format!("<h2 id=\"{stable_id}\">{label}</h2>");
+                    assert!(original.contains(&heading));
+                    assert!(edited.contains(&heading));
+                    assert_eq!(edited.matches(&format!("id=\"{stable_id}\"")).count(), 1);
+                }
+                assert!(edited.contains(&format!("<h2 id=\"{other_id}\">{other}</h2>")));
+            }
+        }
     }
 }
