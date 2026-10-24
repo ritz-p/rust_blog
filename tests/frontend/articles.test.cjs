@@ -5,7 +5,7 @@ const { JSDOM } = require('jsdom');
 
 const base = process.env.STATIC_SITE_URL;
 test('confirmation articles preserve code and display conditions through nginx', { skip: !base && 'Set STATIC_SITE_URL to check the exported fixtures' }, async () => {
-  for (const number of [31, 33, 34, 35, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49]) {
+  for (const number of [31, 33, 34, 35, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50]) {
     const response = await fetch(new URL(`/posts/${number}/`, base));
     if (number === 37) { assert.equal(response.status, 404); continue; }
     assert.equal(response.status, 200, `article ${number}`);
@@ -13,6 +13,13 @@ test('confirmation articles preserve code and display conditions through nginx',
     try {
       const content = dom.window.document.querySelector('.content.is-medium');
       assert.ok(content, `article ${number}`);
+      const notice = dom.window.document.querySelector('.article-deprecated');
+      assert.equal(Boolean(notice), number === 50, `deprecated notice ${number}`);
+      if (notice) {
+        assert.equal(notice.textContent, 'この記事の内容は古いです');
+        assert.equal(notice.nextElementSibling, content);
+        assert.equal(notice.getAttribute('role'), 'note');
+      }
       const source = readFileSync(`content/articles/${number}.md`, 'utf8').replaceAll('\r\n', '\n');
       const blocks = [...source.matchAll(/^```[^\n]*\n([\s\S]*?)^```/gm)];
       const rendered = [...content.querySelectorAll('pre code')];

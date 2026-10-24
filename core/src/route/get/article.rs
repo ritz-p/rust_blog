@@ -107,6 +107,7 @@ pub async fn article_detail(
             metadata: crate::utils::metadata::article_metadata(&article, config, false),
             title: article.title,
             content_html: content,
+            deprecated: article.deprecated,
             created_at: created_at,
             updated_at: updated_at,
             tags: &tags,
@@ -151,7 +152,7 @@ mod tests {
             db.execute(backend.build(&table)).await.unwrap();
         }
         let cases = [
-            31, 33, 34, 35, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49,
+            31, 33, 34, 35, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50,
         ];
         for number in cases {
             let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -185,6 +186,12 @@ mod tests {
             }
             assert_eq!(response.status(), Status::Ok, "article {number}");
             let html = response.into_string().await.unwrap();
+            let notice = html.find("この記事の内容は古いです");
+            assert_eq!(notice.is_some(), number == 50);
+            if let Some(position) = notice {
+                assert!(position < html.find("<div class=\"content is-medium\">").unwrap());
+                assert!(html.contains("class=\"notification article-deprecated\" role=\"note\""));
+            }
             if [33, 34, 35, 39, 40, 41, 42, 43, 45, 49].contains(&number) {
                 assert!(
                     html.contains("syntax-"),
@@ -219,6 +226,7 @@ mod tests {
             updated_at: Utc::now(),
             icatch_path: None,
             table_of_contents: false,
+            deprecated: false,
         };
         let db = MockDatabase::new(DatabaseBackend::Sqlite)
             .append_query_results([vec![article.clone()]])
@@ -261,7 +269,7 @@ mod tests {
                 .contains("href=\"/posts/highlighted-rust%23intro\""),
             "{html}"
         );
-        assert!(html.contains("href=\"/css/site.css?v=code-copy-1\""));
+        assert!(html.contains("href=\"/css/site.css?v=deprecated-1\""));
         let content = html
             .split("<div class=\"content is-medium\">")
             .nth(1)

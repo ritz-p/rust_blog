@@ -228,7 +228,7 @@ mod tests {
     }
 
     #[rocket::async_test]
-    async fn reseed_updates_table_of_contents_in_both_directions() {
+    async fn reseed_updates_article_flags_in_both_directions() {
         use sea_orm::{ConnectionTrait, Database, EntityTrait, Schema};
         let db = Database::connect("sqlite::memory:").await.unwrap();
         let backend = db.get_database_backend();
@@ -239,6 +239,7 @@ mod tests {
         let mut matter = build_front_matter_from_title_and_slug("TOC", "31");
         for enabled in [false, true, false] {
             matter.table_of_contents = enabled;
+            matter.deprecated = enabled;
             let id = seed_article(&db, &matter, "## Heading").await.unwrap();
             let saved = article::Entity::find_by_id(id)
                 .one(&db)
@@ -246,6 +247,7 @@ mod tests {
                 .unwrap()
                 .unwrap();
             assert_eq!(saved.table_of_contents, enabled);
+            assert_eq!(saved.deprecated, enabled);
             assert_eq!(saved.content, "## Heading");
         }
     }
@@ -337,6 +339,7 @@ mod tests {
             updated_at: ts.unwrap(),
             icatch_path: None,
             table_of_contents: false,
+            deprecated: false,
         }
     }
 

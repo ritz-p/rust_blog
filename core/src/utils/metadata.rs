@@ -80,6 +80,7 @@ mod tests {
             updated_at: chrono::Utc::now(),
             icatch_path: None,
             table_of_contents: false,
+            deprecated: false,
         };
         let mut config = CommonConfig {
             articles_per_page: 10,

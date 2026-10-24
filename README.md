@@ -151,7 +151,7 @@ UTF-8 BOM 付きファイルにも対応し、BOM と改行形式を保持しま
 型・文字数・日時・未知の項目を検証します。不正なファイルは書き換えず、正常なファイルの整形を続けます。
 探索・読み書き・検証のエラーは最後にファイル名つきでまとめて表示し、非ゼロで終了します。
 `--check` では書き換えず、検証エラーと未整形のファイルをまとめて報告します。
-順序は `title`, `slug`, `deleted`, `table_of_contents`, `created_at`, `excerpt`, `icatch_path`, `tags`, `categories`。
+順序は `title`, `slug`, `deleted`, `table_of_contents`, `deprecated`, `created_at`, `excerpt`, `icatch_path`, `tags`, `categories`。
 `date` は名前を保持し、`created_at` と同じ位置に並べます。省略された任意項目は追加しません。
 YAML のコメントや引用形式は正規化されますが、本文は保持します。
 `--check` は検証エラーまたは未整形の場合に非ゼロで終了します。
@@ -166,7 +166,7 @@ docker compose exec web cargo run -p rust_blog --bin export_markdown
 既存ファイルや古い出力があればエラーになります。更新する場合は `--force` を指定してください。
 `--force` は上書きに加え、DB に存在しない `articles/<id>.md`・`fixed_contents/<id>.md` を削除します。空の DB でも古い出力を削除します。
 削除対象は各ディレクトリ直下の整数 ID のファイルだけです。それ以外のファイルは保持するため、seed 用の出力先には手書きの Markdown を混在させないでください。
-記事の公開日時・目次設定・タグ・カテゴリ・本文を保持します。
+記事の公開日時・目次設定・deprecated 設定・タグ・カテゴリ・本文を保持します。
 DB の ID・更新日時および固定ページの日時は seed の入力項目ではないためヘッダーには含めません。
 タグ・カテゴリは seed と同じ名前の配列です。独立した taxonomy の slug や未使用項目のバックアップには使えません。
 
@@ -180,6 +180,7 @@ docker compose exec -e ARTICLE_PATH=markdown_output/articles -e FIXED_CONTENT_PA
 - [テスト観点](docs/testing.md)
 - [CI の構成](docs/ci-checks.md)
 - [目次設定](docs/table-of-contents.md)
+- [古い記事の注意表示](docs/deprecated-articles.md)
 - [静的デプロイ](docs/static-deploy.md)
 - [export バンドル](docs/export-bundle-usage.md)
 - [Cloudflare](docs/cloudflare.md)

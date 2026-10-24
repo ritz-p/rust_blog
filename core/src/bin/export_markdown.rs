@@ -13,6 +13,7 @@ struct ArticleMatter<'a> {
     title: &'a str,
     slug: &'a str,
     table_of_contents: bool,
+    deprecated: bool,
     created_at: String,
     excerpt: &'a Option<String>,
     icatch_path: &'a Option<String>,
@@ -61,6 +62,7 @@ async fn documents(db: &impl ConnectionTrait) -> Result<Vec<(PathBuf, String)>> 
             title: &model.title,
             slug: &model.slug,
             table_of_contents: model.table_of_contents,
+            deprecated: model.deprecated,
             created_at: model.created_at.to_rfc3339(),
             excerpt: &model.excerpt,
             icatch_path: &model.icatch_path,
@@ -216,7 +218,7 @@ mod tests {
             db.execute(backend.build(&statement)).await.unwrap();
         }
         assert!(documents(&db).await.unwrap().is_empty());
-        let matter: FrontMatter = serde_yaml::from_str("title: 'Test: 日本語 --- test'\nslug: test-export\ntable_of_contents: true\ncreated_at: 2026-01-01T00:00:00Z\ntags: [Rust]\ncategories: [Dev]\n").unwrap();
+        let matter: FrontMatter = serde_yaml::from_str("title: 'Test: 日本語 --- test'\nslug: test-export\ntable_of_contents: true\ndeprecated: true\ncreated_at: 2026-01-01T00:00:00Z\ntags: [Rust]\ncategories: [Dev]\n").unwrap();
         let body = "\n# Body\n---\n```rust\nfn main() {}\n```\n";
         let id = seed_article(&db, &matter, body).await.unwrap();
         seed_tag(&db, &matter, id).await.unwrap();
@@ -247,6 +249,7 @@ mod tests {
             Some("2026-01-01T00:00:00+00:00")
         );
         assert!(parsed.table_of_contents);
+        assert!(parsed.deprecated);
         assert_eq!(exported_body, body);
         assert!(output[1].1.ends_with("---\nAbout body"));
         let root = std::env::temp_dir().join(format!(

@@ -1,6 +1,6 @@
 # Article fixture regression tests
 
-`cargo test -p rust_blog confirmation_articles` seeds selected real Markdown fixtures into an isolated in-memory database and requests the actual article route. It checks publication filtering, language highlighting, table-of-contents settings and minimal articles. It does not depend on the total article count.
+`cargo test -p rust_blog confirmation_articles` seeds selected real Markdown fixtures into an isolated in-memory database and requests the actual article route. It checks publication filtering, language highlighting, table-of-contents settings, deprecated notices and minimal articles. It does not depend on the total article count.
 
 The JavaScript CI exports all fixtures and runs `tests/frontend/articles.test.cjs` through nginx using `STATIC_SITE_URL`. It compares every rendered code block with its original Markdown content and checks images, TOC targets, empty content and future publication. Locally run `docker compose exec -T -e STATIC_SITE_URL=http://static web npm run test:js` after export and recreating the static container.
 

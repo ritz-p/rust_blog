@@ -537,3 +537,9 @@
   margin-top: 1rem;
   font-size: 0.875rem;
 }
+
+.article-deprecated {
+  color: #7c2d12;
+  background-color: #ffedd5;
+  border-left: 4px solid #ea580c;
+}

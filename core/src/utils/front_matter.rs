@@ -9,6 +9,8 @@ pub struct FrontMatter {
     pub deleted: bool,
     #[serde(default)]
     pub table_of_contents: bool,
+    #[serde(default)]
+    pub deprecated: bool,
     #[serde(default, alias = "date")]
     pub created_at: Option<String>,
     pub excerpt: Option<String>,
@@ -40,6 +42,7 @@ impl FrontMatter {
             slug,
             deleted,
             table_of_contents: false,
+            deprecated: false,
             created_at,
             excerpt,
             icatch_path,
@@ -54,19 +57,28 @@ mod tests {
     use super::FrontMatter;
 
     #[test]
-    fn table_of_contents_is_opt_in() {
+    fn article_flags_are_opt_in() {
         let base = "title: Test\nslug: test\ntags: []\ncategories: []\n";
-        for (setting, expected) in [
-            ("", false),
-            ("table_of_contents: false\n", false),
-            ("table_of_contents: true\n", true),
-        ] {
-            let matter: FrontMatter = serde_yaml::from_str(&format!("{base}{setting}")).unwrap();
-            assert_eq!(matter.table_of_contents, expected);
+        for field in ["table_of_contents", "deprecated"] {
+            for (setting, expected) in [
+                (String::new(), false),
+                (format!("{field}: false\n"), false),
+                (format!("{field}: true\n"), true),
+            ] {
+                let matter: FrontMatter =
+                    serde_yaml::from_str(&format!("{base}{setting}")).unwrap();
+                assert_eq!(
+                    if field == "deprecated" {
+                        matter.deprecated
+                    } else {
+                        matter.table_of_contents
+                    },
+                    expected
+                );
+            }
+            assert!(
+                serde_yaml::from_str::<FrontMatter>(&format!("{base}{field}: invalid")).is_err()
+            );
         }
-        assert!(
-            serde_yaml::from_str::<FrontMatter>(&format!("{base}table_of_contents: invalid"))
-                .is_err()
-        );
     }
 }

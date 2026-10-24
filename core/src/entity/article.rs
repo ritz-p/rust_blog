@@ -18,6 +18,7 @@ pub struct Model {
     pub updated_at: DateTimeUtc,
     pub icatch_path: Option<String>,
     pub table_of_contents: bool,
+    pub deprecated: bool,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

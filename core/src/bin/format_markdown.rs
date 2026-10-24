@@ -13,6 +13,7 @@ const ORDER: &[&str] = &[
     "slug",
     "deleted",
     "table_of_contents",
+    "deprecated",
     "created_at",
     "excerpt",
     "icatch_path",
@@ -190,6 +191,9 @@ fn validate(source: &Mapping) -> Result<()> {
             Some(Value::Bool(false)),
             |_: bool| Ok(()),
         ),
+        validate_field(source, "deprecated", Some(Value::Bool(false)), |_: bool| {
+            Ok(())
+        }),
     ] {
         if let Err(error) = result {
             errors.push(format!("{error:#}"));
@@ -636,6 +640,7 @@ mod tests {
             format!("{base}created_at: yesterday\n"),
             format!("{base}typo: true\n"),
             format!("{base}table_of_contents: nope\n"),
+            format!("{base}deprecated: nope\n"),
             base.replace("tags: []", "tags: ['']"),
             format!("{base}title: Duplicate\n"),
         ] {

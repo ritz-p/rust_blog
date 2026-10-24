@@ -10,6 +10,7 @@ mod m20251231_000001_create_article_icatch_path;
 
 pub struct Migrator;
 mod m20260922_000001_article_table_of_contents;
+mod m20261024_000001_article_deprecated;
 
 #[async_trait::async_trait]
 impl MigratorTrait for Migrator {
@@ -23,6 +24,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20251024_190826_create_fixed_content_table::Migration),
             Box::new(m20251231_000001_create_article_icatch_path::Migration),
             Box::new(m20260922_000001_article_table_of_contents::Migration),
+            Box::new(m20261024_000001_article_deprecated::Migration),
         ]
     }
 }
