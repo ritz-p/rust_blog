@@ -63,7 +63,7 @@ docker compose exec web cargo run -p rust_blog --bin export
 docker compose up -d --force-recreate static
 ```
 
-[http://localhost:8082/](http://localhost:8082/) で確認できます。生成先は `dist/` です。
+[http://localhost:18081/](http://localhost:18081/) で確認できます。生成先は `dist/` です。
 
 ## 記事検索
 

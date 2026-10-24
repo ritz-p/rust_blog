@@ -67,7 +67,7 @@
   - `docker compose exec web cargo run -p rust_blog --bin export`
 - 静的 preview:
   - `docker compose up -d --force-recreate static`
-  - `http://localhost:8082/` で確認
+  - `http://localhost:18081/` で確認
 
 ## Production Container Checks
 
