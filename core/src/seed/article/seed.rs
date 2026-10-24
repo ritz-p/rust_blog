@@ -57,6 +57,9 @@ pub async fn prepare(
     active_model
         .table_of_contents
         .set_if_not_equals(front_matter.table_of_contents);
+    active_model
+        .deprecated
+        .set_if_not_equals(front_matter.deprecated);
     Ok(active_model)
 }
 

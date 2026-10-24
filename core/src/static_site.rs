@@ -155,6 +155,7 @@ mod slug_tests {
             created_at: Set(Utc::now()),
             updated_at: Set(Utc::now()),
             table_of_contents: Set(false),
+            deprecated: Set(false),
             ..Default::default()
         }
         .insert(&db)
@@ -367,6 +368,7 @@ async fn export_article_pages(
             content
         };
         ctx.insert("content_html", &content);
+        ctx.insert("deprecated", &article.deprecated);
         ctx.insert("created_at", &utc_to_jst(article.created_at));
         ctx.insert("updated_at", &utc_to_jst(article.updated_at));
         ctx.insert("tags", &tags);
@@ -1169,6 +1171,7 @@ mod tests {
                 updated_at: Set(date),
                 icatch_path: Set(None),
                 table_of_contents: Set(false),
+                deprecated: Set(false),
             }
             .insert(&db)
             .await
@@ -1341,6 +1344,7 @@ mod tests {
             updated_at: Utc::now(),
             icatch_path: None,
             table_of_contents: false,
+            deprecated: false,
         };
         let db = MockDatabase::new(DatabaseBackend::Sqlite)
             .append_query_results([vec![article.clone()]])
@@ -1374,7 +1378,7 @@ mod tests {
         );
         assert!(html.contains("property=\"og:title\" content=\"Highlighted Rust\""));
         assert!(html.contains("href=\"/posts/highlighted-rust/\""));
-        assert!(html.contains("href=\"/css/site.css?v=code-copy-1\""));
+        assert!(html.contains("href=\"/css/site.css?v=deprecated-1\""));
         let content = html
             .split("<div class=\"content is-medium\">")
             .nth(1)

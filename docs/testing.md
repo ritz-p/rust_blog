@@ -78,6 +78,7 @@ Markdown・JavaScript・静的配信の検証は [CI の構成](ci-checks.md) �
   - 検索語・対象月を保持したページング URL
 - 記事詳細 (`article.rs`)
   - ハイライト済みコードと対応する CSS の配信
+  - deprecated の注意表示と本文より前の配置、未指定記事での非表示
 
 ### Seed (`core/src/seed.rs`, `core/src/seed/`)
 

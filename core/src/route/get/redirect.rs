@@ -88,6 +88,7 @@ mod tests {
             created_at: Set(now),
             updated_at: Set(now),
             table_of_contents: Set(false),
+            deprecated: Set(false),
             ..Default::default()
         }
         .insert(&db)

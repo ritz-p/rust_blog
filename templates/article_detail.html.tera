@@ -8,6 +8,9 @@
   <div class="column is-8">
     <article class="article-page" aria-labelledby="post-title">
       {% include "partial/article_header" %}
+      {% if deprecated %}
+      <aside class="notification article-deprecated" role="note">この記事の内容は古いです</aside>
+      {% endif %}
       <div class="content is-medium">
         {{ content_html | safe }}
       </div>

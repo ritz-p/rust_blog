@@ -404,6 +404,7 @@ mod tests {
                 excerpt: None,
                 icatch_path: None,
                 table_of_contents: false,
+                deprecated: false,
                 created_at,
                 updated_at: now,
             };
@@ -441,6 +442,7 @@ mod tests {
                 excerpt: None,
                 icatch_path: None,
                 table_of_contents: false,
+                deprecated: false,
                 created_at: now,
                 updated_at: now,
             })

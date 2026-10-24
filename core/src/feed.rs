@@ -76,6 +76,7 @@ mod tests {
                 }),
                 updated_at: Set(date),
                 table_of_contents: Set(false),
+                deprecated: Set(false),
                 ..Default::default()
             }
             .insert(&db)
