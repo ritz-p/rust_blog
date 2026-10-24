@@ -1,5 +1,6 @@
+use crate::entity::article;
 use anyhow::Result;
-use sea_orm::DatabaseConnection;
+use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder, QuerySelect};
 
 fn xml(value: &str) -> String {
     let value: String = value.chars().filter(|c| matches!(*c, '\t' | '\n' | '\r' | '\u{20}'..='\u{d7ff}' | '\u{e000}'..='\u{fffd}' | '\u{10000}'..='\u{10ffff}')).collect();
@@ -12,7 +13,13 @@ pub async fn atom(
     title: &str,
     is_static: bool,
 ) -> Result<String> {
-    let articles = crate::repository::article::get_feed_articles(db).await?;
+    let articles = article::Entity::find()
+        .filter(article::Column::CreatedAt.lte(chrono::Utc::now()))
+        .order_by_desc(article::Column::CreatedAt)
+        .order_by_asc(article::Column::Slug)
+        .limit(20)
+        .all(db)
+        .await?;
     let updated = articles
         .iter()
         .map(|article| article.updated_at.max(article.created_at))
