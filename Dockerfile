@@ -28,7 +28,7 @@ RUN rustup show active-toolchain
 RUN cargo install sea-orm-cli --version 1.1.19 --locked
 RUN rustup component add rustfmt clippy
 
-EXPOSE 8888
+EXPOSE 8081
 
 ENV RUST_BACKTRACE=1
 RUN echo 'alias seaorm="sea-orm-cli"' >> /home/${USERNAME}/.bashrc

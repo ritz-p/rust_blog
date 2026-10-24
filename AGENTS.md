@@ -67,7 +67,7 @@
   - `docker compose exec web cargo run -p rust_blog --bin export`
 - 静的 preview:
   - `docker compose up -d --force-recreate static`
-  - `http://localhost:8081/` で確認
+  - `http://localhost:18081/` で確認
 
 ## Production Container Checks
 
@@ -80,7 +80,7 @@
 例:
 
 - `docker build -f prod/Dockerfile -t rust-blog-prod-local .`
-- `docker run --rm -p 8080:8080 -v "${PWD}/data:/data" rust-blog-prod-local`
+- `docker run --rm -p 8081:8080 -v "${PWD}/data:/data" rust-blog-prod-local`
 - `docker run --rm -v "${PWD}/data:/data" -v "${PWD}/artifact:/export" rust-blog-prod-local export /export/dist`
 
 export はディレクトリを rename して切り替えるため、出力先そのものではなく親ディレクトリをマウントする。この例のホスト側出力先は `artifact/dist/`。

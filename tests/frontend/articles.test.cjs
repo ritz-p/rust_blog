@@ -27,7 +27,7 @@ test('confirmation articles preserve code and display conditions through nginx',
         const links = toc.querySelectorAll('a');
         assert.ok(links.length > 0, `TOC links ${number}`);
         for (const link of links) {
-          assert.ok(content.querySelector(`[id="${link.hash.slice(1)}"]`), `TOC target ${number}`);
+          assert.ok(dom.window.document.getElementById(decodeURIComponent(link.hash.slice(1))), `TOC target ${number}`);
         }
       }
       if (number === 38) assert.equal(content.querySelector('nav.table-of-contents'), null);

@@ -41,7 +41,7 @@ docker compose exec -T web sh docker/export-articles.sh
 docker compose up -d --force-recreate static
 ```
 
-`http://localhost:8081/` を開いて一覧・記事・画像を確認します。
+`http://localhost:18081/` を開いて一覧・記事・画像を確認します。
 記事を追加・編集したときも同じ export コマンドを実行します。
 export は出力ディレクトリを作り直すため、実行後は上記のコマンドで
 `static` コンテナも再作成してマウントを更新します。

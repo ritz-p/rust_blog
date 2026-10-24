@@ -23,7 +23,7 @@ docker compose exec web cargo run -p rust_blog --bin seed
 docker compose exec web cargo run -p rust_blog
 ```
 
-[http://localhost:8888/](http://localhost:8888/) で確認できます。
+[http://localhost:8081/](http://localhost:8081/) で確認できます。
 `ARTICLE_PATH`・`FIXED_CONTENT_PATH` で seed の入力ディレクトリを変更できます。
 seed は読み込み・解析・検証・DB 操作のエラーをファイル単位で集約し、処理可能なファイルを最後まで処理します。
 最後にエラー一覧を表示し、1 件でも失敗した場合は非ゼロで終了します。成功した変更は DB に残ります。DB に接続できない場合は処理を開始できません。
@@ -63,7 +63,7 @@ docker compose exec web cargo run -p rust_blog --bin export
 docker compose up -d --force-recreate static
 ```
 
-[http://localhost:8081/](http://localhost:8081/) で確認できます。生成先は `dist/` です。
+[http://localhost:18081/](http://localhost:18081/) で確認できます。生成先は `dist/` です。
 
 ## 記事検索
 
@@ -82,12 +82,13 @@ JavaScript が必要です。記事の変更を検索へ反映するには expor
 サーバー表示と静的出力で構文ハイライトが適用されます。
 言語指定なし・未対応言語・インデント形式は通常のテキスト表示です。
 長い行は横スクロールできます。
+JavaScript が有効な場合、言語名とコピーボタンを表示します。コピーできない環境ではコードを選択し、手動コピーを案内します。詳細は [コードのコピー](docs/code-copy.md) を参照してください。
 
 ## 本番コンテナ
 
 ```bash
 docker build -f prod/Dockerfile -t rust-blog:prod .
-docker run --rm -p 8080:8080 -v "$(pwd)/data:/data" rust-blog:prod
+docker run --rm -p 8081:8080 -v "$(pwd)/data:/data" rust-blog:prod
 ```
 このイメージは起動時に以下を行います。
 1. SQLite ファイルを `/data/blog.db` に用意
