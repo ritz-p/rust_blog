@@ -1,3 +1,5 @@
+mod output;
+
 use std::{
     collections::HashMap,
     fs,
@@ -60,7 +62,23 @@ pub async fn export_site(
         Some(origin) => Some(crate::discovery::sitemap(db, origin, true).await?),
         None => None,
     };
-    reset_output_dir(out_dir)?;
+    let feed = match origin.as_deref() {
+        Some(origin) => Some(
+            crate::feed::atom(
+                db,
+                origin,
+                config_map
+                    .get("site_name")
+                    .map(String::as_str)
+                    .unwrap_or("Blog"),
+                true,
+            )
+            .await?,
+        ),
+        None => None,
+    };
+    let output = output::StagedOutput::new(out_dir)?;
+    let out_dir = output.path();
     write_static_assets(out_dir, &paths.content_dir, config_map)?;
 
     let config = CommonConfig {
@@ -91,8 +109,11 @@ pub async fn export_site(
     if let Some(sitemap) = sitemap {
         fs::write(out_dir.join("sitemap.xml"), sitemap)?;
     }
+    if let Some(feed) = feed {
+        fs::write(out_dir.join("feed.xml"), feed)?;
+    }
 
-    Ok(())
+    output.publish()
 }
 
 async fn validate_content_slugs(db: &DatabaseConnection) -> Result<()> {
@@ -176,6 +197,7 @@ async fn export_search_index(
             "url": static_article_url(&article.slug),
             "excerpt": article.excerpt.as_deref().map(markdown_to_text).unwrap_or_else(|| cut_out_string(&markdown_to_text(&article.content), 100)),
             "text": crate::utils::search::article_text(article),
+            "body": markdown_to_text(&article.content),
             "icatch_path": article.icatch_path.as_ref().or(config.default_icatch_path.as_ref()),
             "created_at": utc_to_jst(article.created_at),
             "updated_at": utc_to_jst(article.updated_at),
@@ -681,6 +703,13 @@ async fn latest_articles_json(db: &DatabaseConnection) -> Result<Vec<serde_json:
 
 fn base_context(config: &CommonConfig) -> Context {
     let mut ctx = Context::new();
+    ctx.insert(
+        "feed_url",
+        &crate::discovery::site_origin(config.public_url.as_deref())
+            .ok()
+            .flatten()
+            .map(|_| "/feed.xml"),
+    );
     ctx.insert("site_name", &config.site_name);
     ctx.insert("favicon_path", &config.favicon_path);
     ctx.insert("year", &Utc::now().year());
@@ -731,15 +760,6 @@ fn normalize_template_name(path: &Path) -> String {
         .to_string()
 }
 
-fn reset_output_dir(out_dir: &Path) -> Result<()> {
-    if out_dir.exists() {
-        fs::remove_dir_all(out_dir)
-            .with_context(|| format!("failed to clear output dir {:?}", out_dir))?;
-    }
-    fs::create_dir_all(out_dir)?;
-    Ok(())
-}
-
 fn write_static_assets(
     out_dir: &Path,
     content_dir: &Path,
@@ -788,6 +808,10 @@ fn build_headers_file() -> String {
         "",
         "/icon/*",
         "  Cache-Control: public, max-age=31556952, immutable",
+        "",
+        "/feed.xml",
+        "  Content-Type: application/atom+xml; charset=utf-8",
+        "  Cache-Control: public, max-age=0, must-revalidate",
         "",
     ]
     .join("\n")
@@ -1041,6 +1065,11 @@ mod tests {
                 .await
                 .unwrap();
             let sitemap = fs::read_to_string(out.join("sitemap.xml")).unwrap();
+            let feed = fs::read_to_string(out.join("feed.xml")).unwrap();
+            assert_eq!(feed.contains("<entry>"), published);
+            if published {
+                assert!(feed.contains("href=\"https://example.com/posts/scheduled/\""));
+            }
             assert_eq!(
                 sitemap.contains("<loc>https://example.com/posts/scheduled/</loc>"),
                 published

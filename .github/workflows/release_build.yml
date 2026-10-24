@@ -5,6 +5,9 @@ on:
     tags:
       - "v*"
 
+env:
+  COMPOSE_FILE: docker-compose.yml:docker-compose.ci.yml
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -13,25 +16,28 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Install linker dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends clang mold
-
-      - name: Install Rust and cache Cargo
-        uses: actions-rust-lang/setup-rust-toolchain@v2
+      - uses: ./.github/actions/prepare-checks
+        with:
+          build-tools: "false"
 
       - name: Build project
-        run: cargo build --release --target x86_64-unknown-linux-gnu
+        run: docker compose exec -T web cargo build --release --target x86_64-unknown-linux-gnu
 
-      - name: Rename artifact
+      - name: Collect artifact
         shell: bash
         run: |
-          mv target/x86_64-unknown-linux-gnu/release/rust_blog \
-             target/x86_64-unknown-linux-gnu/release/rust_blog-${{ github.ref_name }}-x86_64-unknown-linux-gnu
+          mkdir -p artifact
+          docker compose cp \
+            web:/tmp/rust-blog-target/x86_64-unknown-linux-gnu/release/rust_blog \
+            "artifact/rust_blog-${{ github.ref_name }}-x86_64-unknown-linux-gnu"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v7
         with:
           name: rust_blog-${{ github.ref_name }}-x86_64-unknown-linux-gnu
-          path: target/x86_64-unknown-linux-gnu/release/rust_blog-${{ github.ref_name }}-x86_64-unknown-linux-gnu
+          path: artifact/rust_blog-${{ github.ref_name }}-x86_64-unknown-linux-gnu
+          if-no-files-found: error
+
+      - name: Stop containers
+        if: always()
+        run: docker compose down

@@ -26,3 +26,8 @@ docker compose exec web cargo run -p rust_blog --bin export
 ```
 
 確認用の記事は `content/articles/31.md` です。
+# Heading permalinks
+
+Headings receive `heading-...` IDs derived from their visible text even when the table of contents is disabled. Inserting a differently named heading does not change existing IDs. IDs preserve letter case and encode non-alphanumeric characters as hexadecimal Unicode values: `API` and `api` stay distinct, while `A+B` becomes `heading-A_2b_B` and `A/B` becomes `heading-A_2f_B`. Repeated names receive double-hyphen numeric suffixes (for example, `heading-Same--2`); renaming or reordering identical headings can still change their links. Each heading has a link and a copy button, with a normal anchor fallback if clipboard access fails.
+
+Pages with a table of contents retain `toc-heading-N` anchors for compatibility with previous ordinal links. Legacy links highlight and focus the adjacent heading. Those links remain positional; use the new heading links for new references. Server and static page paths differ, so the copy button uses the URL of the page being viewed.

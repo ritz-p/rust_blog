@@ -2,9 +2,9 @@ name: JavaScript
 
 on:
   pull_request:
-    branches: [master]
+    branches: [develop]
   push:
-    branches: [master]
+    branches: [develop]
   workflow_dispatch:
 
 env:
@@ -44,6 +44,9 @@ jobs:
 
       - name: Test navigation, search and static preview
         run: docker compose exec -T -e STATIC_SITE_URL=http://static web npm run test:js
+
+      - name: Validate internal links and images
+        run: docker compose exec -T -e STATIC_SITE_URL=http://static web node tests/frontend/check-links.cjs dist
 
       - name: Stop containers
         if: always()

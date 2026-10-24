@@ -26,6 +26,6 @@ Publication happens on the next successful deployment after the article date, so
 
 ## Separate content repositories and other hosts
 
-Install the export bundle in the repository that owns the Markdown and configure a scheduler there to run migration, seed, export and deployment in that order. Alternatively, run `docker/export-articles.sh` followed by your deployment command from cron with the repository as working directory. Rebuild from Markdown to reflect edited dates, deleted articles and cancellations.
+Install the export bundle in the repository that owns the Markdown and configure a scheduler there to run migration, seed, export and deployment in that order. When using this repository's development environment, run `docker compose exec -T web sh docker/export-articles.sh` followed by your deployment command from cron with the repository as working directory and `web` already running. Rebuild from Markdown to reflect edited dates, deleted articles and cancellations.
 
 Future article contents are retained in the database artifact, so treat that artifact as private. Do not publish it with `dist/`. Images are copied as assets irrespective of article dates; do not place embargoed files in the public asset directory.

@@ -8,7 +8,7 @@ test('copy controls preserve source and select the correct block when clipboard 
   try {
     await new Promise(resolve => dom.window.document.addEventListener('DOMContentLoaded', resolve, { once: true }));
     let copied;
-    Object.defineProperty(dom.window.navigator, 'clipboard', { value: { writeText: async value => { copied = value; } } });
+    Object.defineProperty(dom.window.navigator, 'clipboard', { configurable: true, value: { writeText: async value => { copied = value; } } });
     dom.window.eval(readFileSync('core/assets/nav.js', 'utf8'));
     dom.window.document.dispatchEvent(new dom.window.Event('DOMContentLoaded'));
     const toolbars = dom.window.document.querySelectorAll('.code-toolbar');
@@ -24,5 +24,14 @@ test('copy controls preserve source and select the correct block when clipboard 
     await new Promise(resolve => setImmediate(resolve));
     assert.equal(dom.window.getSelection().toString(), 'second\n');
     assert.match(toolbars[1].textContent, /手動でコピー/);
+    delete dom.window.navigator.clipboard;
+    const button = toolbars[0].querySelector('button');
+    button.focus();
+    assert.equal(dom.window.document.activeElement, button);
+    assert.equal(button.type, 'button');
+    button.click();
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(dom.window.getSelection().toString(), '\t世界 <x>\n');
+    assert.match(toolbars[0].querySelector('[role="status"]').textContent, /手動でコピー/);
   } finally { dom.window.close(); }
 });

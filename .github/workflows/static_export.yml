@@ -6,6 +6,9 @@ on:
     tags:
       - "v*"
 
+env:
+  COMPOSE_FILE: docker-compose.yml:docker-compose.ci.yml
+
 jobs:
   build-export-tool:
     runs-on: ubuntu-latest
@@ -14,27 +17,23 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Install linker dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends clang mold
-
-      - name: Install Rust and cache Cargo
-        uses: actions-rust-lang/setup-rust-toolchain@v2
+      - uses: ./.github/actions/prepare-checks
+        with:
+          build-tools: "false"
 
       - name: Build export tools
         run: |
-          cargo build --release --target x86_64-unknown-linux-gnu -p rust_blog --bin export --bin seed
-          cargo build --release --target x86_64-unknown-linux-gnu -p migration --bin migration
+          docker compose exec -T web cargo build --release --target x86_64-unknown-linux-gnu -p rust_blog --bin export --bin seed
+          docker compose exec -T web cargo build --release --target x86_64-unknown-linux-gnu -p migration --bin migration
 
       - name: Assemble export bundle
         shell: bash
         run: |
           BUNDLE_DIR="artifact/rust-blog-export-tools-${{ github.ref_name }}-x86_64-unknown-linux-gnu"
           mkdir -p "${BUNDLE_DIR}/templates"
-          cp target/x86_64-unknown-linux-gnu/release/export "${BUNDLE_DIR}/export"
-          cp target/x86_64-unknown-linux-gnu/release/seed "${BUNDLE_DIR}/seed"
-          cp target/x86_64-unknown-linux-gnu/release/migration "${BUNDLE_DIR}/migration"
+          docker compose cp web:/tmp/rust-blog-target/x86_64-unknown-linux-gnu/release/export "${BUNDLE_DIR}/export"
+          docker compose cp web:/tmp/rust-blog-target/x86_64-unknown-linux-gnu/release/seed "${BUNDLE_DIR}/seed"
+          docker compose cp web:/tmp/rust-blog-target/x86_64-unknown-linux-gnu/release/migration "${BUNDLE_DIR}/migration"
           cp -R templates/. "${BUNDLE_DIR}/templates/"
 
       - name: Package export bundle
@@ -50,3 +49,7 @@ jobs:
           name: rust-blog-export-tools-${{ github.ref_name }}-x86_64-unknown-linux-gnu
           path: artifact/rust-blog-export-tools-${{ github.ref_name }}-x86_64-unknown-linux-gnu.tar.gz
           if-no-files-found: error
+
+      - name: Stop containers
+        if: always()
+        run: docker compose down

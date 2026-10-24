@@ -23,7 +23,7 @@ docker compose exec web cargo run -p rust_blog --bin seed
 docker compose exec web cargo run -p rust_blog
 ```
 
-[http://localhost:8888/](http://localhost:8888/) で確認できます。
+[http://localhost:8081/](http://localhost:8081/) で確認できます。
 `ARTICLE_PATH`・`FIXED_CONTENT_PATH` で seed の入力ディレクトリを変更できます。
 seed は読み込み・解析・検証・DB 操作のエラーをファイル単位で集約し、処理可能なファイルを最後まで処理します。
 最後にエラー一覧を表示し、1 件でも失敗した場合は非ゼロで終了します。成功した変更は DB に残ります。DB に接続できない場合は処理を開始できません。
@@ -40,7 +40,7 @@ docker compose exec web sea-orm-cli generate entity -o core/src/entity --with-se
 docker compose exec web cargo test -p rust_blog
 ```
 
-Markdown・JavaScript の CI は master 向け PR と master への push で実行します。
+Markdown・JavaScript の CI は develop 向け PR と develop への push で実行します。
 ワークフローは `markdown_checks.yml` と `javascript_checks.yml` に分かれており、それぞれ独立して実行します。静的 export・配信確認は JavaScript 側で実行します。
 Markdown のリンク・見出しなどの lint、記事 front matter の検証・整形チェック、JavaScript の lint、検索とナビゲーションの DOM テストを行います。
 静的 export は一時 DB から生成し、nginx 経由で HTML・JavaScript・検索インデックス・記事の配信も確認します。
@@ -63,7 +63,7 @@ docker compose exec web cargo run -p rust_blog --bin export
 docker compose up -d --force-recreate static
 ```
 
-[http://localhost:8081/](http://localhost:8081/) で確認できます。生成先は `dist/` です。
+[http://localhost:8082/](http://localhost:8082/) で確認できます。生成先は `dist/` です。
 
 ## 記事検索
 
@@ -82,12 +82,13 @@ JavaScript が必要です。記事の変更を検索へ反映するには expor
 サーバー表示と静的出力で構文ハイライトが適用されます。
 言語指定なし・未対応言語・インデント形式は通常のテキスト表示です。
 長い行は横スクロールできます。
+JavaScript が有効な場合、言語名とコピーボタンを表示します。コピーできない環境ではコードを選択し、手動コピーを案内します。詳細は [コードのコピー](docs/code-copy.md) を参照してください。
 
 ## 本番コンテナ
 
 ```bash
 docker build -f prod/Dockerfile -t rust-blog:prod .
-docker run --rm -p 8080:8080 -v "$(pwd)/data:/data" rust-blog:prod
+docker run --rm -p 8081:8080 -v "$(pwd)/data:/data" rust-blog:prod
 ```
 このイメージは起動時に以下を行います。
 1. SQLite ファイルを `/data/blog.db` に用意
@@ -104,41 +105,27 @@ docker run --rm -p 8080:8080 -v "$(pwd)/data:/data" rust-blog:prod
 
 Cloudflare 側では、このコンテナを配置したホストへ DNS を向けて Proxy を有効化します。
 
-## SeaOrm について
+### 本番コンテナでの静的 export
 
-1. テーブル作成
+出力先をディレクトリ単位で切り替えるため、親ディレクトリをマウントします。
 
-```bash
-seaorm migrate generate ${table_name}
+```sh
+docker run --rm -v "${PWD}/data:/data" -v "${PWD}/artifact:/export" rust-blog:prod export /export/dist
 ```
 
-2. 生成されたファイルを編集してテーブル定義を書く
+ホスト側の出力先は `artifact/dist/` です。出力先自体を `/app/dist` にマウントすると Linux のマウントポイントを rename できず失敗します。移行・プレビュー手順は [静的 export の説明](docs/static-deploy.md) を参照してください。
 
-# migration/src/mYYYYMMDDHHMMSS\_${table_name}.rs
+## マイグレーション
 
-3. マイグレーションを適用
-
-```bash
-seaorm migrate up -u "$DATABASE_URL"
-```
-
-4. Entity を DB から再生成
+リポジトリのルートから、起動済みの `web` サービスで生成します。
+`add_example_table` は変更内容を表す名前に置き換えてください。
 
 ```bash
-seaorm generate entity -u "$DATABASE_URL" -o core/src/entity --with-serde both
+docker compose exec web sea-orm-cli migrate generate add_example_table
 ```
 
-5. 適用状況を確認
-
-```bash
-seaorm migrate status -u "$DATABASE_URL"
-```
-
-6. 全部やり直す（drop→up）
-
-```bash
-seaorm migrate refresh -u "$DATABASE_URL"
-```
+生成された `migration/src/` のファイルを編集し、[開発手順](#開発)の migration 適用・エンティティ再生成を実行します。
+適用状況の確認やロールバックは [Migrator CLI](migration/README.md) を参照してください。
 
 ## 記事 Markdown の整形・検証
 
@@ -160,7 +147,7 @@ docker compose exec web cargo run -p rust_blog --bin format_markdown -- --check 
 省略時の対象は `content/articles`。ファイル・ディレクトリを複数指定できます。
 明示指定したシンボリックリンクはリンク先を処理します。ディレクトリ配下のリンクはたどりません。
 UTF-8 BOM 付きファイルにも対応し、BOM と改行形式を保持します。
-必須項目は `title`、`slug`、`tags`、`categories`（配列は空でも可）。
+整形 CLI の必須項目は `title`、`slug`、`tags`、`categories`（配列は空でも可）。seed では `tags`・`categories` を省略すると空の配列として扱います。
 型・文字数・日時・未知の項目を検証します。不正なファイルは書き換えず、正常なファイルの整形を続けます。
 探索・読み書き・検証のエラーは最後にファイル名つきでまとめて表示し、非ゼロで終了します。
 `--check` では書き換えず、検証エラーと未整形のファイルをまとめて報告します。
@@ -191,6 +178,7 @@ docker compose exec -e ARTICLE_PATH=markdown_output/articles -e FIXED_CONTENT_PA
 ## 関連ドキュメント
 
 - [テスト観点](docs/testing.md)
+- [CI の構成](docs/ci-checks.md)
 - [目次設定](docs/table-of-contents.md)
 - [静的デプロイ](docs/static-deploy.md)
 - [export バンドル](docs/export-bundle-usage.md)

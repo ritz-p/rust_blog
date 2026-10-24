@@ -5,6 +5,19 @@
 既存の `blog.db` は変更しません。`dist/` は実行ごとに再生成されます。
 `deleted: true` の記事は公開対象に含まれません。
 
+export は出力先と同じ親ディレクトリの一時領域で全ファイルを生成し、必須ファイルを確認してから出力先を置き換えます。生成に失敗した場合は前回の出力を保持します。置き換え時のエラーでは旧出力を復元し、復元にも失敗した場合はエラーに表示する `previous` ディレクトリに旧出力を保持します。成功した再出力では削除済み記事のファイルも除去されます。
+
+同時 export は親ディレクトリの `.出力名.export.lock` で防止します。プロセスを強制終了した場合は、実行中の export がないことと旧出力の所在を確認してから残ったロックを削除してください。ディレクトリの切り替えは2回の rename を使うため、切り替え中の短い空白や OS 停止時まで保証するものではありません。
+
+本番 Docker でホストへ出力する場合、出力ディレクトリ自体を bind mount すると rename できません。親ディレクトリをマウントし、その配下へ出力してください。
+
+```sh
+docker build -f prod/Dockerfile -t rust-blog-prod-local .
+docker run --rm -v "${PWD}/data:/data" -v "${PWD}/artifact:/export" rust-blog-prod-local export /export/dist
+```
+
+この例では既存の `data/blog.db` からホストの `artifact/dist/` に出力します。本番 entrypoint は migration を実行しますがテスト記事の seed は実行しません。従来の `-v "${PWD}/dist:/app/dist" ... export` は出力先がマウントポイントになるため利用できません。上記の親ディレクトリマウントへ移行してください。標準の `static` サービスは `dist/` を参照するため、`artifact/dist/` をプレビューするときはその bind mount も変更して再作成します。
+
 ## 記事の作成日時
 
 静的 export では記事の Front Matter に `created_at`（別名 `date`）が必須です。
@@ -28,7 +41,7 @@ docker compose exec -T web sh docker/export-articles.sh
 docker compose up -d --force-recreate static
 ```
 
-`http://localhost:8081/` を開いて一覧・記事・画像を確認します。
+`http://localhost:8082/` を開いて一覧・記事・画像を確認します。
 記事を追加・編集したときも同じ export コマンドを実行します。
 export は出力ディレクトリを作り直すため、実行後は上記のコマンドで
 `static` コンテナも再作成してマウントを更新します。
@@ -81,10 +94,11 @@ docker compose exec -T -e EXPORT_DATABASE_PATH=artifact/static-export/blog.db we
    トークンをファイルへ書き込む必要はありません。
 4. **Run workflow** で `deploy` をオンにして実行します。
 
-`wrangler.toml` の `rust-blog-static` という名前で Workers Static Assets に公開します。
+`wrangler.toml` の `name`（現在は `test-static-blog`）で Workers Static Assets に公開します。
 同じ名前の Worker がある場合は、そのデプロイが更新されます。
-公開 URL はデプロイステップのログで確認できます。
-初回に workers.dev サブドメインの設定を求められる場合は、Cloudflare ダッシュボードで設定します。
+現在の設定は `workers_dev = false`・`preview_urls = false` です。
+Cloudflare 側で対象 Worker に設定したカスタムドメインや route を確認してアクセスしてください。
+workers.dev で公開する場合は、`workers_dev` の設定とアカウントのサブドメインを別途用意します。
 
 公開先では Rust サーバーや SQLite を動かさず、生成済みファイルを配信します。
 この構成に D1 や Containers の契約は不要です。
