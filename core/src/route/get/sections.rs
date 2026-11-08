@@ -71,6 +71,7 @@ async fn render(
         page.unwrap_or(1),
         config.articles_per_page,
         false,
+        config.default_icatch_path.as_deref(),
     )
     .await
     .map_err(|error| {
