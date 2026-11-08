@@ -57,6 +57,8 @@ pub fn validate_fixed(slug: &str) -> Result<()> {
     validate(slug, 100)?;
     ensure!(
         ![
+            "all",
+            "sections",
             "posts",
             "page",
             "archive",

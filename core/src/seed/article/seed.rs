@@ -53,6 +53,12 @@ pub async fn prepare(
     active_model
         .icatch_path
         .set_if_not_equals(front_matter.icatch_path.clone());
+    active_model.section.set_if_not_equals(
+        front_matter
+            .section
+            .clone()
+            .unwrap_or_else(|| "blog".into()),
+    );
     active_model.content.set_if_not_equals(body.to_string());
     active_model
         .table_of_contents

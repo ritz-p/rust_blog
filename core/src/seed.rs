@@ -128,7 +128,7 @@ async fn seed_article_file(
     require_created_at: bool,
     file_timestamps: bool,
 ) -> Result<()> {
-    let (matter, body) =
+    let (mut matter, body) =
         parse_markdown_to_front_matter(path).map_err(|error| anyhow::anyhow!("parse: {error}"))?;
     if matter.deleted {
         delete_article_by_slug(db, &matter.slug)
@@ -136,6 +136,11 @@ async fn seed_article_file(
             .context("delete article")?;
         return Ok(());
     }
+    let navigation = crate::sections::Navigation::load()?;
+    let section = matter
+        .section
+        .get_or_insert(navigation.default_section.clone());
+    navigation.validate_section(section)?;
     ensure!(
         !require_created_at || matter.created_at.is_some(),
         "static export requires created_at (or date) in article front matter"

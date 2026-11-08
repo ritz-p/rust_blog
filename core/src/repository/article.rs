@@ -395,6 +395,7 @@ mod tests {
                 icatch_path: None,
                 table_of_contents: false,
                 deprecated: false,
+                section: "blog".into(),
                 created_at,
                 updated_at: now,
             };
@@ -433,6 +434,7 @@ mod tests {
                 icatch_path: None,
                 table_of_contents: false,
                 deprecated: false,
+                section: "blog".into(),
                 created_at: now,
                 updated_at: now,
             })

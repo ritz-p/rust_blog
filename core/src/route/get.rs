@@ -8,3 +8,5 @@ pub mod index;
 pub mod redirect;
 pub mod static_asset;
 pub mod tag;
+
+pub mod sections;

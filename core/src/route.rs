@@ -64,7 +64,11 @@ pub async fn launch(
     if !redirects.articles.is_empty() || !redirects.pages.is_empty() {
         redirects.validate_database(&db).await?;
     }
+    let navigation = rust_blog::sections::Navigation::from_config(&config_map)?;
+    navigation.validate_database(&db).await?;
+    let template_navigation = navigation.clone();
     rocket::build()
+        .manage(navigation)
         .manage(redirects)
         .manage(db)
         .manage(CommonConfig {
@@ -75,10 +79,16 @@ pub async fn launch(
             public_url: config_map.get("public_url").cloned(),
         })
         .attach(SecurityHeaders)
-        .attach(Template::fairing())
+        .attach(Template::custom(move |engines| {
+            rust_blog::sections::install_navigation(&mut engines.tera, &template_navigation, false)
+                .expect("valid navigation template");
+        }))
         .mount(
             "/",
             routes![
+                get::sections::home,
+                get::sections::all,
+                get::sections::section,
                 fixed_content_detail,
                 index,
                 index_archive,

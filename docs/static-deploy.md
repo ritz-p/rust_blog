@@ -74,7 +74,7 @@ docker compose exec -T -e EXPORT_DATABASE_PATH=artifact/static-export/blog.db we
 トップ・年月別・タグ別・カテゴリ別の一覧に適用され、サーバーと静的exportで共通です。
 サーバーではURLの `per` パラメーターが指定されている場合、その値を優先します。
 
-サーバーの既定値は `blog_config.toml` です。サイト名・画像ディレクトリなどの共通設定に使います。seedはこのファイルを読みません。タグ・カテゴリは各記事のフロントマターだけで指定します。
+サーバーの既定値は `blog_config.toml` です。サイト名・画像ディレクトリなどの共通設定に使います。seedも記事区分の設定を読みます。タグ・カテゴリは各記事のフロントマターだけで指定します。
 `[common]` の `image_dir` / `icon_dir` はサーバーの配信元と export のコピー元に共通です。
 指定時は `RUST_BLOG_CONTENT_DIR` より優先し、相対パスは作業ディレクトリ基準です。
 未指定時の export は従来どおりコンテンツディレクトリ配下の `image` / `icon` を使います。

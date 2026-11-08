@@ -5,3 +5,23 @@ articles_per_page = 20
 "favicon_path" = "/icon/fox_girl_black_line_white.png"
 image_dir = "content/image"
 icon_dir = "content/icon"
+
+[navigation]
+home = "all"
+default_section = "blog"
+
+[[navigation.tabs]]
+kind = "page"
+id = "about"
+label = "About"
+slug = "about"
+
+[[navigation.tabs]]
+kind = "all"
+id = "all"
+label = "すべて"
+
+[[navigation.tabs]]
+kind = "section"
+id = "blog"
+label = "ブログ"

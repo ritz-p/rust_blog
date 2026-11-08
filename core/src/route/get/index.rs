@@ -46,7 +46,7 @@ fn build_index_url(
     url
 }
 
-#[get("/?<query..>")]
+#[get("/?<query..>", rank = 2)]
 pub async fn index(
     config: &State<CommonConfig>,
     db: &State<DatabaseConnection>,
@@ -199,6 +199,7 @@ async fn render_index(
     Ok(Template::render(
         "index",
         context! {
+            active_tab: "all",
             site_name: &config.site_name,
             feed_url: rust_blog::discovery::site_origin(config.public_url.as_deref()).ok().flatten().map(|_| "/feed.xml"),
             favicon_path: &config.favicon_path,
@@ -266,7 +267,7 @@ mod tests {
             .expect("failed to connect sqlite memory");
         db.execute(Statement::from_string(
             DbBackend::Sqlite,
-            "CREATE TABLE article (id INTEGER PRIMARY KEY, title TEXT NOT NULL, slug TEXT NOT NULL, excerpt TEXT NULL, content TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, icatch_path TEXT NULL, table_of_contents BOOLEAN NOT NULL DEFAULT false, deprecated BOOLEAN NOT NULL DEFAULT false);",
+            "CREATE TABLE article (id INTEGER PRIMARY KEY, title TEXT NOT NULL, slug TEXT NOT NULL, excerpt TEXT NULL, content TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, icatch_path TEXT NULL, table_of_contents BOOLEAN NOT NULL DEFAULT false, deprecated BOOLEAN NOT NULL DEFAULT false, section TEXT NOT NULL DEFAULT 'blog');",
         ))
         .await
         .expect("failed to create article table");

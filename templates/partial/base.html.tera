@@ -44,6 +44,7 @@
       </div>
     </div>
   </nav>
+  {% include "partial/navigation" ignore missing %}
   <section class="section">
     <div class="container">
       {% block content %}{% endblock content %}

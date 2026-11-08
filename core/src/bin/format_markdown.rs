@@ -11,6 +11,7 @@ use walkdir::WalkDir;
 const ORDER: &[&str] = &[
     "title",
     "slug",
+    "section",
     "deleted",
     "table_of_contents",
     "deprecated",
@@ -155,6 +156,17 @@ fn validate(source: &Mapping) -> Result<()> {
             validate_title(&value)
         }),
         validate_field(source, "slug", None, |value: String| validate_slug(&value)),
+        validate_field(
+            source,
+            "section",
+            Some(Value::Null),
+            |value: Option<String>| {
+                if let Some(value) = value {
+                    rust_blog::slug::validate(&value, 100)?;
+                }
+                Ok(())
+            },
+        ),
         validate_field(
             source,
             date_field,

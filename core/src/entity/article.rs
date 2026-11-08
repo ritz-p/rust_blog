@@ -19,6 +19,8 @@ pub struct Model {
     pub icatch_path: Option<String>,
     pub table_of_contents: bool,
     pub deprecated: bool,
+    #[sea_orm(default_value = "blog")]
+    pub section: String,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

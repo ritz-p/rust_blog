@@ -88,7 +88,10 @@ pub async fn export_site(
         favicon_path: config_map.get("favicon_path").cloned(),
         public_url: config_map.get("public_url").cloned(),
     };
-    let tera = load_templates(&paths.templates_dir)?;
+    let mut tera = load_templates(&paths.templates_dir)?;
+    let navigation = crate::sections::Navigation::from_config(config_map)?;
+    navigation.validate_database(db).await?;
+    crate::sections::install_navigation(&mut tera, &navigation, true)?;
 
     export_search_index(db, &config, out_dir).await?;
 
@@ -98,6 +101,7 @@ pub async fn export_site(
     export_tag_pages(&tera, db, &config, out_dir).await?;
     export_category_pages(&tera, db, &config, out_dir).await?;
     export_error_page(&tera, &config, out_dir, "404", "404.html")?;
+    crate::sections::export(&tera, db, &navigation, &config, out_dir).await?;
     write_cloudflare_support_files(out_dir)?;
     if !redirects.articles.is_empty() || !redirects.pages.is_empty() {
         redirects.write_static(db, out_dir).await?;
@@ -1172,6 +1176,7 @@ mod tests {
                 icatch_path: Set(None),
                 table_of_contents: Set(false),
                 deprecated: Set(false),
+                section: Set("blog".into()),
             }
             .insert(&db)
             .await
@@ -1345,6 +1350,7 @@ mod tests {
             icatch_path: None,
             table_of_contents: false,
             deprecated: false,
+            section: "blog".into(),
         };
         let db = MockDatabase::new(DatabaseBackend::Sqlite)
             .append_query_results([vec![article.clone()]])

@@ -3,6 +3,8 @@ use serde::Deserialize;
 #[derive(Deserialize, Debug)]
 #[allow(dead_code)]
 pub struct FrontMatter {
+    #[serde(default)]
+    pub section: Option<String>,
     pub title: String,
     pub slug: String,
     #[serde(default)]
@@ -38,6 +40,7 @@ impl FrontMatter {
         categories: Vec<String>,
     ) -> Self {
         Self {
+            section: None,
             title,
             slug,
             deleted,

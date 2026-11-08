@@ -71,6 +71,7 @@ mod repository_tests {
             icatch_path: None,
             table_of_contents: false,
             deprecated: false,
+            section: "blog".into(),
         };
         let page = Page { number: 1, per: 10 };
         let db = MockDatabase::new(DatabaseBackend::Sqlite)
