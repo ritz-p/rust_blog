@@ -1,14 +1,16 @@
 document.addEventListener('DOMContentLoaded', async () => {
   const results = document.getElementById('index-results');
   if (!results || results.dataset.staticSearch !== 'true') return;
+  const searchUrl = results.dataset.searchUrl || '/';
+  const allPeriodsUrl = results.dataset.allPeriodsUrl || '/';
   const params = new URLSearchParams(window.location.search);
   const query = (params.get('q') || '').trim();
   const year = params.get('year') || results.dataset.year;
   const month = params.get('month') || results.dataset.month;
   const validPeriod = /^\d{4}$/.test(year) && Number(month) >= 1 && Number(month) <= 12;
-  const periodPath = validPeriod ? `/archive/${year}/${String(Number(month)).padStart(2, '0')}/` : '/';
+  const periodPath = validPeriod ? `/archive/${year}/${String(Number(month)).padStart(2, '0')}/` : allPeriodsUrl;
   if (!query) {
-    if (validPeriod && window.location.pathname === '/') window.location.replace(periodPath);
+    if (validPeriod && (window.location.pathname === '/' || window.location.pathname === searchUrl)) window.location.replace(periodPath);
     return;
   }
   const input = document.getElementById('search-query');
@@ -78,7 +80,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function pageUrl(page) {
-    const url = new URL('/', window.location.origin);
+    const url = new URL(searchUrl, window.location.origin);
     url.searchParams.set('q', query);
     url.searchParams.set('page', String(page));
     url.searchParams.set('per', String(per));

@@ -14,8 +14,8 @@ const fixture = `<!doctype html><html><body>
   <div id="index-results" data-static-search="true" data-per="2"></div>
 </body></html>`;
 
-async function browser(t, script, query = '', fetch = undefined) {
-  const dom = new JSDOM(fixture, { url: `https://blog.example/${query}` });
+async function browser(t, script, query = '', fetch = undefined, html = fixture) {
+  const dom = new JSDOM(html, { url: `https://blog.example/${query}` });
   t.after(() => dom.window.close());
   await new Promise(resolve => dom.window.document.addEventListener('DOMContentLoaded', resolve, { once: true }));
   let handler;
@@ -28,7 +28,7 @@ async function browser(t, script, query = '', fetch = undefined) {
   const navigations = [];
   const location = {
     origin: dom.window.location.origin,
-    pathname: '/', search: dom.window.location.search, hash: dom.window.location.hash,
+    pathname: dom.window.location.pathname, search: dom.window.location.search, hash: dom.window.location.hash,
     assign: href => navigations.push(href), replace: href => navigations.push(href),
   };
   const source = readFileSync(path.join(__dirname, '../../core/assets', script), 'utf8');
@@ -155,4 +155,21 @@ test('static preview serves the referenced scripts and searchable documents', { 
   } finally {
     dom.window.close();
   }
+});
+
+test('custom home keeps search pagination on the dedicated search page', async t => {
+  const html = fixture.replace('data-static-search="true"', 'data-static-search="true" data-search-url="/search/" data-all-periods-url="/all/"');
+  for (const period of ['', '&year=2026&month=9']) {
+    const { document } = await browser(t, 'search.js', `search/?q=rust&page=2${period}`, async () => ({ ok: true, json: async () => articles }), html);
+    assert.match(document.getElementById('search-status').textContent, /5件/);
+    for (const link of document.querySelectorAll('nav.pagination a')) {
+      const url = new URL(link.href);
+      assert.equal(url.pathname, '/search/');
+      assert.equal(url.searchParams.get('q'), 'rust');
+      if (period) assert.equal(url.searchParams.get('month'), '9');
+    }
+    assert.equal(document.getElementById('clear-search').pathname, period ? '/archive/2026/09/' : '/all/');
+  }
+  const { navigations } = await browser(t, 'search.js', 'search/?year=2026&month=9', undefined, html);
+  assert.deepEqual(navigations, ['/archive/2026/09/']);
 });

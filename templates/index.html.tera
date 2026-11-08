@@ -4,7 +4,7 @@
 {% block content %}
 <h1 class="title">記事一覧 - {{ site_name }}</h1>
 
-<form action="/" method="get" role="search" class="mb-5" id="article-search">
+<form action="{{ search_url | default(value='/') }}" method="get" role="search" class="mb-5" id="article-search">
   <label class="label" for="search-query">記事を検索</label>
   <div class="field has-addons">
     <div class="control is-expanded">
@@ -39,7 +39,7 @@
   </div>
 {% endif %}
 
-<div id="index-results" data-static-search="{{ static_search }}" data-per="{{ per }}" data-year="{{ search_year | default(value='') }}" data-month="{{ search_month | default(value='') }}">
+<div id="index-results" data-static-search="{{ static_search }}" data-search-url="{{ search_url | default(value='/') }}" data-all-periods-url="{{ all_periods_url }}" data-per="{{ per }}" data-year="{{ search_year | default(value='') }}" data-month="{{ search_month | default(value='') }}">
 {% if articles and articles | length > 0 %}
   <div class="article-list">
     {% for article in articles %}
@@ -55,5 +55,5 @@
 
 {% block scripts %}
 {{ super() }}
-{% if static_search %}<script src="/js/search.js?v=snippets-1" defer></script>{% endif %}
+{% if static_search %}<script src="/js/search.js?v=search-route-1" defer></script>{% endif %}
 {% endblock scripts %}

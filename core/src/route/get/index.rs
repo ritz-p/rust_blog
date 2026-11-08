@@ -15,6 +15,7 @@ use crate::{
 #[derive(Clone, Copy)]
 enum IndexUrlMode {
     Query,
+    Search,
     Archive,
 }
 
@@ -32,6 +33,11 @@ fn build_index_url(
         (IndexUrlMode::Archive, Some(period)) => {
             format!("/archive/{}/{:02}/page/{page}", period.year, period.month)
         }
+        (IndexUrlMode::Search, Some(period)) => format!(
+            "/search?page={page}&per={per}&year={}&month={}",
+            period.year, period.month
+        ),
+        (IndexUrlMode::Search, None) => format!("/search?page={page}&per={per}"),
         (_, Some(period)) => format!(
             "/?page={page}&per={per}&year={}&month={}",
             period.year, period.month
@@ -53,6 +59,15 @@ pub async fn index(
     query: Option<IndexQuery>,
 ) -> Result<Template, Status> {
     render_index(config, db, query, IndexUrlMode::Query).await
+}
+
+#[get("/search?<query..>")]
+pub async fn search(
+    config: &State<CommonConfig>,
+    db: &State<DatabaseConnection>,
+    query: Option<IndexQuery>,
+) -> Result<Template, Status> {
+    render_index(config, db, query, IndexUrlMode::Search).await
 }
 
 #[get("/archive/<year>/<month>?<q>")]
@@ -206,12 +221,13 @@ async fn render_index(
             tags_url: "/tags",
             categories_url: "/categories",
             about_url: "/about",
+            search_url: "/search",
             search_query: search_query,
             search_count: search_count,
             search_year: selected_period.map(|period| period.year),
             search_month: selected_period.map(|period| period.month),
             static_search: false,
-            all_periods_url: build_index_url(1, page_info.per, None, IndexUrlMode::Query, search_query),
+            all_periods_url: build_index_url(1, page_info.per, None, IndexUrlMode::Search, search_query),
             clear_search_url: build_index_url(1, page_info.per, selected_period, mode, ""),
             articles: articles,
             page: page_info.current_page,
@@ -232,7 +248,7 @@ async fn render_index(
 
 #[cfg(test)]
 mod tests {
-    use super::{index, index_archive, index_archive_page};
+    use super::{index, index_archive, index_archive_page, search};
     use crate::utils::config::CommonConfig;
     use rocket::http::Status;
     use rocket::local::asynchronous::Client;
@@ -244,9 +260,23 @@ mod tests {
     }
 
     async fn client_with_page_size(db: sea_orm::DatabaseConnection, per: u64) -> Client {
+        client_with_home(db, per, "all").await
+    }
+
+    async fn client_with_home(db: sea_orm::DatabaseConnection, per: u64, home: &str) -> Client {
+        let mut navigation = rust_blog::sections::Navigation {
+            home: home.into(),
+            ..Default::default()
+        };
+        navigation.tabs.push(rust_blog::sections::Tab::Page {
+            id: "about".into(),
+            label: "About".into(),
+            slug: "about".into(),
+        });
         let rocket =
             rocket::custom(rocket::Config::figment().merge(("template_dir", "../templates")))
                 .manage(db)
+                .manage(navigation)
                 .manage(CommonConfig {
                     articles_per_page: per,
                     site_name: Some("Test Blog".to_string()),
@@ -255,7 +285,16 @@ mod tests {
                     public_url: None,
                 })
                 .attach(Template::fairing())
-                .mount("/", routes![index, index_archive, index_archive_page]);
+                .mount(
+                    "/",
+                    routes![
+                        index,
+                        index_archive,
+                        index_archive_page,
+                        search,
+                        crate::route::get::sections::home
+                    ],
+                );
         Client::tracked(rocket)
             .await
             .expect("failed to build client")
@@ -285,6 +324,43 @@ mod tests {
         .await
         .expect("failed to insert articles");
         db
+    }
+
+    #[rocket::async_test]
+    async fn search_and_archive_forms_work_with_every_home_tab() {
+        for home in ["all", "blog", "about"] {
+            let client = client_with_home(prepare_index_db().await, 1, home).await;
+            let archive = client
+                .get("/archive/2025/12")
+                .dispatch()
+                .await
+                .into_string()
+                .await
+                .unwrap();
+            let archive = html_escape::decode_html_entities(&archive);
+            assert!(archive.contains("action=\"/search\""));
+            let response = client
+                .get("/search?q=Dec&year=2025&month=12&page=1")
+                .dispatch()
+                .await;
+            assert_eq!(response.status(), Status::Ok);
+            let body = response.into_string().await.unwrap();
+            let body = html_escape::decode_html_entities(&body);
+            assert!(body.contains("検索結果: 2件"));
+            assert!(body.contains("/search?page=2&per=1&year=2025&month=12&q=Dec"));
+            let second = client
+                .get("/search?q=Dec&year=2025&month=12&page=2")
+                .dispatch()
+                .await;
+            assert_eq!(second.status(), Status::Ok);
+            assert!(
+                second
+                    .into_string()
+                    .await
+                    .unwrap()
+                    .contains("検索結果: 2件")
+            );
+        }
     }
 
     #[rocket::async_test]

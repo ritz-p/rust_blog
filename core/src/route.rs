@@ -19,7 +19,7 @@ use get::{
         service_unavailable::service_unavailable, unauthorized::unauthorized,
     },
     fixed_content::fixed_content_detail,
-    index::{index, index_archive, index_archive_page},
+    index::{index, index_archive, index_archive_page, search},
     static_asset::{bulma_css, nav_js, site_css},
     tag::{tag_detail, tag_list},
 };
@@ -91,6 +91,7 @@ pub async fn launch(
                 get::sections::section,
                 fixed_content_detail,
                 index,
+                search,
                 index_archive,
                 index_archive_page,
                 article_detail,

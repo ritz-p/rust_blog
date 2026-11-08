@@ -306,6 +306,7 @@ async fn export_index_variant(
             .collect();
 
         let mut ctx = base_context(config);
+        ctx.insert("search_url", "/search/");
         ctx.insert("search_query", "");
         ctx.insert("static_search", &true);
         ctx.insert("search_year", &period.map(|period| period.year));
@@ -347,6 +348,9 @@ async fn export_index_variant(
             &ctx,
             &out_dir.join(static_index_output_path(page_info.current_page, period)),
         )?;
+        if period.is_none() && page_info.current_page == 1 {
+            render_to_path(tera, "index", &ctx, &out_dir.join("search/index.html"))?;
+        }
     }
 
     Ok(())
@@ -1517,7 +1521,7 @@ mod home_navigation_tests {
         ] {
             db.execute(backend.build(&table)).await.unwrap();
         }
-        for (id, date) in [(1, "2020-01-01"), (2, "2020-01-02"), (3, "2020-02-01")] {
+        for (id, date) in [(1, "2020-01-01"), (2, "2020-01-01"), (3, "2020-01-01")] {
             let matter = crate::utils::front_matter::FrontMatter::new(
                 format!("Article {id}"),
                 format!("article-{id}"),
@@ -1594,6 +1598,19 @@ mod home_navigation_tests {
                 "all/index.html"
             };
             assert!(html(destination).contains("href=\"/posts/article-3/\""));
+            assert!(html("page/2/index.html").contains("href=\"/posts/article-2/\""));
+            assert!(html("page/3/index.html").contains("href=\"/posts/article-1/\""));
+            for path in [
+                "search/index.html",
+                "archive/2020/01/index.html",
+                "page/2/index.html",
+            ] {
+                let page = html(path);
+                assert!(page.contains("action=\"/search/\""));
+                assert!(page.contains("data-search-url=\"/search/\""));
+                assert!(page.contains("data-static-search=\"true\""));
+            }
+            assert!(html("search/index.html").contains("href=\"/posts/article-3/\""));
             if home == "about" {
                 assert!(
                     html("index.html")
