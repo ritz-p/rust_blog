@@ -83,11 +83,11 @@ document.addEventListener('DOMContentLoaded', () => {
     periodFilter.addEventListener('change', (event) => {
       const select = event.currentTarget;
       const option = select.options[select.selectedIndex];
-      const href = option ? option.dataset.href : '';
+      const query = (new URLSearchParams(window.location.search).get('q') || '').trim();
+      const href = option ? ((query && option.dataset.searchHref) || option.dataset.href) : '';
       if (href) {
         const url = new URL(href, window.location.origin);
-        const query = new URLSearchParams(window.location.search).get('q');
-        if (query && query.trim()) url.searchParams.set('q', query.trim());
+        if (query) url.searchParams.set('q', query);
         window.location.assign(url.href);
       }
     });

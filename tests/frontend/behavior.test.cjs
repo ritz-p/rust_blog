@@ -31,9 +31,11 @@ async function browser(t, script, query = '', fetch = undefined, html = fixture)
     pathname: dom.window.location.pathname, search: dom.window.location.search, hash: dom.window.location.hash,
     assign: href => navigations.push(href), replace: href => navigations.push(href),
   };
-  const source = readFileSync(path.join(__dirname, '../../core/assets', script), 'utf8');
-  vm.runInNewContext(source, { document, window: { location, addEventListener: dom.window.addEventListener.bind(dom.window) }, URL, URLSearchParams, fetch });
-  await handler();
+  for (const name of [script].flat()) {
+    const source = readFileSync(path.join(__dirname, '../../core/assets', name), 'utf8');
+    vm.runInNewContext(source, { document, window: { location, addEventListener: dom.window.addEventListener.bind(dom.window) }, URL, URLSearchParams, fetch });
+    await handler();
+  }
   return { document, navigations };
 }
 
@@ -172,4 +174,36 @@ test('custom home keeps search pagination on the dedicated search page', async t
   }
   const { navigations } = await browser(t, 'search.js', 'search/?year=2026&month=9', undefined, html);
   assert.deepEqual(navigations, ['/archive/2026/09/']);
+});
+
+test('all-period selection preserves search without changing the clear-search destination', async t => {
+  const records = [...articles, { ...articles[0], month: 8 }];
+  const fetch = async () => ({ ok: true, json: async () => records });
+  for (const allUrl of ['/', '/all/']) {
+    const html = fixture
+      .replace('<option data-href="/">', `<option data-href="${allUrl}" data-search-href="/search/">`)
+      .replace('data-static-search="true"', `data-static-search="true" data-search-url="/search/" data-all-periods-url="${allUrl}"`);
+    for (const term of ['rust', '', '   ']) {
+      const query = `archive/2026/09/?q=${encodeURIComponent(term)}&year=2026&month=9`;
+      const { document, navigations } = await browser(t, ['nav.js', 'search.js'], query, fetch, html);
+      if (term.trim()) {
+        assert.match(document.getElementById('search-status').textContent, /5件/);
+        assert.equal(document.getElementById('clear-search').pathname, '/archive/2026/09/');
+      }
+      const select = document.querySelector('[data-period-filter]');
+      select.selectedIndex = 0;
+      select.dispatchEvent(new document.defaultView.Event('change'));
+      const url = new URL(navigations[0]);
+      assert.equal(url.pathname, term.trim() ? '/search/' : allUrl);
+      assert.equal(url.searchParams.get('q'), term.trim() || null);
+      assert.equal(url.searchParams.has('year'), false);
+      assert.equal(url.searchParams.has('month'), false);
+      if (term.trim()) {
+        const all = await browser(t, ['nav.js', 'search.js'], url.pathname.slice(1) + url.search, fetch, html);
+        assert.match(all.document.getElementById('search-status').textContent, /6件/);
+        assert.equal(all.document.getElementById('clear-search').pathname, allUrl);
+        assert.equal(all.document.querySelector('[data-period-filter]').selectedIndex, 0);
+      }
+    }
+  }
 });

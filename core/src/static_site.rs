@@ -1586,7 +1586,9 @@ mod home_navigation_tests {
                 "archive/2020/01/page/2/index.html",
             ] {
                 assert!(
-                    html(path).contains(&format!("data-href=\"{first_url}\"")),
+                    html(path).contains(&format!(
+                        "data-href=\"{first_url}\" data-search-href=\"/search/\""
+                    )),
                     "{home}: {path}"
                 );
             }

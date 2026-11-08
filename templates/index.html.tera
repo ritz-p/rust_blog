@@ -28,7 +28,7 @@
     <p class="is-size-7 has-text-grey mb-2">時期別</p>
     <div class="select is-small">
       <select aria-label="時期別フィルタ" data-period-filter>
-        <option data-href="{{ all_periods_url }}" {% if not selected_period %}selected{% endif %}>すべて</option>
+        <option data-href="{{ all_periods_url }}"{% if static_search %} data-search-href="{{ search_url | default(value='/') }}"{% endif %} {% if not selected_period %}selected{% endif %}>すべて</option>
         {% for period in period_links %}
           <option data-href="{{ period.href }}" {% if period.is_selected %}selected{% endif %}>
             {{ period.label }}
