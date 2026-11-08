@@ -22,7 +22,7 @@ CI で生成した export バンドルを、別の記事リポジトリで使っ
 Linux x86_64 環境で実行します。`export` は `templates/` を実行時に読むため、バイナリだけを取り出さずに使います。
 記事 Markdown、画像・アイコン、`blog_config.toml` はバンドルに含まれません。記事リポジトリ側で用意してください。リダイレクトを使う場合は `redirects.toml` も用意します。
 
-タグ・カテゴリは各記事のフロントマターで指定します。`blog_config.toml` はサイト名・画像ディレクトリなどの共通設定を持ち、seed はこの設定ファイルを読みません。
+タグ・カテゴリは各記事のフロントマターで指定します。`blog_config.toml` はサイト名・画像ディレクトリなどの共通設定を持ち、seedも記事区分の設定を読みます。
 
 ## パス解決
 
@@ -33,7 +33,7 @@ Linux x86_64 環境で実行します。`export` は `templates/` を実行時�
 | `DATABASE_URL` | migration・seed・export が使う DB |
 | `ARTICLE_PATH` | seed が読み込む記事ディレクトリ |
 | `FIXED_CONTENT_PATH` | seed が読み込む固定ページディレクトリ |
-| `RUST_BLOG_CONFIG_PATH` | export が読むブログ設定 |
+| `RUST_BLOG_CONFIG_PATH` | seed・export が読むブログ設定 |
 | `RUST_BLOG_TEMPLATES_DIR` | export が読むテンプレート |
 | `RUST_BLOG_CONTENT_DIR` | export がコピーする画像・アイコンの親ディレクトリ |
 

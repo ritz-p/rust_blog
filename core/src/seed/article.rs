@@ -48,16 +48,40 @@ pub async fn seed_tag(
         .exec(db)
         .await?;
     for tag_name in &front_matter.tags {
-        let tag_slug = tag_name.to_lowercase();
+        if front_matter.section.as_deref().unwrap_or("blog") == "blog" && tag_name.starts_with('[')
+        {
+            return Err(DbErr::Custom(
+                "taxonomy names starting with [ are reserved for section namespaces".into(),
+            ));
+        }
+        let scoped_name = crate::sections::taxonomy_name(
+            front_matter.section.as_deref().unwrap_or("blog"),
+            tag_name,
+        );
+        let tag_slug = scoped_name.to_lowercase();
         let existing = tag::Entity::find()
             .filter(tag::Column::Slug.eq(tag_slug.as_str()))
             .one(db)
             .await?;
         let tag_id = if let Some(m) = existing {
+            if let Some(section) = front_matter
+                .section
+                .as_deref()
+                .filter(|section| *section != "blog")
+            {
+                let row = db.query_one(sea_orm::Statement::from_sql_and_values(
+                    sea_orm::DbBackend::Sqlite,
+                    "SELECT COUNT(*) AS count FROM article INNER JOIN article_tag ON article.id = article_tag.article_id WHERE article_tag.tag_id = ? AND article.section != ?",
+                    vec![m.id.into(), section.into()],
+                )).await?.ok_or_else(|| DbErr::Custom("missing taxonomy scope count".into()))?;
+                if row.try_get::<i64>("", "count")? != 0 {
+                    return Err(DbErr::Custom("taxonomy name conflicts with a legacy section namespace; rename the legacy entry before seeding".into()));
+                }
+            }
             m.id
         } else {
             tag::ActiveModel {
-                name: Set(tag_name.clone()),
+                name: Set(scoped_name),
                 slug: Set(tag_slug.clone()),
                 ..Default::default()
             }
@@ -99,16 +123,41 @@ pub async fn seed_category(
         .exec(db)
         .await?;
     for category_name in &front_matter.categories {
-        let category_slug = category_name.to_lowercase();
+        if front_matter.section.as_deref().unwrap_or("blog") == "blog"
+            && category_name.starts_with('[')
+        {
+            return Err(DbErr::Custom(
+                "taxonomy names starting with [ are reserved for section namespaces".into(),
+            ));
+        }
+        let scoped_name = crate::sections::taxonomy_name(
+            front_matter.section.as_deref().unwrap_or("blog"),
+            category_name,
+        );
+        let category_slug = scoped_name.to_lowercase();
         let existing = category::Entity::find()
             .filter(category::Column::Slug.eq(category_slug.as_str()))
             .one(db)
             .await?;
         let category_id = if let Some(m) = existing {
+            if let Some(section) = front_matter
+                .section
+                .as_deref()
+                .filter(|section| *section != "blog")
+            {
+                let row = db.query_one(sea_orm::Statement::from_sql_and_values(
+                    sea_orm::DbBackend::Sqlite,
+                    "SELECT COUNT(*) AS count FROM article INNER JOIN article_category ON article.id = article_category.article_id WHERE article_category.category_id = ? AND article.section != ?",
+                    vec![m.id.into(), section.into()],
+                )).await?.ok_or_else(|| DbErr::Custom("missing taxonomy scope count".into()))?;
+                if row.try_get::<i64>("", "count")? != 0 {
+                    return Err(DbErr::Custom("taxonomy name conflicts with a legacy section namespace; rename the legacy entry before seeding".into()));
+                }
+            }
             m.id
         } else {
             category::ActiveModel {
-                name: Set(category_name.clone()),
+                name: Set(scoped_name),
                 slug: Set(category_slug.clone()),
                 ..Default::default()
             }
@@ -340,6 +389,7 @@ mod tests {
             icatch_path: None,
             table_of_contents: false,
             deprecated: false,
+            section: "blog".into(),
         }
     }
 

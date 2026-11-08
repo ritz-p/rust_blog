@@ -44,6 +44,7 @@
       </div>
     </div>
   </nav>
+  {% include "partial/navigation" ignore missing %}
   <section class="section">
     <div class="container">
       {% block content %}{% endblock content %}
@@ -55,7 +56,7 @@
     </div>
   </footer>
   {% block scripts %}
-  <script src="/js/nav.js?v=code-copy-1" defer></script>
+  <script src="/js/nav.js?v=search-period-1" defer></script>
   {% endblock scripts %}
 </body>
 </html>

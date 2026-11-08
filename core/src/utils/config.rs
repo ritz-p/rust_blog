@@ -88,6 +88,23 @@ fn load_config_from_path(toml_path: &str) -> HashMap<String, String> {
         Ok(config) => config.map,
         Err(_) => HashMap::new(),
     };
+    let mut map = map;
+    if let Ok(contents) = fs::read_to_string(toml_path) {
+        match toml::from_str::<toml::Value>(&contents) {
+            Ok(value) => {
+                if let Some(navigation) = value.get("navigation") {
+                    map.insert(
+                        "navigation".into(),
+                        toml::to_string(navigation)
+                            .unwrap_or_else(|error| format!("invalid navigation: {error}")),
+                    );
+                }
+            }
+            Err(error) => {
+                map.insert("navigation".into(), format!("invalid config: {error}"));
+            }
+        }
+    }
     with_defaults(map)
 }
 

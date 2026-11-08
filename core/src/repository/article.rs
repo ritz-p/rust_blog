@@ -79,6 +79,7 @@ pub async fn get_all_articles(
     let offset = (page_info.current_page - 1) * page_info.per;
     let articles = base_query
         .order_by_desc(article::Column::CreatedAt)
+        .order_by_desc(article::Column::Id)
         .offset(offset)
         .limit(page_info.per)
         .all(db)
@@ -395,6 +396,7 @@ mod tests {
                 icatch_path: None,
                 table_of_contents: false,
                 deprecated: false,
+                section: "blog".into(),
                 created_at,
                 updated_at: now,
             };
@@ -433,6 +435,7 @@ mod tests {
                 icatch_path: None,
                 table_of_contents: false,
                 deprecated: false,
+                section: "blog".into(),
                 created_at: now,
                 updated_at: now,
             })

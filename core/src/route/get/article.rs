@@ -227,6 +227,7 @@ mod tests {
             icatch_path: None,
             table_of_contents: false,
             deprecated: false,
+            section: "blog".into(),
         };
         let db = MockDatabase::new(DatabaseBackend::Sqlite)
             .append_query_results([vec![article.clone()]])

@@ -5,6 +5,7 @@ pub mod entity_extension;
 pub mod feed;
 pub mod redirects;
 pub mod repository;
+pub mod sections;
 pub mod seed;
 pub mod slug;
 pub mod static_site;

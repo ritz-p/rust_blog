@@ -88,16 +88,25 @@ pub async fn export_site(
         favicon_path: config_map.get("favicon_path").cloned(),
         public_url: config_map.get("public_url").cloned(),
     };
-    let tera = load_templates(&paths.templates_dir)?;
+    let mut tera = load_templates(&paths.templates_dir)?;
+    let navigation = crate::sections::Navigation::from_config(config_map)?;
+    navigation.validate_database(db).await?;
+    crate::sections::install_navigation(&mut tera, &navigation, true)?;
 
     export_search_index(db, &config, out_dir).await?;
 
-    export_index_pages(&tera, db, &config, out_dir).await?;
+    let all_index_url = if navigation.home == "all" {
+        "/"
+    } else {
+        "/all/"
+    };
+    export_index_pages(&tera, db, &config, out_dir, all_index_url).await?;
     export_article_pages(&tera, db, &config, out_dir).await?;
     export_fixed_content_pages(&tera, db, &config, out_dir).await?;
     export_tag_pages(&tera, db, &config, out_dir).await?;
     export_category_pages(&tera, db, &config, out_dir).await?;
     export_error_page(&tera, &config, out_dir, "404", "404.html")?;
+    crate::sections::export(&tera, db, &navigation, &config, out_dir).await?;
     write_cloudflare_support_files(out_dir)?;
     if !redirects.articles.is_empty() || !redirects.pages.is_empty() {
         redirects.write_static(db, out_dir).await?;
@@ -218,11 +227,21 @@ async fn export_index_pages(
     db: &DatabaseConnection,
     config: &CommonConfig,
     out_dir: &Path,
+    all_index_url: &str,
 ) -> Result<()> {
     let periods = get_article_periods(db, None).await?;
-    export_index_variant(tera, db, config, out_dir, None, &periods).await?;
+    export_index_variant(tera, db, config, out_dir, None, &periods, all_index_url).await?;
     for period in &periods {
-        export_index_variant(tera, db, config, out_dir, Some(*period), &periods).await?;
+        export_index_variant(
+            tera,
+            db,
+            config,
+            out_dir,
+            Some(*period),
+            &periods,
+            all_index_url,
+        )
+        .await?;
     }
     Ok(())
 }
@@ -234,6 +253,7 @@ async fn export_index_variant(
     out_dir: &Path,
     period: Option<ArticlePeriod>,
     all_periods: &[ArticlePeriod],
+    all_index_url: &str,
 ) -> Result<()> {
     let (_, first_page_info) = get_all_articles(
         db,
@@ -257,7 +277,7 @@ async fn export_index_variant(
             .map(|p| {
                 json!({
                     "label": format!("{}/{:02}", p.year, p.month),
-                    "href": static_index_url(1, Some(*p)),
+                    "href": static_index_url(1, Some(*p), all_index_url),
                     "is_selected": period == Some(*p),
                 })
             })
@@ -286,12 +306,16 @@ async fn export_index_variant(
             .collect();
 
         let mut ctx = base_context(config);
+        ctx.insert("search_url", "/search/");
         ctx.insert("search_query", "");
         ctx.insert("static_search", &true);
         ctx.insert("search_year", &period.map(|period| period.year));
         ctx.insert("search_month", &period.map(|period| period.month));
-        ctx.insert("all_periods_url", "/");
-        ctx.insert("clear_search_url", &static_index_url(1, period));
+        ctx.insert("all_periods_url", all_index_url);
+        ctx.insert(
+            "clear_search_url",
+            &static_index_url(1, period, all_index_url),
+        );
         ctx.insert("articles", &articles);
         ctx.insert("page", &page_info.current_page);
         ctx.insert("per", &page_info.per);
@@ -300,11 +324,17 @@ async fn export_index_variant(
         ctx.insert("has_next", &page_info.has_next);
         ctx.insert("prev_page", &page_info.prev_page);
         ctx.insert("next_page", &page_info.next_page);
-        ctx.insert("prev_url", &static_index_url(page_info.prev_page, period));
-        ctx.insert("next_url", &static_index_url(page_info.next_page, period));
+        ctx.insert(
+            "prev_url",
+            &static_index_url(page_info.prev_page, period, all_index_url),
+        );
+        ctx.insert(
+            "next_url",
+            &static_index_url(page_info.next_page, period, all_index_url),
+        );
         ctx.insert(
             "pagination",
-            &page_info.navigation(|number| static_index_url(number, period)),
+            &page_info.navigation(|number| static_index_url(number, period, all_index_url)),
         );
         ctx.insert(
             "selected_period",
@@ -318,6 +348,9 @@ async fn export_index_variant(
             &ctx,
             &out_dir.join(static_index_output_path(page_info.current_page, period)),
         )?;
+        if period.is_none() && page_info.current_page == 1 {
+            render_to_path(tera, "index", &ctx, &out_dir.join("search/index.html"))?;
+        }
     }
 
     Ok(())
@@ -893,9 +926,9 @@ fn static_index_output_path(page: u64, period: Option<ArticlePeriod>) -> PathBuf
     }
 }
 
-fn static_index_url(page: u64, period: Option<ArticlePeriod>) -> String {
+fn static_index_url(page: u64, period: Option<ArticlePeriod>, all_index_url: &str) -> String {
     match period {
-        None if page <= 1 => "/".to_string(),
+        None if page <= 1 => all_index_url.to_string(),
         None => format!("/page/{page}/"),
         Some(period) if page <= 1 => format!("/archive/{}/{:02}/", period.year, period.month),
         Some(period) => format!("/archive/{}/{:02}/page/{page}/", period.year, period.month),
@@ -1172,6 +1205,7 @@ mod tests {
                 icatch_path: Set(None),
                 table_of_contents: Set(false),
                 deprecated: Set(false),
+                section: Set("blog".into()),
             }
             .insert(&db)
             .await
@@ -1219,8 +1253,8 @@ mod tests {
         let info = PageInfo::new(Page { number: 5, per: 1 }, 10);
         let period = crate::repository::article::ArticlePeriod::new(2025, 12).unwrap();
         let variants = [
-            info.navigation(|page| super::static_index_url(page, None)),
-            info.navigation(|page| super::static_index_url(page, Some(period))),
+            info.navigation(|page| super::static_index_url(page, None, "/")),
+            info.navigation(|page| super::static_index_url(page, Some(period), "/")),
             info.navigation(|page| super::static_tag_url("rust", "updated_at", page)),
             info.navigation(|page| super::static_category_url("dev", "created_at", page)),
         ];
@@ -1345,6 +1379,7 @@ mod tests {
             icatch_path: None,
             table_of_contents: false,
             deprecated: false,
+            section: "blog".into(),
         };
         let db = MockDatabase::new(DatabaseBackend::Sqlite)
             .append_query_results([vec![article.clone()]])
@@ -1462,5 +1497,132 @@ mod tests {
         assert!(!redirects.contains("/css /css/ 308"));
 
         fs::remove_dir_all(out_dir).expect("failed to remove temp export dir");
+    }
+}
+
+#[cfg(test)]
+mod home_navigation_tests {
+    use super::*;
+    use crate::entity::{article, article_category, article_tag, category, fixed_content, tag};
+    use sea_orm::{ConnectionTrait, Database, Schema};
+
+    #[rocket::async_test]
+    async fn retained_indexes_link_to_all_articles_when_home_changes() {
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        let backend = db.get_database_backend();
+        let schema = Schema::new(backend);
+        for table in [
+            schema.create_table_from_entity(article::Entity),
+            schema.create_table_from_entity(tag::Entity),
+            schema.create_table_from_entity(category::Entity),
+            schema.create_table_from_entity(article_tag::Entity),
+            schema.create_table_from_entity(article_category::Entity),
+            schema.create_table_from_entity(fixed_content::Entity),
+        ] {
+            db.execute(backend.build(&table)).await.unwrap();
+        }
+        for (id, date) in [(1, "2020-01-01"), (2, "2020-01-01"), (3, "2020-01-01")] {
+            let matter = crate::utils::front_matter::FrontMatter::new(
+                format!("Article {id}"),
+                format!("article-{id}"),
+                false,
+                Some(date.into()),
+                None,
+                None,
+                vec![],
+                vec![],
+            );
+            crate::seed::article::seed_article(&db, &matter, "body")
+                .await
+                .unwrap();
+        }
+        db.execute(sea_orm::Statement::from_string(backend,
+            "INSERT INTO fixed_content (title, slug, content, created_at, updated_at) VALUES ('Fixed home', 'about', 'fixed body', '2020-01-01T00:00:00Z', '2020-01-01T00:00:00Z')"
+        )).await.unwrap();
+        let root = std::env::temp_dir().join(format!(
+            "home-index-links-{}-{}",
+            std::process::id(),
+            chrono::Utc::now().timestamp_nanos_opt().unwrap()
+        ));
+        let out = root.join("dist");
+        let paths = ExportPaths {
+            templates_dir: PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../templates"),
+            content_dir: root.join("content"),
+        };
+        for (home, first_url) in [("all", "/"), ("blog", "/all/"), ("about", "/all/")] {
+            let navigation = format!(
+                r#"
+                home = "{home}"
+                default_section = "blog"
+                tabs = [
+                    {{kind = "all", id = "all", label = "すべて"}},
+                    {{kind = "section", id = "blog", label = "Section home"}},
+                    {{kind = "page", id = "about", label = "About", slug = "about"}}
+                ]
+            "#
+            );
+            let config = HashMap::from([
+                ("articles_per_page".into(), "1".into()),
+                ("navigation".into(), navigation),
+            ]);
+            export_site(&db, &config, &out, &paths).await.unwrap();
+            let html = |path: &str| {
+                html_escape::decode_html_entities(&fs::read_to_string(out.join(path)).unwrap())
+                    .into_owned()
+            };
+            let page = html("page/2/index.html");
+            for link in [
+                format!("class=\"pagination-previous\" href=\"{first_url}\""),
+                format!("href=\"{first_url}\" aria-label=\"Latest page\""),
+                format!("href=\"{first_url}\" aria-label=\"Page 1\""),
+                format!("href=\"{first_url}\" id=\"clear-search\""),
+            ] {
+                assert!(page.contains(&link), "{home}: {link}");
+            }
+            assert!(page.contains("href=\"/page/3/\""));
+            for path in [
+                "page/2/index.html",
+                "archive/2020/01/index.html",
+                "archive/2020/01/page/2/index.html",
+            ] {
+                assert!(
+                    html(path).contains(&format!(
+                        "data-href=\"{first_url}\" data-search-href=\"/search/\""
+                    )),
+                    "{home}: {path}"
+                );
+            }
+            let archive = html("archive/2020/01/page/2/index.html");
+            assert!(archive.contains("class=\"pagination-previous\" href=\"/archive/2020/01/\""));
+            let destination = if first_url == "/" {
+                "index.html"
+            } else {
+                "all/index.html"
+            };
+            assert!(html(destination).contains("href=\"/posts/article-3/\""));
+            assert!(html("page/2/index.html").contains("href=\"/posts/article-2/\""));
+            assert!(html("page/3/index.html").contains("href=\"/posts/article-1/\""));
+            for path in [
+                "search/index.html",
+                "archive/2020/01/index.html",
+                "page/2/index.html",
+            ] {
+                let page = html(path);
+                assert!(page.contains("action=\"/search/\""));
+                assert!(page.contains("data-search-url=\"/search/\""));
+                assert!(page.contains("data-static-search=\"true\""));
+            }
+            assert!(html("search/index.html").contains("href=\"/posts/article-3/\""));
+            if home == "about" {
+                assert!(
+                    html("index.html")
+                        .contains("<h1 id=\"post-title\" class=\"title is-2\">Fixed home</h1>")
+                );
+            }
+            if home == "blog" {
+                assert!(html("index.html").contains("<h1 class=\"title\">Section home</h1>"));
+            }
+        }
+        fs::remove_dir_all(root).unwrap();
     }
 }

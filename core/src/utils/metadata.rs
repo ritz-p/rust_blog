@@ -81,6 +81,7 @@ mod tests {
             icatch_path: None,
             table_of_contents: false,
             deprecated: false,
+            section: "blog".into(),
         };
         let mut config = CommonConfig {
             articles_per_page: 10,

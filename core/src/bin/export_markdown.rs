@@ -10,6 +10,7 @@ use std::{
 
 #[derive(Serialize)]
 struct ArticleMatter<'a> {
+    section: &'a str,
     title: &'a str,
     slug: &'a str,
     table_of_contents: bool,
@@ -48,7 +49,7 @@ async fn documents(db: &impl ConnectionTrait) -> Result<Vec<(PathBuf, String)>> 
             .all(db)
             .await?
             .into_iter()
-            .map(|tag| tag.name)
+            .map(|tag| rust_blog::sections::taxonomy_label(&model.section, &tag.name).to_owned())
             .collect();
         let categories = model
             .find_related(category::Entity)
@@ -56,9 +57,12 @@ async fn documents(db: &impl ConnectionTrait) -> Result<Vec<(PathBuf, String)>> 
             .all(db)
             .await?
             .into_iter()
-            .map(|category| category.name)
+            .map(|category| {
+                rust_blog::sections::taxonomy_label(&model.section, &category.name).to_owned()
+            })
             .collect();
         let matter = ArticleMatter {
+            section: &model.section,
             title: &model.title,
             slug: &model.slug,
             table_of_contents: model.table_of_contents,
