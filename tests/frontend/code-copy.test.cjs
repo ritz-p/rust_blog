@@ -18,7 +18,8 @@ test('copy controls preserve source and select the correct block when clipboard 
     toolbars[0].querySelector('button').click();
     await new Promise(resolve => setImmediate(resolve));
     assert.equal(copied, '\t世界 <x>\n');
-    assert.match(toolbars[0].textContent, /コピーしました/);
+    assert.equal(toolbars[0].textContent, 'rust');
+    assert.equal(toolbars[0].querySelector('button').getAttribute('aria-label'), 'コードをコピー');
     dom.window.navigator.clipboard.writeText = async () => { throw new Error('denied'); };
     toolbars[1].querySelector('button').click();
     await new Promise(resolve => setImmediate(resolve));

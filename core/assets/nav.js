@@ -13,16 +13,13 @@ document.addEventListener('DOMContentLoaded', () => {
     toolbar.className = 'code-toolbar';
     const label = document.createElement('span');
     label.textContent = code.dataset.language || 'Text';
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'button is-small';
-    button.textContent = 'コードをコピー';
+    const button = copyButton('コードをコピー');
     const status = document.createElement('span');
     status.setAttribute('role', 'status');
     button.addEventListener('click', async () => {
       try {
         await window.navigator.clipboard.writeText(code.textContent);
-        status.textContent = 'コピーしました';
+        status.textContent = '';
       } catch {
         const range = document.createRange();
         range.selectNodeContents(code);
