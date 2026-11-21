@@ -57,7 +57,7 @@ impl Default for Navigation {
             tabs: vec![
                 Tab::All {
                     id: "all".into(),
-                    label: "すべて".into(),
+                    label: "記事一覧".into(),
                 },
                 Tab::Section {
                     id: "blog".into(),
