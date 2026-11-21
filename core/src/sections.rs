@@ -1,3 +1,5 @@
+use crate::domain::page::Page;
+use crate::repository::article::{ArticlePeriod, period_counts};
 use anyhow::{Result, ensure};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
@@ -265,8 +267,8 @@ pub async fn context(
     db: &sea_orm::DatabaseConnection,
     navigation: &Navigation,
     section: Option<&str>,
-    number: u64,
-    per: u64,
+    page: Page,
+    period: Option<ArticlePeriod>,
     static_mode: bool,
     default_icatch_path: Option<&str>,
 ) -> Result<tera::Context> {
@@ -274,12 +276,12 @@ pub async fn context(
         db,
         navigation,
         section,
-        per,
+        page.per,
         static_mode,
         default_icatch_path,
     )
     .await?
-    .context(db, number)
+    .context(db, page.number, period)
     .await
 }
 
@@ -290,7 +292,7 @@ struct Listing<'a> {
     static_mode: bool,
     default_icatch_path: Option<&'a str>,
     query: sea_orm::Select<crate::entity::article::Entity>,
-    total: u64,
+    periods: Vec<(ArticlePeriod, u64)>,
 }
 
 impl<'a> Listing<'a> {
@@ -303,7 +305,7 @@ impl<'a> Listing<'a> {
         default_icatch_path: Option<&'a str>,
     ) -> Result<Self> {
         use crate::entity::article;
-        use sea_orm::{ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter};
+        use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
         if let Some(section) = section {
             navigation.validate_section(section)?;
         }
@@ -312,7 +314,7 @@ impl<'a> Listing<'a> {
         if let Some(section) = section {
             query = query.filter(article::Column::Section.eq(section));
         }
-        let total = query.clone().count(db).await?;
+        let periods = period_counts(db, query.clone()).await?;
         Ok(Self {
             navigation,
             section,
@@ -320,17 +322,26 @@ impl<'a> Listing<'a> {
             static_mode,
             default_icatch_path,
             query,
-            total,
+            periods,
         })
+    }
+
+    fn total(&self, period: Option<ArticlePeriod>) -> u64 {
+        self.periods
+            .iter()
+            .filter(|(month, _)| period.is_none_or(|p| p == *month))
+            .map(|(_, count)| count)
+            .sum()
     }
 
     async fn context(
         &self,
         db: &sea_orm::DatabaseConnection,
         number: u64,
+        period: Option<ArticlePeriod>,
     ) -> Result<tera::Context> {
         use crate::entity::article;
-        use sea_orm::{QueryOrder, QuerySelect};
+        use sea_orm::{QueryFilter, QueryOrder, QuerySelect};
         let navigation = self.navigation;
         let section = self.section;
         let static_mode = self.static_mode;
@@ -339,11 +350,16 @@ impl<'a> Listing<'a> {
                 number,
                 per: self.per,
             },
-            self.total,
+            self.total(period),
         );
-        let models = self
-            .query
-            .clone()
+        let mut query = self.query.clone();
+        if let Some(month) = period {
+            let filter = month
+                .sqlite_datetime_range_filter()
+                .ok_or_else(|| anyhow::anyhow!("invalid article period"))?;
+            query = query.filter(filter);
+        }
+        let models = query
             .order_by_desc(article::Column::CreatedAt)
             .order_by_desc(article::Column::Id)
             .limit(page.per)
@@ -369,18 +385,22 @@ impl<'a> Listing<'a> {
             })
             .ok_or_else(|| anyhow::anyhow!("missing tab"))?;
         let base = navigation.url(tab, static_mode);
-        let url = |number| {
-            if static_mode {
-                if number == 1 {
-                    base.clone()
-                } else {
-                    format!("{base}page/{number}/")
-                }
-            } else {
-                format!("{base}?page={number}")
-            }
-        };
+        let url = |number| listing_url(&base, static_mode, period, number);
+        let links: Vec<_> = self
+            .periods
+            .iter()
+            .map(|(month, _)| {
+                serde_json::json!({
+                    "label": format!("{}/{:02}", month.year, month.month),
+                    "href": listing_url(&base, static_mode, Some(*month), 1),
+                    "is_selected": period == Some(*month),
+                })
+            })
+            .collect();
         let mut ctx = tera::Context::new();
+        ctx.insert("period_links", &links);
+        ctx.insert("selected_period", &period.is_some());
+        ctx.insert("all_periods_url", &base);
         ctx.insert("search_url", &format!("/search{suffix}"));
         ctx.insert("tab_title", tab.label());
         ctx.insert("active_tab", tab.id());
@@ -396,6 +416,26 @@ impl<'a> Listing<'a> {
         ctx.insert("prev_url", &url(page.prev_page));
         ctx.insert("next_url", &url(page.next_page));
         Ok(ctx)
+    }
+}
+
+fn listing_url(base: &str, static_mode: bool, period: Option<ArticlePeriod>, page: u64) -> String {
+    if static_mode {
+        let mut path = base.to_owned();
+        if let Some(month) = period {
+            path.push_str(&format!("archive/{}/{:02}/", month.year, month.month));
+        }
+        if page > 1 {
+            path.push_str(&format!("page/{page}/"));
+        }
+        path
+    } else if let Some(month) = period {
+        format!(
+            "{base}?year={}&month={}&page={page}",
+            month.year, month.month
+        )
+    } else {
+        format!("{base}?page={page}")
     }
 }
 
@@ -436,31 +476,22 @@ pub async fn export(
             config.default_icatch_path.as_deref(),
         )
         .await?;
-        let mut number = 1;
-        loop {
-            let mut context = listing.context(db, number).await?;
-            context.insert("site_name", &config.site_name);
-            context.insert("favicon_path", &config.favicon_path);
-            let directory = if number == 1 {
-                out.join(base.trim_matches('/'))
-            } else {
-                out.join(base.trim_matches('/'))
-                    .join(format!("page/{number}"))
-            };
-            std::fs::create_dir_all(&directory)?;
-            std::fs::write(
-                directory.join("index.html"),
-                tera.render("sections", &context)?,
-            )?;
-            if number
-                >= context
-                    .get("total_pages")
-                    .and_then(|value| value.as_u64())
-                    .unwrap_or(1)
-            {
-                break;
+        let periods =
+            std::iter::once(None).chain(listing.periods.iter().map(|(period, _)| Some(*period)));
+        for period in periods {
+            let pages = listing.total(period).div_ceil(listing.per).max(1);
+            for number in 1..=pages {
+                let mut context = listing.context(db, number, period).await?;
+                context.insert("site_name", &config.site_name);
+                context.insert("favicon_path", &config.favicon_path);
+                let url = listing_url(&base, true, period, number);
+                let directory = out.join(url.trim_matches('/'));
+                std::fs::create_dir_all(&directory)?;
+                std::fs::write(
+                    directory.join("index.html"),
+                    tera.render("sections", &context)?,
+                )?;
             }
-            number += 1;
         }
     }
     if navigation.home != "all" {
@@ -527,15 +558,31 @@ mod integration_tests {
                 .await
                 .unwrap();
         }
-        let all = context(&db, &navigation, None, 1, 10, false, None)
-            .await
-            .unwrap()
-            .into_json();
+        let all = context(
+            &db,
+            &navigation,
+            None,
+            Page { number: 1, per: 10 },
+            None,
+            false,
+            None,
+        )
+        .await
+        .unwrap()
+        .into_json();
         assert_eq!(all["articles"].as_array().unwrap().len(), 2);
-        let tech = context(&db, &navigation, Some("tech"), 1, 10, true, None)
-            .await
-            .unwrap()
-            .into_json();
+        let tech = context(
+            &db,
+            &navigation,
+            Some("tech"),
+            Page { number: 1, per: 10 },
+            None,
+            true,
+            None,
+        )
+        .await
+        .unwrap()
+        .into_json();
         assert_eq!(tech["articles"].as_array().unwrap().len(), 1);
         assert_eq!(tech["articles"][0]["title"], "second");
         assert_eq!(tech["articles"][0]["url"], "/posts/second/");
@@ -567,8 +614,8 @@ mod integration_tests {
             )
             .await
             .unwrap();
-            let first = listing.context(&db, 1).await.unwrap().into_json();
-            let second = listing.context(&db, 2).await.unwrap().into_json();
+            let first = listing.context(&db, 1, None).await.unwrap().into_json();
+            let second = listing.context(&db, 2, None).await.unwrap().into_json();
             assert_eq!(first["articles"].as_array().unwrap().len(), 1);
             assert_eq!(first["articles"][0]["title"], "second");
             assert_eq!(first["articles"][0]["icatch_path"], "/fallback.png");
@@ -643,11 +690,21 @@ mod export_regression_tests {
     use std::collections::BTreeMap;
 
     fn mock_listing(db: MockDatabase, total: i32, pages: usize) -> MockDatabase {
-        db.append_query_results([vec![BTreeMap::from([(
-            "num_items".to_owned(),
-            sea_orm::Value::from(total),
-        )])]])
-        .append_query_results(vec![Vec::<article::Model>::new(); pages])
+        let date = chrono::DateTime::parse_from_rfc3339("2020-01-01T00:00:00Z")
+            .unwrap()
+            .to_utc();
+        let rows = vec![
+            BTreeMap::from([("created_at".to_owned(), sea_orm::Value::from(date))]);
+            total as usize
+        ];
+        db.append_query_results([rows]).append_query_results(vec![
+            Vec::<article::Model>::new();
+            if total == 0 {
+                pages
+            } else {
+                2 * pages
+            }
+        ])
     }
 
     fn config() -> crate::utils::config::CommonConfig {
@@ -690,8 +747,8 @@ mod export_regression_tests {
             "page 50"
         );
         let log = db.into_transaction_log();
-        assert_eq!(log.len(), 102);
-        for entry in log.iter().skip(1).take(50) {
+        assert_eq!(log.len(), 202);
+        for entry in log.iter().skip(1).take(100) {
             let query = format!("{entry:?}");
             assert!(query.contains("LIMIT"), "{query}");
             assert!(query.contains("OFFSET"), "{query}");
