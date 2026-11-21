@@ -4,8 +4,11 @@ CI で生成した export バンドルを、別の記事リポジトリで使っ
 
 ## 配布方針
 
-`.github/workflows/static_export.yml` の **Export Tool Build** は `v*` タグの push と手動実行に対応します。`develop` への通常の push では生成しません。
-手動実行する場合は `develop` またはリリースタグを選択してください。バンドル名には選択した ref 名が使われます。
+**Export Tool Build** は `release` ブランチへの push（PR のマージを含む）で export バンドルをビルドし、GitHub Releases の Latest として公開します。タグは `vYYYYMMDD-<コミット SHA の先頭 12 桁>` です。日付には対象コミットのコミッター日時（JST）を使います。
+
+CI は対象コミットを指定してドラフトを作り、`rust-blog-export-tools-<タグ>-x86_64-unknown-linux-gnu.tar.gz` を添付します。GitHub が記録した SHA-256 がビルド結果と一致してから公開します。失敗した場合は Actions で同じ実行を再実行できます。公開済みならその版を維持し、ブランチが先に進んでいれば新しいコミットの実行が公開を担当します。利用側のリポジトリは、公開後に Latest からバンドルを取得できます。
+
+手動実行と `v*` タグの push では、従来どおり Actions artifact を生成します。バンドル名には選択した ref 名を使い、名前に含まれる `/` は `-` に置き換えます。
 
 `v0.1.0` の例:
 
