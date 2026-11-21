@@ -346,6 +346,7 @@ mod tests {
             assert_eq!(response.status(), Status::Ok);
             let body = response.into_string().await.unwrap();
             let html = html_escape::decode_html_entities(&body);
+            assert!(html.contains(r#"href="/about">About</a>"#));
             assert!(html.contains("href=\"/posts/dec-1\""));
             assert!(!html.contains("href=\"/posts/dec-2\""));
             assert!(html.contains(&format!("href=\"{base}?year=2025&month=12&page=1\"")));

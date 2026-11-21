@@ -1,19 +1,14 @@
 document.addEventListener('DOMContentLoaded', () => {
-  function copyButton(label) {
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'button is-small';
-    button.setAttribute('aria-label', label);
-    button.innerHTML = '<svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="8" y="8" width="12" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/></svg>';
-    return button;
-  }
-
   for (const code of document.querySelectorAll('.content pre > code')) {
     const toolbar = document.createElement('div');
     toolbar.className = 'code-toolbar';
     const label = document.createElement('span');
     label.textContent = code.dataset.language || 'Text';
-    const button = copyButton('コードをコピー');
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'button is-small';
+    button.setAttribute('aria-label', 'コードをコピー');
+    button.innerHTML = '<svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="8" y="8" width="12" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/></svg>';
     const status = document.createElement('span');
     status.setAttribute('role', 'status');
     button.addEventListener('click', async () => {
@@ -54,30 +49,17 @@ document.addEventListener('DOMContentLoaded', () => {
     link.href = `#${heading.id}`;
     link.textContent = ' #';
     link.setAttribute('aria-label', '見出しへのリンク');
-    const button = copyButton('リンクをコピー');
-    button.classList.add('heading-copy');
-    const status = document.createElement('span');
-    status.setAttribute('role', 'status');
-    button.addEventListener('click', async () => {
-      const url = new URL(window.location.href);
-      url.hash = heading.id;
-      try {
-        await window.navigator.clipboard.writeText(url.href);
-        status.textContent = '';
-      } catch {
-        status.textContent = 'コピーできません。# のリンクから URL を取得してください。';
-      }
-    });
-    heading.append(link, button, status);
+    heading.append(link);
   }
   const burgers = Array.prototype.slice.call(document.querySelectorAll('.navbar-burger'), 0);
   burgers.forEach((el) => {
     el.addEventListener('click', () => {
       const target = el.dataset.target;
       const targetElement = document.getElementById(target);
-      el.classList.toggle('is-active');
       if (targetElement) {
-        targetElement.classList.toggle('is-active');
+        const expanded = targetElement.classList.toggle('is-active');
+        el.classList.toggle('is-active', expanded);
+        el.setAttribute('aria-expanded', String(expanded));
       }
     });
   });
