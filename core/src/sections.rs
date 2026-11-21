@@ -291,8 +291,6 @@ struct Listing<'a> {
     default_icatch_path: Option<&'a str>,
     query: sea_orm::Select<crate::entity::article::Entity>,
     total: u64,
-    tags: Vec<serde_json::Value>,
-    categories: Vec<serde_json::Value>,
 }
 
 impl<'a> Listing<'a> {
@@ -304,11 +302,8 @@ impl<'a> Listing<'a> {
         static_mode: bool,
         default_icatch_path: Option<&'a str>,
     ) -> Result<Self> {
-        use crate::entity::{article, article_category, article_tag, category, tag};
-        use sea_orm::{
-            ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect,
-            QueryTrait,
-        };
+        use crate::entity::article;
+        use sea_orm::{ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter};
         if let Some(section) = section {
             navigation.validate_section(section)?;
         }
@@ -318,24 +313,6 @@ impl<'a> Listing<'a> {
             query = query.filter(article::Column::Section.eq(section));
         }
         let total = query.clone().count(db).await?;
-        let article_ids = query
-            .clone()
-            .select_only()
-            .column(article::Column::Id)
-            .into_query();
-        let suffix = if static_mode { "/" } else { "" };
-        let tags = tag::Entity::find().filter(tag::Column::Id.in_subquery(
-            sea_orm::sea_query::Query::select().column(article_tag::Column::TagId).from(article_tag::Entity)
-                .and_where(article_tag::Column::ArticleId.in_subquery(article_ids.clone())).to_owned()
-        )).order_by_asc(tag::Column::Slug).all(db).await?.into_iter().map(|value| serde_json::json!({
-            "name": value.name, "url": format!("/tag/{}{suffix}", crate::utils::url_segment(&value.slug))
-        })).collect();
-        let categories = category::Entity::find().filter(category::Column::Id.in_subquery(
-            sea_orm::sea_query::Query::select().column(article_category::Column::CategoryId).from(article_category::Entity)
-                .and_where(article_category::Column::ArticleId.in_subquery(article_ids)).to_owned()
-        )).order_by_asc(category::Column::Slug).all(db).await?.into_iter().map(|value| serde_json::json!({
-            "name": value.name, "url": format!("/category/{}{suffix}", crate::utils::url_segment(&value.slug))
-        })).collect();
         Ok(Self {
             navigation,
             section,
@@ -344,8 +321,6 @@ impl<'a> Listing<'a> {
             default_icatch_path,
             query,
             total,
-            tags,
-            categories,
         })
     }
 
@@ -408,12 +383,10 @@ impl<'a> Listing<'a> {
         let mut ctx = tera::Context::new();
         ctx.insert("tab_title", tab.label());
         ctx.insert("active_tab", tab.id());
-        ctx.insert("tags_url", &format!("{base}#section-tags"));
-        ctx.insert("categories_url", &format!("{base}#section-categories"));
+        ctx.insert("tags_url", &format!("/tags{suffix}"));
+        ctx.insert("categories_url", &format!("/categories{suffix}"));
         ctx.insert("navigation_tabs", &navigation.links(static_mode));
         ctx.insert("articles", &articles);
-        ctx.insert("section_tags", &self.tags);
-        ctx.insert("section_categories", &self.categories);
         ctx.insert("pagination", &page.navigation(url));
         ctx.insert("page", &page.current_page);
         ctx.insert("total_pages", &page.total_pages);
@@ -558,8 +531,6 @@ mod integration_tests {
             .unwrap()
             .into_json();
         assert_eq!(all["articles"].as_array().unwrap().len(), 2);
-        assert_eq!(all["section_tags"].as_array().unwrap().len(), 2);
-        assert_eq!(all["section_categories"].as_array().unwrap().len(), 2);
         let tech = context(&db, &navigation, Some("tech"), 1, 10, true, None)
             .await
             .unwrap()
@@ -567,7 +538,6 @@ mod integration_tests {
         assert_eq!(tech["articles"].as_array().unwrap().len(), 1);
         assert_eq!(tech["articles"][0]["title"], "second");
         assert_eq!(tech["articles"][0]["url"], "/posts/second/");
-        assert_eq!(tech["section_tags"].as_array().unwrap().len(), 1);
         let (articles, _) = crate::repository::article::get_articles_by_tag_slug(
             &db,
             crate::domain::page::Page { number: 1, per: 10 },
@@ -603,8 +573,6 @@ mod integration_tests {
             assert_eq!(first["articles"][0]["icatch_path"], "/fallback.png");
             assert_eq!(second["articles"][0]["title"], "first");
             assert_eq!(second["articles"][0]["icatch_path"], "/own.png");
-            assert_eq!(first["section_tags"], second["section_tags"]);
-            assert_eq!(first["section_tags"].as_array().unwrap().len(), 2);
             assert_eq!(first["total_pages"], 2);
         }
     }
@@ -669,7 +637,7 @@ mod navigation_render_tests {
 #[cfg(test)]
 mod export_regression_tests {
     use super::*;
-    use crate::entity::{article, category, tag};
+    use crate::entity::article;
     use sea_orm::{DbBackend, MockDatabase};
     use std::collections::BTreeMap;
 
@@ -678,8 +646,6 @@ mod export_regression_tests {
             "num_items".to_owned(),
             sea_orm::Value::from(total),
         )])]])
-        .append_query_results([Vec::<tag::Model>::new()])
-        .append_query_results([Vec::<category::Model>::new()])
         .append_query_results(vec![Vec::<article::Model>::new(); pages])
     }
 
@@ -704,7 +670,7 @@ mod export_regression_tests {
     }
 
     #[rocket::async_test]
-    async fn export_loads_taxonomy_once_per_tab_and_fetches_only_each_page() {
+    async fn export_counts_once_per_tab_and_fetches_only_each_page() {
         let db = mock_listing(
             mock_listing(MockDatabase::new(DbBackend::Sqlite), 1000, 50),
             1000,
@@ -723,8 +689,8 @@ mod export_regression_tests {
             "page 50"
         );
         let log = db.into_transaction_log();
-        assert_eq!(log.len(), 106);
-        for entry in log.iter().skip(3).take(50) {
+        assert_eq!(log.len(), 102);
+        for entry in log.iter().skip(1).take(50) {
             let query = format!("{entry:?}");
             assert!(query.contains("LIMIT"), "{query}");
             assert!(query.contains("OFFSET"), "{query}");
