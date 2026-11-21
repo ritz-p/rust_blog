@@ -14,6 +14,6 @@ Server URLs use `/posts/slug`; static URLs use `/posts/slug/`. Slugs are URL enc
 - https://planorama.dev/
 ```
 
-リンク先に Open Graph の説明文や画像があればカードに表示します。タイトルと説明文には HTML の `title` と `meta name="description"` も使えます。取得できない場合は元の URL をクリックできます。文中のリンクやコードブロックは通常どおり表示されます。
+リンク先に Open Graph の説明文や HTTPS のサムネイルがあればカードに表示します。タイトルと説明文には HTML の `title` と `meta name="description"` も使えます。取得できない場合は元の URL をクリックできます。文中のリンクやコードブロックは通常どおり表示されます。
 
 サーバーは記事表示時、静的サイトは export 時に公開 HTTP(S) ページを取得します。同じ URL の取得結果はプロセス内で15分間再利用されます。静的サイトのカードを更新するには再度 export してください。
