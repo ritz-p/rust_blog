@@ -3,6 +3,7 @@
 {% block content %}
 <h1 class="title">{{ tab_title }}</h1>
 {% include "partial/period_filter" %}
+{% if active_tab == "all" %}<p class="mb-5"><a href="{{ search_url }}">記事を検索</a></p>{% endif %}
 <div class="article-list">
 {% for article in articles %}{% include "partial/article_card" %}{% else %}<p>まだ記事がありません。</p>{% endfor %}
 </div>

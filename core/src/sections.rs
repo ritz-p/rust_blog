@@ -401,6 +401,7 @@ impl<'a> Listing<'a> {
         ctx.insert("period_links", &links);
         ctx.insert("selected_period", &period.is_some());
         ctx.insert("all_periods_url", &base);
+        ctx.insert("search_url", &format!("/search{suffix}"));
         ctx.insert("tab_title", tab.label());
         ctx.insert("active_tab", tab.id());
         ctx.insert("tags_url", &format!("/tags{suffix}"));
