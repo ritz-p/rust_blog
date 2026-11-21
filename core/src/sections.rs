@@ -381,6 +381,7 @@ impl<'a> Listing<'a> {
             }
         };
         let mut ctx = tera::Context::new();
+        ctx.insert("search_url", &format!("/search{suffix}"));
         ctx.insert("tab_title", tab.label());
         ctx.insert("active_tab", tab.id());
         ctx.insert("tags_url", &format!("/tags{suffix}"));
