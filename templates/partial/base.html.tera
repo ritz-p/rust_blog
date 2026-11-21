@@ -27,7 +27,6 @@
   <nav class="navbar is-light" role="navigation" aria-label="main navigation">
     <div class="container">
       <div class="navbar-brand">
-        <a class="navbar-item has-text-weight-semibold" href="/">記事一覧</a>
         <a role="button" class="navbar-burger" aria-label="menu" aria-expanded="false" data-target="mainNav">
           <span aria-hidden="true"></span>
           <span aria-hidden="true"></span>

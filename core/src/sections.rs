@@ -57,7 +57,7 @@ impl Default for Navigation {
             tabs: vec![
                 Tab::All {
                     id: "all".into(),
-                    label: "すべて".into(),
+                    label: "記事一覧".into(),
                 },
                 Tab::Section {
                     id: "blog".into(),
@@ -406,6 +406,7 @@ impl<'a> Listing<'a> {
             }
         };
         let mut ctx = tera::Context::new();
+        ctx.insert("search_url", &format!("/search{suffix}"));
         ctx.insert("tab_title", tab.label());
         ctx.insert("active_tab", tab.id());
         ctx.insert("tags_url", &format!("{base}#section-tags"));

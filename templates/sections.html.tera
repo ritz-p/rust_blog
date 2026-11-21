@@ -2,6 +2,7 @@
 {% block title %}{{ tab_title }} - {{ site_name }}{% endblock title %}
 {% block content %}
 <h1 class="title">{{ tab_title }}</h1>
+{% if active_tab == "all" %}<p class="mb-5"><a href="{{ search_url }}">記事を検索</a></p>{% endif %}
 <div class="tags" id="section-categories" aria-label="カテゴリ">
 {% for item in section_categories %}<a class="tag is-info is-light" href="{{ item.url }}">{{ item.name }}</a>{% endfor %}
 </div>
