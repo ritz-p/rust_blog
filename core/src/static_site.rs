@@ -413,7 +413,7 @@ async fn export_article_pages(
             "metadata",
             &crate::utils::metadata::article_metadata(article, config, true),
         );
-        let content = markdown_to_html(&article.content);
+        let content = crate::link_cards::article_html(&article.content).await;
         let content = if article.table_of_contents {
             toc(&content)
         } else {
@@ -1450,7 +1450,7 @@ mod tests {
         );
         assert!(html.contains("property=\"og:title\" content=\"Highlighted Rust\""));
         assert!(html.contains("href=\"/posts/highlighted-rust/\""));
-        assert!(html.contains("href=\"/css/site.css?v=tab-alignment-1\""));
+        assert!(html.contains("href=\"/css/site.css?v=link-cards-1\""));
         let content = html
             .split("<div class=\"content is-medium\">")
             .nth(1)

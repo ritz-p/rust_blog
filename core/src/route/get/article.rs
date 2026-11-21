@@ -4,11 +4,7 @@ use crate::{
         category::get_categories_by_article,
         tag::get_tags_by_article,
     },
-    utils::{
-        config::CommonConfig,
-        markdown::{markdown_to_html, toc},
-        utc_to_jst,
-    },
+    utils::{config::CommonConfig, markdown::toc, utc_to_jst},
 };
 use rocket::{State, http::Status};
 use rocket_dyn_templates::{Template, context};
@@ -39,7 +35,7 @@ pub async fn article_detail(
         Err(_) => return Err(Status::NotFound),
     };
 
-    let content = markdown_to_html(&article.content);
+    let content = rust_blog::link_cards::article_html(&article.content).await;
     let content = if article.table_of_contents {
         toc(&content)
     } else {
@@ -416,7 +412,7 @@ mod tests {
                 .contains("href=\"/posts/highlighted-rust%23intro\""),
             "{html}"
         );
-        assert!(html.contains("href=\"/css/site.css?v=tab-alignment-1\""));
+        assert!(html.contains("href=\"/css/site.css?v=link-cards-1\""));
         let content = html
             .split("<div class=\"content is-medium\">")
             .nth(1)

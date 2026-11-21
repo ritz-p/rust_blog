@@ -4,6 +4,7 @@ pub mod domain;
 pub mod entity;
 pub mod entity_extension;
 pub mod feed;
+pub mod link_cards;
 pub mod redirects;
 pub mod repository;
 pub mod sections;
