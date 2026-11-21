@@ -89,14 +89,21 @@ google.com, pub-XXXXXXXXXXXXXXXX, DIRECT, f08c47fec0942fa0
 """
 ```
 
-特定の記事に広告を表示する場合は、同じ `[adsense]` に以下の 2 行を加え、ディスプレイ広告ユニットのコードにある `data-ad-client` と `data-ad-slot` の実値に置き換えます。`ads.txt` の公開だけなら、この 2 項目は省略できます。
+**自動広告**を使う場合は、同じ `[adsense]` に AdSense コードの `client=` に続くパブリッシャー ID を設定します。
 
 ```toml
 publisher_id = "ca-pub-XXXXXXXXXXXXXXXX"
-sidebar_slot = "XXXXXXXXXX"
 ```
 
-対象の記事 Markdown のフロントマターに `adsense_sidebar: true` を追加すると、最新記事・前後の記事リンクの下にレスポンシブ広告が 1 枠入ります。既存記事と設定を省略した記事はオフです。サイトの `enabled = false` は記事側の指定に優先します。
+AdSense 管理画面で対象サイトの自動広告をオンにし、広告を表示したい記事の YAML フロントマターに次の行を追加します。自動広告だけを使う場合、`sidebar_slot` は不要です。[Google の設定手順](https://support.google.com/adsense/answer/9261307?hl=ja)
+
+```yaml
+adsense_auto_ads: true
+```
+
+**サイドバーの手動広告枠**も使う場合は、`[adsense]` の `sidebar_slot` にディスプレイ広告ユニットの `data-ad-slot` を文字列で設定します。記事に `adsense_sidebar: true` を指定すると、最新記事・前後の記事リンクの下に 1 枠を設けます。
+
+両方の記事設定は省略時に `false` です。両方オフの記事とサイト設定が `enabled = false` の場合は、広告スクリプトを読み込みません。手動枠だけを使う記事も同じ Google スクリプトを読み込みます。その記事をサイト全体の自動広告から除外するには、AdSense 管理画面でページ除外を設定してください。[Google のページ除外手順](https://support.google.com/adsense/answer/9262311?hl=ja)
 
 既存 DB にマイグレーションを適用し、記事を seed し直してください。サイト設定の変更はサーバーの再起動または静的サイトの再 export と配信で反映されます。Cloudflare に静的サイトを配信する場合は、生成された `_headers` も一緒に配信してください。
 
@@ -175,7 +182,7 @@ UTF-8 BOM 付きファイルにも対応し、BOM と改行形式を保持しま
 型・文字数・日時・未知の項目を検証します。不正なファイルは書き換えず、正常なファイルの整形を続けます。
 探索・読み書き・検証のエラーは最後にファイル名つきでまとめて表示し、非ゼロで終了します。
 `--check` では書き換えず、検証エラーと未整形のファイルをまとめて報告します。
-順序は `title`, `slug`, `deleted`, `table_of_contents`, `deprecated`, `adsense_sidebar`, `created_at`, `excerpt`, `icatch_path`, `tags`, `categories`。
+順序は `title`, `slug`, `deleted`, `table_of_contents`, `deprecated`, `adsense_sidebar`, `adsense_auto_ads`, `created_at`, `excerpt`, `icatch_path`, `tags`, `categories`。
 `date` は名前を保持し、`created_at` と同じ位置に並べます。省略された任意項目は追加しません。
 YAML のコメントや引用形式は正規化されますが、本文は保持します。
 `--check` は検証エラーまたは未整形の場合に非ゼロで終了します。

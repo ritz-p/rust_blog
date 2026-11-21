@@ -21,6 +21,8 @@ pub struct Model {
     pub deprecated: bool,
     #[sea_orm(default_value = false)]
     pub adsense_sidebar: bool,
+    #[sea_orm(default_value = false)]
+    pub adsense_auto_ads: bool,
     #[sea_orm(default_value = "blog")]
     pub section: String,
 }

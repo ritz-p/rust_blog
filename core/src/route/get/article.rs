@@ -102,11 +102,13 @@ pub async fn article_detail(
         })
         .collect();
 
-    let sidebar = adsense.sidebar(article.adsense_sidebar).map_err(|error| {
-        error!("article {slug}: {error}");
-        Status::InternalServerError
-    })?;
-    let policy = if sidebar.is_some() {
+    let article_ads = adsense
+        .article_ads(article.adsense_auto_ads, article.adsense_sidebar)
+        .map_err(|error| {
+            error!("article {slug}: {error}");
+            Status::InternalServerError
+        })?;
+    let policy = if article_ads.is_some() {
         rust_blog::adsense::AD_CSP.as_str()
     } else {
         rust_blog::adsense::DEFAULT_CSP.as_str()
@@ -129,7 +131,7 @@ pub async fn article_detail(
             tags: &tags,
             categories: &categories,
             latest_articles: latest_articles,
-            adsense_sidebar: sidebar,
+            article_ads: article_ads,
             nav_integrity: rust_blog::adsense::NAV_INTEGRITY.as_str(),
             surrounding_articles: surrounding
         },
@@ -196,11 +198,17 @@ mod tests {
         };
         let out = root.join("site");
         let seller = "google.com, pub-0123456789012345, DIRECT, f08c47fec0942fa0\n";
+        let articles = [
+            ("sidebar", false, true),
+            ("auto", true, false),
+            ("both", true, true),
+            ("plain", false, false),
+        ];
         for enabled in [true, false] {
             let db = fixture_db().await;
-            for (slug, requested) in [("with-ad", true), ("plain", false)] {
+            for (slug, auto, sidebar) in articles {
                 let yaml = format!(
-                    "title: Example\nslug: {slug}\ncreated_at: '2020-01-01'\nadsense_sidebar: {requested}"
+                    "title: Example\nslug: {slug}\ncreated_at: '2020-01-01'\nadsense_sidebar: {sidebar}\nadsense_auto_ads: {auto}"
                 );
                 let matter = serde_yaml::from_str(&yaml).unwrap();
                 rust_blog::seed::article::seed_article(&db, &matter, "Body")
@@ -245,8 +253,8 @@ mod tests {
             } else {
                 assert_eq!(response.status(), Status::NotFound);
             }
-            for (slug, requested) in [("with-ad", true), ("plain", false)] {
-                let show = enabled && requested;
+            for (slug, auto, sidebar) in articles {
+                let show = enabled && (auto || sidebar);
                 let response = client.get(format!("/posts/{slug}")).dispatch().await;
                 assert_eq!(response.status(), Status::Ok);
                 let csp = response
@@ -258,19 +266,22 @@ mod tests {
                     fs::read_to_string(out.join(format!("posts/{slug}/index.html"))).unwrap();
                 assert_eq!(
                     exported.contains("http-equiv=\"Content-Security-Policy\""),
-                    enabled && !requested
+                    enabled && !show
                 );
                 for html in [exported, response.into_string().await.unwrap()] {
                     assert_eq!(
                         html.matches("data-ad-slot=\"1234567890\"").count(),
-                        usize::from(show)
+                        usize::from(enabled && sidebar)
                     );
-                    assert_eq!(html.contains("/js/adsense.js"), show);
-                    if show {
+                    assert_eq!(html.matches("/js/adsense.js").count(), usize::from(show));
+                    assert_eq!(html.contains(" data-sidebar defer"), enabled && sidebar);
+                    if enabled && sidebar {
                         assert!(
                             html.find("aria-label=\"前後の記事\"").unwrap()
                                 < html.find("class=\"adsbygoogle").unwrap()
                         );
+                    }
+                    if show {
                         assert!(html.contains(rust_blog::adsense::AD_INTEGRITY.as_str()));
                     }
                 }
@@ -360,6 +371,7 @@ mod tests {
             table_of_contents: false,
             deprecated: false,
             adsense_sidebar: false,
+            adsense_auto_ads: false,
             section: "blog".into(),
         };
         let db = MockDatabase::new(DatabaseBackend::Sqlite)

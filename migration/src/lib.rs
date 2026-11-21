@@ -10,6 +10,7 @@ mod m20251231_000001_create_article_icatch_path;
 
 mod m20261108_000001_article_section;
 mod m20261122_000001_article_adsense_sidebar;
+mod m20261122_000002_article_adsense_auto_ads;
 pub struct Migrator;
 mod m20260922_000001_article_table_of_contents;
 mod m20261024_000001_article_deprecated;
@@ -29,6 +30,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20261024_000001_article_deprecated::Migration),
             Box::new(m20261108_000001_article_section::Migration),
             Box::new(m20261122_000001_article_adsense_sidebar::Migration),
+            Box::new(m20261122_000002_article_adsense_auto_ads::Migration),
         ]
     }
 }

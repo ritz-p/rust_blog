@@ -72,6 +72,7 @@ mod repository_tests {
             table_of_contents: false,
             deprecated: false,
             adsense_sidebar: false,
+            adsense_auto_ads: false,
             section: "blog".into(),
         };
         let page = Page { number: 1, per: 10 };

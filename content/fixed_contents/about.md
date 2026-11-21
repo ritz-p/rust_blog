@@ -48,6 +48,7 @@ fn main() {
 | `tags` | 整形 CLI では必須 | タグのリスト。付けない場合は `[]`。seed では省略時も空として扱います。 |
 | `categories` | 整形 CLI では必須 | カテゴリのリスト。付けない場合は `[]`。seed では省略時も空として扱います。 |
 | `icatch_path` | 省略可 | サムネイル画像のパス。例：`"/image/example.png"`。指定する場合は1〜200文字相当。省略時はサイト設定の既定画像を使います。 |
+| `adsense_auto_ads` | 省略時 `false` | `true` でこの記事に自動広告コードを読み込みます。サイト側の AdSense 設定と管理画面の自動広告を有効にしてください。 |
 | `adsense_sidebar` | 省略時 `false` | サイトの AdSense 設定が有効な場合、`true` で右サイドバーに広告を 1 枠表示。 |
 | `table_of_contents` | 省略時 `false` | `true` で目次を表示、`false` で非表示。 |
 | `deleted` | 省略時 `false` | `true` にしてseedすると、そのslugの記事をデータベースから削除します。 |

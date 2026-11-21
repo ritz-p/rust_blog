@@ -15,6 +15,8 @@ pub struct FrontMatter {
     pub deprecated: bool,
     #[serde(default)]
     pub adsense_sidebar: bool,
+    #[serde(default)]
+    pub adsense_auto_ads: bool,
     #[serde(default, alias = "date")]
     pub created_at: Option<String>,
     pub excerpt: Option<String>,
@@ -49,6 +51,7 @@ impl FrontMatter {
             table_of_contents: false,
             deprecated: false,
             adsense_sidebar: false,
+            adsense_auto_ads: false,
             created_at,
             excerpt,
             icatch_path,
@@ -65,7 +68,7 @@ mod tests {
     #[test]
     fn article_flags_are_opt_in() {
         let base = "title: Test\nslug: test\ntags: []\ncategories: []\n";
-        for field in ["table_of_contents", "deprecated"] {
+        for field in ["table_of_contents", "deprecated", "adsense_auto_ads"] {
             for (setting, expected) in [
                 (String::new(), false),
                 (format!("{field}: false\n"), false),
@@ -74,10 +77,10 @@ mod tests {
                 let matter: FrontMatter =
                     serde_yaml::from_str(&format!("{base}{setting}")).unwrap();
                 assert_eq!(
-                    if field == "deprecated" {
-                        matter.deprecated
-                    } else {
-                        matter.table_of_contents
+                    match field {
+                        "adsense_auto_ads" => matter.adsense_auto_ads,
+                        "deprecated" => matter.deprecated,
+                        _ => matter.table_of_contents,
                     },
                     expected
                 );

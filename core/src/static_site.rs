@@ -370,7 +370,10 @@ async fn export_article_pages(
     let mut articles = get_all_published_articles(db).await?;
     articles.sort_by_key(|a| std::cmp::Reverse((a.created_at, a.id)));
     let latest_articles = latest_articles_json(db).await?;
-    let has_ads = adsense.ads_txt().is_some() && articles.iter().any(|a| a.adsense_sidebar);
+    let has_ads = adsense.ads_txt().is_some()
+        && articles
+            .iter()
+            .any(|a| a.adsense_auto_ads || a.adsense_sidebar);
     for (index, article) in articles.iter().enumerate() {
         let surrounding: Vec<_> =
             crate::repository::article::surrounding_articles(&articles, index)
@@ -395,16 +398,16 @@ async fn export_article_pages(
             .collect();
 
         let mut ctx = base_context(config);
-        let sidebar = adsense
-            .sidebar(article.adsense_sidebar)
+        let article_ads = adsense
+            .article_ads(article.adsense_auto_ads, article.adsense_sidebar)
             .with_context(|| format!("article {}", article.slug))?;
         if has_ads {
             ctx.insert("nav_integrity", crate::adsense::NAV_INTEGRITY.as_str());
-            if sidebar.is_none() {
+            if article_ads.is_none() {
                 ctx.insert("article_meta_csp", crate::adsense::DEFAULT_FETCH_CSP);
             }
         }
-        ctx.insert("adsense_sidebar", &sidebar);
+        ctx.insert("article_ads", &article_ads);
         ctx.insert("title", &article.title);
         ctx.insert(
             "metadata",
@@ -1236,6 +1239,7 @@ mod tests {
                 table_of_contents: Set(false),
                 deprecated: Set(false),
                 adsense_sidebar: Set(false),
+                adsense_auto_ads: Set(false),
                 section: Set("blog".into()),
             }
             .insert(&db)
@@ -1411,6 +1415,7 @@ mod tests {
             table_of_contents: false,
             deprecated: false,
             adsense_sidebar: false,
+            adsense_auto_ads: false,
             section: "blog".into(),
         };
         let db = MockDatabase::new(DatabaseBackend::Sqlite)

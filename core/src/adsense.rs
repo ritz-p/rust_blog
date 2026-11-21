@@ -33,9 +33,9 @@ pub struct AdSense {
 }
 
 #[derive(Serialize)]
-pub struct Sidebar<'a> {
+pub struct ArticleAds<'a> {
     publisher_id: &'a str,
-    slot: &'a str,
+    sidebar_slot: Option<&'a str>,
     script_integrity: &'static str,
 }
 
@@ -56,8 +56,8 @@ impl AdSense {
         self.enabled.then_some(self.ads_txt.as_str())
     }
 
-    pub fn sidebar(&self, requested: bool) -> Result<Option<Sidebar<'_>>> {
-        if !(requested && self.enabled) {
+    pub fn article_ads(&self, auto_ads: bool, sidebar: bool) -> Result<Option<ArticleAds<'_>>> {
+        if !self.enabled || !(auto_ads || sidebar) {
             return Ok(None);
         }
         let publisher = self
@@ -69,12 +69,14 @@ impl AdSense {
             "adsense.publisher_id must be ca-pub- followed by 16 digits"
         );
         ensure!(
-            !self.sidebar_slot.is_empty() && self.sidebar_slot.bytes().all(|b| b.is_ascii_digit()),
+            !sidebar
+                || (!self.sidebar_slot.is_empty()
+                    && self.sidebar_slot.bytes().all(|b| b.is_ascii_digit())),
             "adsense.sidebar_slot must contain the numeric ad unit ID"
         );
-        Ok(Some(Sidebar {
+        Ok(Some(ArticleAds {
             publisher_id: &self.publisher_id,
-            slot: &self.sidebar_slot,
+            sidebar_slot: sidebar.then_some(self.sidebar_slot.as_str()),
             script_integrity: &AD_INTEGRITY,
         }))
     }
@@ -88,13 +90,13 @@ mod tests {
     fn seller_file_is_independent_of_sidebar_credentials() {
         let mut cfg = AdSense::default();
         assert!(cfg.ads_txt().is_none());
-        assert!(cfg.sidebar(true).unwrap().is_none());
+        assert!(cfg.article_ads(false, true).unwrap().is_none());
         cfg.enabled = true;
         cfg.ads_txt = "first\nsecond\n".into();
         assert_eq!(cfg.ads_txt(), Some("first\nsecond\n"));
-        assert!(cfg.sidebar(false).unwrap().is_none());
+        assert!(cfg.article_ads(false, false).unwrap().is_none());
         assert!(
-            cfg.sidebar(true)
+            cfg.article_ads(false, true)
                 .err()
                 .unwrap()
                 .to_string()
@@ -102,13 +104,23 @@ mod tests {
         );
         cfg.publisher_id = "ca-pub-0123456789012345".into();
         assert!(
-            cfg.sidebar(true)
+            cfg.article_ads(false, true)
                 .err()
                 .unwrap()
                 .to_string()
                 .contains("sidebar_slot")
         );
+        assert!(
+            cfg.article_ads(true, false)
+                .unwrap()
+                .unwrap()
+                .sidebar_slot
+                .is_none()
+        );
         cfg.sidebar_slot = "0123456789".into();
-        assert_eq!(cfg.sidebar(true).unwrap().unwrap().slot, "0123456789");
+        assert_eq!(
+            cfg.article_ads(false, true).unwrap().unwrap().sidebar_slot,
+            Some("0123456789")
+        );
     }
 }

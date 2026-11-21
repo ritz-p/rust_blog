@@ -16,6 +16,7 @@ struct ArticleMatter<'a> {
     table_of_contents: bool,
     deprecated: bool,
     adsense_sidebar: bool,
+    adsense_auto_ads: bool,
     created_at: String,
     excerpt: &'a Option<String>,
     icatch_path: &'a Option<String>,
@@ -69,6 +70,7 @@ async fn documents(db: &impl ConnectionTrait) -> Result<Vec<(PathBuf, String)>> 
             table_of_contents: model.table_of_contents,
             deprecated: model.deprecated,
             adsense_sidebar: model.adsense_sidebar,
+            adsense_auto_ads: model.adsense_auto_ads,
             created_at: model.created_at.to_rfc3339(),
             excerpt: &model.excerpt,
             icatch_path: &model.icatch_path,
@@ -224,7 +226,7 @@ mod tests {
             db.execute(backend.build(&statement)).await.unwrap();
         }
         assert!(documents(&db).await.unwrap().is_empty());
-        let matter: FrontMatter = serde_yaml::from_str("title: 'Test: 日本語 --- test'\nslug: test-export\ntable_of_contents: true\ndeprecated: true\nadsense_sidebar: true\ncreated_at: 2026-01-01T00:00:00Z\ntags: [Rust]\ncategories: [Dev]\n").unwrap();
+        let matter: FrontMatter = serde_yaml::from_str("title: 'Test: 日本語 --- test'\nslug: test-export\ntable_of_contents: true\ndeprecated: true\nadsense_sidebar: true\nadsense_auto_ads: true\ncreated_at: 2026-01-01T00:00:00Z\ntags: [Rust]\ncategories: [Dev]\n").unwrap();
         let body = "\n# Body\n---\n```rust\nfn main() {}\n```\n";
         let id = seed_article(&db, &matter, body).await.unwrap();
         seed_tag(&db, &matter, id).await.unwrap();
@@ -257,6 +259,7 @@ mod tests {
         assert!(parsed.table_of_contents);
         assert!(parsed.deprecated);
         assert!(parsed.adsense_sidebar);
+        assert!(parsed.adsense_auto_ads);
         assert_eq!(exported_body, body);
         assert!(output[1].1.ends_with("---\nAbout body"));
         let root = std::env::temp_dir().join(format!(
