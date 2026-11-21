@@ -19,7 +19,7 @@ slug = "about"
 [[navigation.tabs]]
 kind = "all"
 id = "all"
-label = "すべて"
+label = "記事一覧"
 
 [[navigation.tabs]]
 kind = "section"

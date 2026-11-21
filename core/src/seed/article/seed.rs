@@ -66,6 +66,12 @@ pub async fn prepare(
     active_model
         .deprecated
         .set_if_not_equals(front_matter.deprecated);
+    active_model
+        .adsense_sidebar
+        .set_if_not_equals(front_matter.adsense_sidebar);
+    active_model
+        .adsense_auto_ads
+        .set_if_not_equals(front_matter.adsense_auto_ads);
     Ok(active_model)
 }
 

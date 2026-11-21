@@ -38,7 +38,12 @@ impl Fairing for SecurityHeaders {
     }
 
     async fn on_response<'r>(&self, _req: &'r Request<'_>, res: &mut Response<'r>) {
-        res.set_header(Header::new("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' https: data:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'"));
+        if !res.headers().contains("Content-Security-Policy") {
+            res.set_header(Header::new(
+                "Content-Security-Policy",
+                rust_blog::adsense::DEFAULT_CSP.as_str(),
+            ));
+        }
         res.set_header(Header::new(
             "Referrer-Policy",
             "strict-origin-when-cross-origin",
@@ -68,6 +73,7 @@ pub async fn launch(
     navigation.validate_database(&db).await?;
     let template_navigation = navigation.clone();
     rocket::build()
+        .manage(rust_blog::adsense::AdSense::from_config(&config_map)?)
         .manage(navigation)
         .manage(redirects)
         .manage(db)
@@ -100,6 +106,8 @@ pub async fn launch(
                 get::discovery::sitemap,
                 get::discovery::robots,
                 get::feed::feed,
+                get::static_asset::ads_txt,
+                get::static_asset::adsense_js,
                 bulma_css,
                 site_css,
                 nav_js,

@@ -12,8 +12,11 @@ test('heading link copies the current URL and exposes a fallback on failure', as
     dom.window.eval(readFileSync('core/assets/nav.js', 'utf8'));
     dom.window.document.dispatchEvent(new dom.window.Event('DOMContentLoaded'));
     const button = dom.window.document.querySelector('.heading-copy');
+    assert.equal(button.getAttribute('aria-label'), 'リンクをコピー');
+    assert.equal(button.textContent, '');
     button.click();
     await new Promise(resolve => setImmediate(resolve));
+    assert.equal(dom.window.document.querySelector('[role=status]').textContent, '');
     assert.equal(decodeURIComponent(copied), 'https://example.com/posts/test/#heading-日本語');
     dom.window.navigator.clipboard.writeText = async () => { throw new Error('denied'); };
     button.click();

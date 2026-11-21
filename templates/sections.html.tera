@@ -2,12 +2,8 @@
 {% block title %}{{ tab_title }} - {{ site_name }}{% endblock title %}
 {% block content %}
 <h1 class="title">{{ tab_title }}</h1>
-<div class="tags" id="section-categories" aria-label="カテゴリ">
-{% for item in section_categories %}<a class="tag is-info is-light" href="{{ item.url }}">{{ item.name }}</a>{% endfor %}
-</div>
-<div class="tags" id="section-tags" aria-label="タグ">
-{% for item in section_tags %}<a class="tag is-light" href="{{ item.url }}">{{ item.name }}</a>{% endfor %}
-</div>
+{% include "partial/period_filter" %}
+{% if active_tab == "all" %}<p class="mb-5"><a href="{{ search_url }}">記事を検索</a></p>{% endif %}
 <div class="article-list">
 {% for article in articles %}{% include "partial/article_card" %}{% else %}<p>まだ記事がありません。</p>{% endfor %}
 </div>

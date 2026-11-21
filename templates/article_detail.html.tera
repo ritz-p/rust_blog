@@ -3,6 +3,15 @@
 {% import "partial/categories" as categories_macro%}
 {% block title %}{{ title }}{% endblock title %}
 
+{% block head %}
+  {% if article_meta_csp %}<meta http-equiv="Content-Security-Policy" content="{{ article_meta_csp }}">{% endif %}
+  {{ super() }}
+  {% if article_ads %}
+  <script src="/js/adsense.js" integrity="{{ article_ads.script_integrity | safe }}"
+          data-ad-client="{{ article_ads.publisher_id }}"{% if article_ads.sidebar_slot %} data-sidebar{% endif %} defer></script>
+  {% endif %}
+{% endblock head %}
+
 {% block content %}
 <div class="columns">
   <div class="column is-8">

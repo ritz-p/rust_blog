@@ -15,6 +15,8 @@ const ORDER: &[&str] = &[
     "deleted",
     "table_of_contents",
     "deprecated",
+    "adsense_sidebar",
+    "adsense_auto_ads",
     "created_at",
     "excerpt",
     "icatch_path",
@@ -200,6 +202,18 @@ fn validate(source: &Mapping) -> Result<()> {
         validate_field(
             source,
             "table_of_contents",
+            Some(Value::Bool(false)),
+            |_: bool| Ok(()),
+        ),
+        validate_field(
+            source,
+            "adsense_sidebar",
+            Some(Value::Bool(false)),
+            |_: bool| Ok(()),
+        ),
+        validate_field(
+            source,
+            "adsense_auto_ads",
             Some(Value::Bool(false)),
             |_: bool| Ok(()),
         ),

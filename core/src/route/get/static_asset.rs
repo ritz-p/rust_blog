@@ -18,3 +18,13 @@ pub fn site_css() -> (ContentType, &'static str) {
 pub fn nav_js() -> (ContentType, &'static str) {
     (ContentType::JavaScript, NAV_JS)
 }
+
+#[get("/ads.txt")]
+pub fn ads_txt(config: &rocket::State<rust_blog::adsense::AdSense>) -> Option<&str> {
+    config.ads_txt()
+}
+
+#[get("/js/adsense.js")]
+pub fn adsense_js() -> (ContentType, &'static str) {
+    (ContentType::JavaScript, rust_blog::adsense::SCRIPT)
+}

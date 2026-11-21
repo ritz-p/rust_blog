@@ -19,7 +19,7 @@
   {% if metadata.image %}<meta property="og:image" content="{{ metadata.image | escape | safe }}">{% endif %}
   {% endif %}
   <link rel="stylesheet" href="/css/bulma.min.css">
-  <link rel="stylesheet" href="/css/site.css?v=deprecated-1">
+  <link rel="stylesheet" href="/css/site.css?v=list-align-1">
   <link rel="shortcut icon" href= "{{ favicon_path }}" >
   {% endblock head %}
 </head>
@@ -27,7 +27,6 @@
   <nav class="navbar is-light" role="navigation" aria-label="main navigation">
     <div class="container">
       <div class="navbar-brand">
-        <a class="navbar-item has-text-weight-semibold" href="/">記事一覧</a>
         <a role="button" class="navbar-burger" aria-label="menu" aria-expanded="false" data-target="mainNav">
           <span aria-hidden="true"></span>
           <span aria-hidden="true"></span>
@@ -56,7 +55,7 @@
     </div>
   </footer>
   {% block scripts %}
-  <script src="/js/nav.js?v=search-period-1" defer></script>
+  <script src="/js/nav.js?v=code-copy-1"{% if nav_integrity %} integrity="{{ nav_integrity | safe }}"{% endif %} defer></script>
   {% endblock scripts %}
 </body>
 </html>

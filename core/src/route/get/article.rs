@@ -15,12 +15,19 @@ use rocket_dyn_templates::{Template, context};
 use sea_orm::DatabaseConnection;
 use serde_json::json;
 
+#[derive(rocket::Responder)]
+pub struct ArticlePage {
+    template: Template,
+    policy: rocket::http::Header<'static>,
+}
+
 #[get("/posts/<slug>", rank = 2)]
 pub async fn article_detail(
     config: &State<CommonConfig>,
     db: &State<DatabaseConnection>,
+    adsense: &State<rust_blog::adsense::AdSense>,
     slug: &str,
-) -> Result<Template, Status> {
+) -> Result<ArticlePage, Status> {
     let conn = db.inner();
     let maybe = get_article_by_slug(conn, slug)
         .await
@@ -95,7 +102,18 @@ pub async fn article_detail(
         })
         .collect();
 
-    Ok(Template::render(
+    let article_ads = adsense
+        .article_ads(article.adsense_auto_ads, article.adsense_sidebar)
+        .map_err(|error| {
+            error!("article {slug}: {error}");
+            Status::InternalServerError
+        })?;
+    let policy = if article_ads.is_some() {
+        rust_blog::adsense::AD_CSP.as_str()
+    } else {
+        rust_blog::adsense::DEFAULT_CSP.as_str()
+    };
+    let template = Template::render(
         "article_detail",
         context! {
             site_name: &config.site_name,
@@ -113,9 +131,15 @@ pub async fn article_detail(
             tags: &tags,
             categories: &categories,
             latest_articles: latest_articles,
+            article_ads: article_ads,
+            nav_integrity: rust_blog::adsense::NAV_INTEGRITY.as_str(),
             surrounding_articles: surrounding
         },
-    ))
+    );
+    Ok(ArticlePage {
+        template,
+        policy: rocket::http::Header::new("Content-Security-Policy", policy),
+    })
 }
 
 #[cfg(test)]
@@ -134,8 +158,7 @@ mod tests {
     use rocket_dyn_templates::Template;
     use sea_orm::{DatabaseBackend, MockDatabase};
 
-    #[rocket::async_test]
-    async fn confirmation_articles_render_through_server_routes() {
+    async fn fixture_db() -> sea_orm::DatabaseConnection {
         use crate::entity::{article_category, article_tag, fixed_content};
         use sea_orm::{ConnectionTrait, Database, Schema};
         let db = Database::connect("sqlite::memory:").await.unwrap();
@@ -151,6 +174,125 @@ mod tests {
         ] {
             db.execute(backend.build(&table)).await.unwrap();
         }
+        db
+    }
+
+    #[rocket::async_test]
+    async fn adsense_publication_and_article_opt_in_match_in_both_outputs() {
+        use crate::route::get::static_asset::ads_txt;
+        use rust_blog::{
+            adsense::AdSense,
+            static_site::{ExportPaths, export_site},
+        };
+        use std::{fs, path::PathBuf};
+
+        let root = std::env::temp_dir().join(format!(
+            "adsense-{}-{}",
+            std::process::id(),
+            Utc::now().timestamp_nanos_opt().unwrap()
+        ));
+        fs::create_dir_all(&root).unwrap();
+        let paths = ExportPaths {
+            templates_dir: PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../templates"),
+            content_dir: root.join("content"),
+        };
+        let out = root.join("site");
+        let seller = "google.com, pub-0123456789012345, DIRECT, f08c47fec0942fa0\n";
+        let articles = [
+            ("sidebar", false, true),
+            ("auto", true, false),
+            ("both", true, true),
+            ("plain", false, false),
+        ];
+        for enabled in [true, false] {
+            let db = fixture_db().await;
+            for (slug, auto, sidebar) in articles {
+                let yaml = format!(
+                    "title: Example\nslug: {slug}\ncreated_at: '2020-01-01'\nadsense_sidebar: {sidebar}\nadsense_auto_ads: {auto}"
+                );
+                let matter = serde_yaml::from_str(&yaml).unwrap();
+                rust_blog::seed::article::seed_article(&db, &matter, "Body")
+                    .await
+                    .unwrap();
+            }
+            let config_path = root.join("blog_config.toml");
+            fs::write(&config_path, format!(
+                "[common]\nsite_name = 'Test'\n[adsense]\nenabled = {enabled}\nads_txt = '''\n{seller}'''\npublisher_id = 'ca-pub-0123456789012345'\nsidebar_slot = '1234567890'"
+            )).unwrap();
+            let map = rust_blog::utils::config::load_config_from_file(&config_path);
+            export_site(&db, &map, &out, &paths).await.unwrap();
+            assert_eq!(out.join("ads.txt").exists(), enabled);
+            if enabled {
+                assert_eq!(fs::read_to_string(out.join("ads.txt")).unwrap(), seller);
+            }
+            let headers = fs::read_to_string(out.join("_headers")).unwrap();
+            assert_eq!(
+                headers.contains(rust_blog::adsense::AD_CSP.as_str()),
+                enabled
+            );
+            let rocket = rocket::custom(
+                rocket::Config::figment().merge(("template_dir", &paths.templates_dir)),
+            )
+            .manage(db)
+            .manage(AdSense::from_config(&map).unwrap())
+            .manage(CommonConfig {
+                articles_per_page: 10,
+                site_name: Some("Test".into()),
+                default_icatch_path: None,
+                favicon_path: None,
+                public_url: None,
+            })
+            .attach(Template::fairing())
+            .attach(crate::route::SecurityHeaders)
+            .mount("/", routes![article_detail, ads_txt]);
+            let client = Client::tracked(rocket).await.unwrap();
+            let response = client.get("/ads.txt").dispatch().await;
+            if enabled {
+                assert_eq!(response.content_type(), Some(ContentType::Plain));
+                assert_eq!(response.into_string().await.as_deref(), Some(seller));
+            } else {
+                assert_eq!(response.status(), Status::NotFound);
+            }
+            for (slug, auto, sidebar) in articles {
+                let show = enabled && (auto || sidebar);
+                let response = client.get(format!("/posts/{slug}")).dispatch().await;
+                assert_eq!(response.status(), Status::Ok);
+                let csp = response
+                    .headers()
+                    .get_one("Content-Security-Policy")
+                    .unwrap();
+                assert_eq!(csp.contains("'strict-dynamic'"), show);
+                let exported =
+                    fs::read_to_string(out.join(format!("posts/{slug}/index.html"))).unwrap();
+                assert_eq!(
+                    exported.contains("http-equiv=\"Content-Security-Policy\""),
+                    enabled && !show
+                );
+                for html in [exported, response.into_string().await.unwrap()] {
+                    assert_eq!(
+                        html.matches("data-ad-slot=\"1234567890\"").count(),
+                        usize::from(enabled && sidebar)
+                    );
+                    assert_eq!(html.matches("/js/adsense.js").count(), usize::from(show));
+                    assert_eq!(html.contains(" data-sidebar defer"), enabled && sidebar);
+                    if enabled && sidebar {
+                        assert!(
+                            html.find("aria-label=\"前後の記事\"").unwrap()
+                                < html.find("class=\"adsbygoogle").unwrap()
+                        );
+                    }
+                    if show {
+                        assert!(html.contains(rust_blog::adsense::AD_INTEGRITY.as_str()));
+                    }
+                }
+            }
+        }
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[rocket::async_test]
+    async fn confirmation_articles_render_through_server_routes() {
+        let db = fixture_db().await;
         let cases = [
             31, 33, 34, 35, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50,
         ];
@@ -168,6 +310,7 @@ mod tests {
             concat!(env!("CARGO_MANIFEST_DIR"), "/../templates"),
         )))
         .manage(db)
+        .manage(rust_blog::adsense::AdSense::default())
         .manage(CommonConfig {
             articles_per_page: 10,
             site_name: Some("Fixture tests".into()),
@@ -227,6 +370,8 @@ mod tests {
             icatch_path: None,
             table_of_contents: false,
             deprecated: false,
+            adsense_sidebar: false,
+            adsense_auto_ads: false,
             section: "blog".into(),
         };
         let db = MockDatabase::new(DatabaseBackend::Sqlite)
@@ -242,6 +387,7 @@ mod tests {
             concat!(env!("CARGO_MANIFEST_DIR"), "/../templates"),
         )))
         .manage(db)
+        .manage(rust_blog::adsense::AdSense::default())
         .manage(CommonConfig {
             articles_per_page: 10,
             site_name: Some("Test Blog".to_owned()),
@@ -270,7 +416,7 @@ mod tests {
                 .contains("href=\"/posts/highlighted-rust%23intro\""),
             "{html}"
         );
-        assert!(html.contains("href=\"/css/site.css?v=deprecated-1\""));
+        assert!(html.contains("href=\"/css/site.css?v=list-align-1\""));
         let content = html
             .split("<div class=\"content is-medium\">")
             .nth(1)

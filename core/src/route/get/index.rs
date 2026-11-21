@@ -292,7 +292,9 @@ mod tests {
                         index_archive,
                         index_archive_page,
                         search,
-                        crate::route::get::sections::home
+                        crate::route::get::sections::home,
+                        crate::route::get::sections::section,
+                        crate::route::get::sections::all
                     ],
                 );
         Client::tracked(rocket)
@@ -306,7 +308,7 @@ mod tests {
             .expect("failed to connect sqlite memory");
         db.execute(Statement::from_string(
             DbBackend::Sqlite,
-            "CREATE TABLE article (id INTEGER PRIMARY KEY, title TEXT NOT NULL, slug TEXT NOT NULL, excerpt TEXT NULL, content TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, icatch_path TEXT NULL, table_of_contents BOOLEAN NOT NULL DEFAULT false, deprecated BOOLEAN NOT NULL DEFAULT false, section TEXT NOT NULL DEFAULT 'blog');",
+            "CREATE TABLE article (id INTEGER PRIMARY KEY, title TEXT NOT NULL, slug TEXT NOT NULL, excerpt TEXT NULL, content TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, icatch_path TEXT NULL, table_of_contents BOOLEAN NOT NULL DEFAULT false, deprecated BOOLEAN NOT NULL DEFAULT false, adsense_sidebar BOOLEAN NOT NULL DEFAULT false, adsense_auto_ads BOOLEAN NOT NULL DEFAULT false, section TEXT NOT NULL DEFAULT 'blog');",
         ))
         .await
         .expect("failed to create article table");
@@ -324,6 +326,47 @@ mod tests {
         .await
         .expect("failed to insert articles");
         db
+    }
+
+    #[rocket::async_test]
+    async fn tab_periods_keep_scope_across_months_and_pages() {
+        let db = prepare_index_db().await;
+        db.execute(Statement::from_string(
+            DbBackend::Sqlite,
+            "UPDATE article SET section = 'notes' WHERE slug = 'nov-1'",
+        ))
+        .await
+        .unwrap();
+        let client = client_with_page_size(db, 1).await;
+        for base in ["/sections/blog", "/all"] {
+            let response = client
+                .get(format!("{base}?year=2025&month=12&page=2"))
+                .dispatch()
+                .await;
+            assert_eq!(response.status(), Status::Ok);
+            let body = response.into_string().await.unwrap();
+            let html = html_escape::decode_html_entities(&body);
+            assert!(html.contains("href=\"/posts/dec-1\""));
+            assert!(!html.contains("href=\"/posts/dec-2\""));
+            assert!(html.contains(&format!("href=\"{base}?year=2025&month=12&page=1\"")));
+            assert!(html.contains(&format!("data-href=\"{base}\"")));
+            assert_eq!(html.contains("2025/11"), base == "/all");
+            assert!(!html.contains("2099/01"));
+        }
+        let body = client
+            .get("/sections/blog?year=2026&month=2")
+            .dispatch()
+            .await
+            .into_string()
+            .await
+            .unwrap();
+        assert!(
+            html_escape::decode_html_entities(&body).contains("href=\"/posts/feb-jst-boundary\"")
+        );
+        assert_eq!(
+            client.get("/all?month=2").dispatch().await.status(),
+            Status::NotFound
+        );
     }
 
     #[rocket::async_test]

@@ -101,13 +101,17 @@ pub async fn export_site(
         "/all/"
     };
     export_index_pages(&tera, db, &config, out_dir, all_index_url).await?;
-    export_article_pages(&tera, db, &config, out_dir).await?;
+    let adsense = crate::adsense::AdSense::from_config(config_map)?;
+    if let Some(body) = adsense.ads_txt() {
+        fs::write(out_dir.join("ads.txt"), body)?;
+    }
+    let has_ads = export_article_pages(&tera, db, &config, &adsense, out_dir).await?;
     export_fixed_content_pages(&tera, db, &config, out_dir).await?;
     export_tag_pages(&tera, db, &config, out_dir).await?;
     export_category_pages(&tera, db, &config, out_dir).await?;
     export_error_page(&tera, &config, out_dir, "404", "404.html")?;
     crate::sections::export(&tera, db, &navigation, &config, out_dir).await?;
-    write_cloudflare_support_files(out_dir)?;
+    write_cloudflare_support_files(out_dir, has_ads)?;
     if !redirects.articles.is_empty() || !redirects.pages.is_empty() {
         redirects.write_static(db, out_dir).await?;
     }
@@ -360,11 +364,16 @@ async fn export_article_pages(
     tera: &Tera,
     db: &DatabaseConnection,
     config: &CommonConfig,
+    adsense: &crate::adsense::AdSense,
     out_dir: &Path,
-) -> Result<()> {
+) -> Result<bool> {
     let mut articles = get_all_published_articles(db).await?;
     articles.sort_by_key(|a| std::cmp::Reverse((a.created_at, a.id)));
     let latest_articles = latest_articles_json(db).await?;
+    let has_ads = adsense.ads_txt().is_some()
+        && articles
+            .iter()
+            .any(|a| a.adsense_auto_ads || a.adsense_sidebar);
     for (index, article) in articles.iter().enumerate() {
         let surrounding: Vec<_> =
             crate::repository::article::surrounding_articles(&articles, index)
@@ -389,6 +398,16 @@ async fn export_article_pages(
             .collect();
 
         let mut ctx = base_context(config);
+        let article_ads = adsense
+            .article_ads(article.adsense_auto_ads, article.adsense_sidebar)
+            .with_context(|| format!("article {}", article.slug))?;
+        if has_ads {
+            ctx.insert("nav_integrity", crate::adsense::NAV_INTEGRITY.as_str());
+            if article_ads.is_none() {
+                ctx.insert("article_meta_csp", crate::adsense::DEFAULT_FETCH_CSP);
+            }
+        }
+        ctx.insert("article_ads", &article_ads);
         ctx.insert("title", &article.title);
         ctx.insert(
             "metadata",
@@ -416,7 +435,7 @@ async fn export_article_pages(
             &out_dir.join(format!("posts/{}/index.html", article.slug)),
         )?;
     }
-    Ok(())
+    Ok(has_ads)
 }
 
 async fn export_fixed_content_pages(
@@ -802,6 +821,10 @@ fn write_static_assets(
 ) -> Result<()> {
     write_embedded_asset_file(out_dir.join("css/bulma.min.css"), BULMA_CSS)?;
     write_embedded_asset_file(out_dir.join("css/site.css"), SITE_CSS)?;
+    write_embedded_asset_file(
+        out_dir.join("js/adsense.js"),
+        crate::adsense::SCRIPT.as_bytes(),
+    )?;
     write_embedded_asset_file(out_dir.join("js/nav.js"), NAV_JS)?;
     write_embedded_asset_file(out_dir.join("js/search.js"), SEARCH_JS)?;
     for (key, directory) in [("image_dir", "image"), ("icon_dir", "icon")] {
@@ -814,18 +837,21 @@ fn write_static_assets(
     Ok(())
 }
 
-fn write_cloudflare_support_files(out_dir: &Path) -> Result<()> {
-    fs::write(out_dir.join("_headers"), build_headers_file())
+fn write_cloudflare_support_files(out_dir: &Path, has_ads: bool) -> Result<()> {
+    fs::write(out_dir.join("_headers"), build_headers_file(has_ads))
         .with_context(|| format!("failed to write {:?}", out_dir.join("_headers")))?;
     fs::write(out_dir.join("_redirects"), build_redirects_file(out_dir)?)
         .with_context(|| format!("failed to write {:?}", out_dir.join("_redirects")))?;
     Ok(())
 }
 
-fn build_headers_file() -> String {
-    [
+fn build_headers_file(has_ads: bool) -> String {
+    let mut headers = [
         "/*",
-        "  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' https: data:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'",
+        &format!(
+            "  Content-Security-Policy: {}",
+            crate::adsense::DEFAULT_CSP.as_str()
+        ),
         "  Referrer-Policy: strict-origin-when-cross-origin",
         "  X-Content-Type-Options: nosniff",
         "  X-Frame-Options: DENY",
@@ -849,7 +875,14 @@ fn build_headers_file() -> String {
         "  Cache-Control: public, max-age=0, must-revalidate",
         "",
     ]
-    .join("\n")
+    .join("\n");
+    if has_ads {
+        headers.push_str(&format!(
+            "\n/posts/*\n  ! Content-Security-Policy\n  Content-Security-Policy: {}\n",
+            *crate::adsense::AD_CSP
+        ));
+    }
+    headers
 }
 
 fn build_redirects_file(out_dir: &Path) -> Result<String> {
@@ -1205,6 +1238,8 @@ mod tests {
                 icatch_path: Set(None),
                 table_of_contents: Set(false),
                 deprecated: Set(false),
+                adsense_sidebar: Set(false),
+                adsense_auto_ads: Set(false),
                 section: Set("blog".into()),
             }
             .insert(&db)
@@ -1379,6 +1414,8 @@ mod tests {
             icatch_path: None,
             table_of_contents: false,
             deprecated: false,
+            adsense_sidebar: false,
+            adsense_auto_ads: false,
             section: "blog".into(),
         };
         let db = MockDatabase::new(DatabaseBackend::Sqlite)
@@ -1402,7 +1439,7 @@ mod tests {
             &Default::default(),
         )
         .expect("failed to export assets");
-        export_article_pages(&tera, &db, &config, &output.0)
+        export_article_pages(&tera, &db, &config, &Default::default(), &output.0)
             .await
             .expect("failed to export article");
         let html = fs::read_to_string(output.0.join("posts/highlighted-rust/index.html"))
@@ -1413,7 +1450,7 @@ mod tests {
         );
         assert!(html.contains("property=\"og:title\" content=\"Highlighted Rust\""));
         assert!(html.contains("href=\"/posts/highlighted-rust/\""));
-        assert!(html.contains("href=\"/css/site.css?v=deprecated-1\""));
+        assert!(html.contains("href=\"/css/site.css?v=list-align-1\""));
         let content = html
             .split("<div class=\"content is-medium\">")
             .nth(1)
@@ -1590,6 +1627,18 @@ mod home_navigation_tests {
                         "data-href=\"{first_url}\" data-search-href=\"/search/\""
                     )),
                     "{home}: {path}"
+                );
+            }
+            for tab in ["all", "sections/blog"] {
+                let base = format!("/{tab}/");
+                let month = format!("{base}archive/2020/01/");
+                let tab_page = html(&format!("{tab}/index.html"));
+                assert!(tab_page.contains(&format!("data-href=\"{month}\"")));
+                let second = html(&format!("{tab}/archive/2020/01/page/2/index.html"));
+                assert!(second.contains("href=\"/posts/article-2/\""));
+                assert!(second.contains(&format!("data-href=\"{base}\"")));
+                assert!(
+                    second.contains(&format!("class=\"pagination-previous\" href=\"{month}\""))
                 );
             }
             let archive = html("archive/2020/01/page/2/index.html");
