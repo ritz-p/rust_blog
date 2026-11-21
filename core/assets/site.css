@@ -1,3 +1,11 @@
+.navbar > .container .navbar-brand {
+  margin-left: 0;
+}
+
+.article-tabs .tabs a {
+  padding-inline: 0.75rem;
+}
+
 .taxonomy-empty {
   color: #65758b;
   font-size: 0.8125rem;
