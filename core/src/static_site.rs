@@ -1592,6 +1592,18 @@ mod home_navigation_tests {
                     "{home}: {path}"
                 );
             }
+            for tab in ["all", "sections/blog"] {
+                let base = format!("/{tab}/");
+                let month = format!("{base}archive/2020/01/");
+                let tab_page = html(&format!("{tab}/index.html"));
+                assert!(tab_page.contains(&format!("data-href=\"{month}\"")));
+                let second = html(&format!("{tab}/archive/2020/01/page/2/index.html"));
+                assert!(second.contains("href=\"/posts/article-2/\""));
+                assert!(second.contains(&format!("data-href=\"{base}\"")));
+                assert!(
+                    second.contains(&format!("class=\"pagination-previous\" href=\"{month}\""))
+                );
+            }
             let archive = html("archive/2020/01/page/2/index.html");
             assert!(archive.contains("class=\"pagination-previous\" href=\"/archive/2020/01/\""));
             let destination = if first_url == "/" {
