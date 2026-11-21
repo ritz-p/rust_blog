@@ -49,7 +49,7 @@ impl ArticlePeriod {
         Some((start, end))
     }
 
-    fn sqlite_datetime_range_filter(self) -> Option<SimpleExpr> {
+    pub(crate) fn sqlite_datetime_range_filter(self) -> Option<SimpleExpr> {
         let (start, end) = self.range()?;
         let start = start.format("%Y-%m-%d %H:%M:%S").to_string();
         let end = end.format("%Y-%m-%d %H:%M:%S").to_string();
@@ -135,6 +135,17 @@ pub async fn get_article_periods(
         query = query.filter(filter);
     }
 
+    Ok(period_counts(db, query)
+        .await?
+        .into_iter()
+        .map(|(period, _)| period)
+        .collect())
+}
+
+pub(crate) async fn period_counts(
+    db: &DatabaseConnection,
+    query: sea_orm::Select<article::Entity>,
+) -> Result<Vec<(ArticlePeriod, u64)>, DbErr> {
     let created_ats: Vec<DateTime<Utc>> = query
         .select_only()
         .column(article::Column::CreatedAt)
@@ -143,15 +154,19 @@ pub async fn get_article_periods(
         .all(db)
         .await?;
 
-    let mut periods = Vec::<ArticlePeriod>::new();
+    let mut periods = Vec::<(ArticlePeriod, u64)>::new();
     for created_at in created_ats {
         let created_at_jst = created_at.with_timezone(&Tokyo);
         let period = ArticlePeriod {
             year: created_at_jst.year(),
             month: created_at_jst.month(),
         };
-        if periods.last().copied() != Some(period) {
-            periods.push(period);
+        if let Some((last, count)) = periods.last_mut()
+            && *last == period
+        {
+            *count += 1;
+        } else {
+            periods.push((period, 1));
         }
     }
     Ok(periods)

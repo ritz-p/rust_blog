@@ -1,7 +1,7 @@
 use crate::utils::config::CommonConfig;
 use rocket::{State, http::Status, response::Redirect};
 use rocket_dyn_templates::Template;
-use rust_blog::sections::Navigation;
+use rust_blog::{domain::page::Page, repository::article::ArticlePeriod, sections::Navigation};
 use sea_orm::DatabaseConnection;
 
 pub struct SelectedHome<'r>(&'r Navigation);
@@ -33,28 +33,35 @@ pub fn home(selected: SelectedHome<'_>) -> Option<Redirect> {
         .map(|tab| Redirect::to(navigation.url(tab, false)))
 }
 
-#[get("/all?<page>")]
+#[derive(FromForm)]
+pub struct ListingQuery {
+    page: Option<u64>,
+    year: Option<i32>,
+    month: Option<u32>,
+}
+
+#[get("/all?<query..>")]
 pub async fn all(
     config: &State<CommonConfig>,
     db: &State<DatabaseConnection>,
     navigation: &State<Navigation>,
-    page: Option<u64>,
+    query: ListingQuery,
 ) -> Result<Template, Status> {
-    render(config, db, navigation, None, page).await
+    render(config, db, navigation, None, query).await
 }
 
-#[get("/sections/<section>?<page>")]
+#[get("/sections/<section>?<query..>")]
 pub async fn section(
     config: &State<CommonConfig>,
     db: &State<DatabaseConnection>,
     navigation: &State<Navigation>,
     section: &str,
-    page: Option<u64>,
+    query: ListingQuery,
 ) -> Result<Template, Status> {
     if navigation.validate_section(section).is_err() {
         return Err(Status::NotFound);
     }
-    render(config, db, navigation, Some(section), page).await
+    render(config, db, navigation, Some(section), query).await
 }
 
 async fn render(
@@ -62,14 +69,22 @@ async fn render(
     db: &DatabaseConnection,
     navigation: &Navigation,
     section: Option<&str>,
-    page: Option<u64>,
+    query: ListingQuery,
 ) -> Result<Template, Status> {
+    let period = match (query.year, query.month) {
+        (None, None) => None,
+        (Some(year), Some(month)) => Some(ArticlePeriod::new(year, month).ok_or(Status::NotFound)?),
+        _ => return Err(Status::NotFound),
+    };
     let mut context = rust_blog::sections::context(
         db,
         navigation,
         section,
-        page.unwrap_or(1),
-        config.articles_per_page,
+        Page {
+            number: query.page.unwrap_or(1),
+            per: config.articles_per_page,
+        },
+        period,
         false,
         config.default_icatch_path.as_deref(),
     )
