@@ -176,13 +176,13 @@ mod tests {
             r#"
 default_section = "tech"
 [[tabs]]
-kind = "all"
-id = "all"
-label = "すべて"
-[[tabs]]
 kind = "section"
 id = "tech"
 label = "技術ブログ"
+[[tabs]]
+kind = "all"
+id = "all"
+label = "すべて"
 [[tabs]]
 kind = "page"
 id = "about"
@@ -194,7 +194,16 @@ slug = "about"
         let navigation = Navigation::from_config(&map).unwrap();
         assert_eq!(navigation.home, "all");
         assert_eq!(navigation.default_section, "tech");
-        assert_eq!(navigation.tabs.len(), 3);
+        for static_mode in [false, true] {
+            let links = navigation.links(static_mode);
+            let ids: Vec<_> = links
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|tab| &tab["id"])
+                .collect();
+            assert_eq!(ids, ["all", "tech", "about"]);
+        }
         map.insert("navigation".into(), "invalid".into());
         assert!(Navigation::from_config(&map).is_err());
     }
@@ -241,9 +250,10 @@ impl Navigation {
     }
 
     pub fn links(&self, static_mode: bool) -> serde_json::Value {
+        let mut tabs: Vec<_> = self.tabs.iter().collect();
+        tabs.sort_by_key(|tab| !matches!(tab, Tab::All { .. }));
         serde_json::json!(
-            self.tabs
-                .iter()
+            tabs.into_iter()
                 .map(|tab| serde_json::json!({
                     "id": tab.id(), "label": tab.label(), "url": self.url(tab, static_mode)
                 }))
