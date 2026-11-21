@@ -56,9 +56,10 @@ document.addEventListener('DOMContentLoaded', () => {
     el.addEventListener('click', () => {
       const target = el.dataset.target;
       const targetElement = document.getElementById(target);
-      el.classList.toggle('is-active');
       if (targetElement) {
-        targetElement.classList.toggle('is-active');
+        const expanded = targetElement.classList.toggle('is-active');
+        el.classList.toggle('is-active', expanded);
+        el.setAttribute('aria-expanded', String(expanded));
       }
     });
   });

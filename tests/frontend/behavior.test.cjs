@@ -44,9 +44,11 @@ test('menu toggles and month navigation preserves the search query', async t => 
   const button = document.querySelector('.navbar-burger');
   button.click();
   assert.ok(button.classList.contains('is-active'));
+  assert.equal(button.getAttribute('aria-expanded'), 'true');
   assert.ok(document.getElementById('menu').classList.contains('is-active'));
   button.click();
   assert.ok(!document.getElementById('menu').classList.contains('is-active'));
+  assert.equal(button.getAttribute('aria-expanded'), 'false');
   const select = document.querySelector('select');
   select.selectedIndex = 1;
   select.dispatchEvent(new document.defaultView.Event('change'));

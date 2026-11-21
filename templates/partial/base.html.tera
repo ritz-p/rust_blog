@@ -24,28 +24,28 @@
   {% endblock head %}
 </head>
 <body>
+  <div class="container article-tabs">
+    {% include "partial/navigation" ignore missing %}
+  </div>
   <nav class="navbar is-light" role="navigation" aria-label="main navigation">
     <div class="container">
       <div class="navbar-brand">
-        <a role="button" class="navbar-burger" aria-label="menu" aria-expanded="false" data-target="mainNav">
+        <button type="button" class="navbar-burger" aria-label="メニュー" aria-expanded="false" aria-controls="mainNav" data-target="mainNav">
           <span aria-hidden="true"></span>
           <span aria-hidden="true"></span>
           <span aria-hidden="true"></span>
-        </a>
+        </button>
       </div>
 
       <div id="mainNav" class="navbar-menu">
         <div class="navbar-start">
-          <a class="navbar-item" href="{{ tags_url | default(value='/tags') }}">Tags</a>
-          <a class="navbar-item" href="{{ categories_url | default(value='/categories') }}">Categories</a>
-          <a class="navbar-item" href="{{ about_url | default(value='/about') }}">About</a>
+          <a class="navbar-item" href="{% if tags_url %}{{ tags_url }}{% else %}/tags{% endif %}">Tags</a>
+          <a class="navbar-item" href="{% if categories_url %}{{ categories_url }}{% else %}/categories{% endif %}">Categories</a>
+          <a class="navbar-item" href="{% if about_url %}{{ about_url }}{% else %}/about{% endif %}">About</a>
         </div>
       </div>
     </div>
   </nav>
-  <div class="container article-tabs">
-    {% include "partial/navigation" ignore missing %}
-  </div>
   <section class="section">
     <div class="container">
       {% block content %}{% endblock content %}
@@ -57,7 +57,7 @@
     </div>
   </footer>
   {% block scripts %}
-  <script src="/js/nav.js?v=code-copy-2"{% if nav_integrity %} integrity="{{ nav_integrity | safe }}"{% endif %} defer></script>
+  <script src="/js/nav.js?v=nav-menu-1"{% if nav_integrity %} integrity="{{ nav_integrity | safe }}"{% endif %} defer></script>
   {% endblock scripts %}
 </body>
 </html>
