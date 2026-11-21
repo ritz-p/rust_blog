@@ -530,12 +530,22 @@
   font-style: italic;
 }
 .code-toolbar {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 0.5rem;
+  column-gap: 0.5rem;
   margin-top: 1rem;
   font-size: 0.875rem;
+}
+
+.code-toolbar .button {
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+}
+
+.code-toolbar [role="status"] {
+  grid-column: 1 / -1;
 }
 
 .article-deprecated {
