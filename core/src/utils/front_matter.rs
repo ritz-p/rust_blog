@@ -13,6 +13,8 @@ pub struct FrontMatter {
     pub table_of_contents: bool,
     #[serde(default)]
     pub deprecated: bool,
+    #[serde(default)]
+    pub adsense_sidebar: bool,
     #[serde(default, alias = "date")]
     pub created_at: Option<String>,
     pub excerpt: Option<String>,
@@ -46,6 +48,7 @@ impl FrontMatter {
             deleted,
             table_of_contents: false,
             deprecated: false,
+            adsense_sidebar: false,
             created_at,
             excerpt,
             icatch_path,

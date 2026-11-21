@@ -289,6 +289,7 @@ mod tests {
         for enabled in [false, true, false] {
             matter.table_of_contents = enabled;
             matter.deprecated = enabled;
+            matter.adsense_sidebar = enabled;
             let id = seed_article(&db, &matter, "## Heading").await.unwrap();
             let saved = article::Entity::find_by_id(id)
                 .one(&db)
@@ -297,6 +298,7 @@ mod tests {
                 .unwrap();
             assert_eq!(saved.table_of_contents, enabled);
             assert_eq!(saved.deprecated, enabled);
+            assert_eq!(saved.adsense_sidebar, enabled);
             assert_eq!(saved.content, "## Heading");
         }
     }
@@ -389,6 +391,7 @@ mod tests {
             icatch_path: None,
             table_of_contents: false,
             deprecated: false,
+            adsense_sidebar: false,
             section: "blog".into(),
         }
     }

@@ -28,4 +28,13 @@
         </ul>
     </aside>
 {% endif %}
+{% if adsense_sidebar %}
+    <aside class="mt-5" aria-label="広告">
+        <ins class="adsbygoogle is-block"
+             data-ad-client="{{ adsense_sidebar.publisher_id }}"
+             data-ad-slot="{{ adsense_sidebar.slot }}"
+             data-ad-format="auto"
+             data-full-width-responsive="true"></ins>
+    </aside>
+{% endif %}
 </div>

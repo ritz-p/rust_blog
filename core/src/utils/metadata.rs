@@ -81,6 +81,7 @@ mod tests {
             icatch_path: None,
             table_of_contents: false,
             deprecated: false,
+            adsense_sidebar: false,
             section: "blog".into(),
         };
         let mut config = CommonConfig {

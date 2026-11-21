@@ -77,6 +77,29 @@ docker compose up -d --force-recreate static
 静的サイトは export 時に生成する `search-index.json` をブラウザーで検索するため、
 JavaScript が必要です。記事の変更を検索へ反映するには export を再実行してください。
 
+## Google AdSense
+
+サイトのルートで `/ads.txt` を公開するには、`blog_config.toml` の `[adsense]` に管理画面からコピーした本文を設定します。`enabled` の既定値は `false` です。
+
+```toml
+[adsense]
+enabled = true
+ads_txt = """
+google.com, pub-XXXXXXXXXXXXXXXX, DIRECT, f08c47fec0942fa0
+"""
+```
+
+特定の記事に広告を表示する場合は、同じ `[adsense]` に以下の 2 行を加え、ディスプレイ広告ユニットのコードにある `data-ad-client` と `data-ad-slot` の実値に置き換えます。`ads.txt` の公開だけなら、この 2 項目は省略できます。
+
+```toml
+publisher_id = "ca-pub-XXXXXXXXXXXXXXXX"
+sidebar_slot = "XXXXXXXXXX"
+```
+
+対象の記事 Markdown のフロントマターに `adsense_sidebar: true` を追加すると、最新記事・前後の記事リンクの下にレスポンシブ広告が 1 枠入ります。既存記事と設定を省略した記事はオフです。サイトの `enabled = false` は記事側の指定に優先します。
+
+既存 DB にマイグレーションを適用し、記事を seed し直してください。サイト設定の変更はサーバーの再起動または静的サイトの再 export と配信で反映されます。Cloudflare に静的サイトを配信する場合は、生成された `_headers` も一緒に配信してください。
+
 ## Markdown
 
 コードフェンスに `rust`、`javascript`、`python`、`bash` などの言語名を指定すると、
@@ -152,7 +175,7 @@ UTF-8 BOM 付きファイルにも対応し、BOM と改行形式を保持しま
 型・文字数・日時・未知の項目を検証します。不正なファイルは書き換えず、正常なファイルの整形を続けます。
 探索・読み書き・検証のエラーは最後にファイル名つきでまとめて表示し、非ゼロで終了します。
 `--check` では書き換えず、検証エラーと未整形のファイルをまとめて報告します。
-順序は `title`, `slug`, `deleted`, `table_of_contents`, `deprecated`, `created_at`, `excerpt`, `icatch_path`, `tags`, `categories`。
+順序は `title`, `slug`, `deleted`, `table_of_contents`, `deprecated`, `adsense_sidebar`, `created_at`, `excerpt`, `icatch_path`, `tags`, `categories`。
 `date` は名前を保持し、`created_at` と同じ位置に並べます。省略された任意項目は追加しません。
 YAML のコメントや引用形式は正規化されますが、本文は保持します。
 `--check` は検証エラーまたは未整形の場合に非ゼロで終了します。
@@ -167,7 +190,7 @@ docker compose exec web cargo run -p rust_blog --bin export_markdown
 既存ファイルや古い出力があればエラーになります。更新する場合は `--force` を指定してください。
 `--force` は上書きに加え、DB に存在しない `articles/<id>.md`・`fixed_contents/<id>.md` を削除します。空の DB でも古い出力を削除します。
 削除対象は各ディレクトリ直下の整数 ID のファイルだけです。それ以外のファイルは保持するため、seed 用の出力先には手書きの Markdown を混在させないでください。
-記事の所属区分・公開日時・目次設定・deprecated 設定・タグ・カテゴリ・本文を保持します。
+記事の所属区分・公開日時・目次設定・deprecated 設定・広告枠設定・タグ・カテゴリ・本文を保持します。
 DB の ID・更新日時および固定ページの日時は seed の入力項目ではないためヘッダーには含めません。
 タグ・カテゴリは seed と同じ名前の配列です。独立した taxonomy の slug や未使用項目のバックアップには使えません。
 
