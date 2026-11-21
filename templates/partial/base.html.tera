@@ -19,7 +19,7 @@
   {% if metadata.image %}<meta property="og:image" content="{{ metadata.image | escape | safe }}">{% endif %}
   {% endif %}
   <link rel="stylesheet" href="/css/bulma.min.css">
-  <link rel="stylesheet" href="/css/site.css?v=code-toolbar-2">
+  <link rel="stylesheet" href="/css/site.css?v=tab-alignment-1">
   <link rel="shortcut icon" href= "{{ favicon_path }}" >
   {% endblock head %}
 </head>
@@ -43,7 +43,9 @@
       </div>
     </div>
   </nav>
-  {% include "partial/navigation" ignore missing %}
+  <div class="container article-tabs">
+    {% include "partial/navigation" ignore missing %}
+  </div>
   <section class="section">
     <div class="container">
       {% block content %}{% endblock content %}
