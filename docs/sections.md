@@ -1,6 +1,6 @@
 # 記事区分とタブ
 
-`blog_config.toml` の `[navigation]` と `[[navigation.tabs]]` で表示順とタブを設定します。設定例はリポジトリの同ファイルを参照してください。
+`blog_config.toml` の `[navigation]` と `[[navigation.tabs]]` でタブを設定します。全記事タブは常に先頭に表示し、残りのタブは設定に書いた順に並びます。設定例はリポジトリの同ファイルを参照してください。
 
 - `kind = "all"` は全区分の記事を表示します。固定ページは含みません。IDは `all` 固定で、1つ必要です。
 - `kind = "section"` はその区分の記事一覧です。
