@@ -3,19 +3,39 @@ name: Export Tool Build
 on:
   workflow_dispatch:
   push:
+    branches: [release]
     tags:
       - "v*"
+
+permissions:
+  contents: read
 
 env:
   COMPOSE_FILE: docker-compose.yml:docker-compose.ci.yml
 
 jobs:
   build-export-tool:
+    if: ${{ !github.event.deleted }}
+    outputs:
+      tag: ${{ steps.bundle.outputs.tag }}
+      name: ${{ steps.bundle.outputs.name }}
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+
+      - name: Name export bundle
+        id: bundle
+        shell: bash
+        run: |
+          version=${GITHUB_REF_NAME//\//-}
+          if [[ "$GITHUB_EVENT_NAME" == push && "$GITHUB_REF" == refs/heads/release ]]; then
+            commit_time=$(git show -s --format=%ct "$GITHUB_SHA")
+            version="v$(TZ=Asia/Tokyo date -d "@$commit_time" +%Y%m%d)-${GITHUB_SHA:0:12}"
+            echo "tag=$version" >> "$GITHUB_OUTPUT"
+          fi
+          echo "name=rust-blog-export-tools-$version-x86_64-unknown-linux-gnu" >> "$GITHUB_OUTPUT"
 
       - uses: ./.github/actions/prepare-checks
         with:
@@ -28,8 +48,10 @@ jobs:
 
       - name: Assemble export bundle
         shell: bash
+        env:
+          BUNDLE_NAME: ${{ steps.bundle.outputs.name }}
         run: |
-          BUNDLE_DIR="artifact/rust-blog-export-tools-${{ github.ref_name }}-x86_64-unknown-linux-gnu"
+          BUNDLE_DIR="artifact/$BUNDLE_NAME"
           mkdir -p "${BUNDLE_DIR}/templates"
           docker compose cp web:/tmp/rust-blog-target/x86_64-unknown-linux-gnu/release/export "${BUNDLE_DIR}/export"
           docker compose cp web:/tmp/rust-blog-target/x86_64-unknown-linux-gnu/release/seed "${BUNDLE_DIR}/seed"
@@ -38,18 +60,41 @@ jobs:
 
       - name: Package export bundle
         shell: bash
-        run: |
-          cd artifact
-          tar -czf "rust-blog-export-tools-${{ github.ref_name }}-x86_64-unknown-linux-gnu.tar.gz" \
-            "rust-blog-export-tools-${{ github.ref_name }}-x86_64-unknown-linux-gnu"
+        env:
+          BUNDLE_NAME: ${{ steps.bundle.outputs.name }}
+        run: tar -C artifact -czf "artifact/$BUNDLE_NAME.tar.gz" "$BUNDLE_NAME"
 
       - name: Upload export bundle
         uses: actions/upload-artifact@v7
         with:
-          name: rust-blog-export-tools-${{ github.ref_name }}-x86_64-unknown-linux-gnu
-          path: artifact/rust-blog-export-tools-${{ github.ref_name }}-x86_64-unknown-linux-gnu.tar.gz
+          name: ${{ steps.bundle.outputs.name }}
+          path: artifact/${{ steps.bundle.outputs.name }}.tar.gz
           if-no-files-found: error
 
       - name: Stop containers
         if: always()
         run: docker compose down
+
+  publish-release:
+    needs: build-export-tool
+    if: github.event_name == 'push' && github.ref == 'refs/heads/release'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    concurrency:
+      group: publish-export-release
+      queue: max
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v7
+        with:
+          name: ${{ needs.build-export-tool.outputs.name }}
+          path: artifact
+      - name: Publish verified bundle as Latest
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.build-export-tool.outputs.tag }}
+          BUNDLE_NAME: ${{ needs.build-export-tool.outputs.name }}
+        run: bash .github/scripts/publish-export-release.sh

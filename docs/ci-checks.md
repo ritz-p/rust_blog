@@ -6,7 +6,7 @@ These checks and the release/export-tool builds run Rust commands in the `web` s
 
 Markdown and JavaScript use the action's default `build-tools: "true"` to cache four binaries: `format_markdown`, `migration`, `seed` and `export`. An exact cache key covers Rust sources, embedded assets/templates, manifests, the lockfile, toolchain and build scripts. There is no fallback binary key: changed build inputs force a rebuild. Markdown-only changes reuse the binaries and still validate/export the current checkout.
 
-Cargo Fmt, Clippy, Cargo Test and release/export-tool builds set `build-tools: "false"` to skip the helper cache and compilation. Rust unit tests, including formatter tests, remain in Cargo Test. Release workflows copy binaries from the container's `/tmp/rust-blog-target` directory before uploading artifacts. Release and export-tool builds run on `v*` tags; the export-tool build also supports manual runs.
+Cargo Fmt, Clippy, Cargo Test and release/export-tool builds set `build-tools: "false"` to skip the helper cache and compilation. Rust unit tests, including formatter tests, remain in Cargo Test. Release workflows copy binaries from the container's `/tmp/rust-blog-target` directory before uploading artifacts. Release and export-tool builds run on `v*` tags; the export-tool build also supports manual runs and publishes a verified bundle to GitHub Releases on pushes to the `release` branch. See [Export Bundle Usage](export-bundle-usage.md).
 
 For a local equivalent of the Markdown/export checks:
 
