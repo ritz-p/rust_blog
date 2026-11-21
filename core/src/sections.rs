@@ -519,7 +519,7 @@ mod integration_tests {
     async fn sections_keep_same_named_taxonomy_separate_and_exclude_fixed_pages() {
         let db = Database::connect("sqlite::memory:").await.unwrap();
         for sql in [
-            "CREATE TABLE article (id INTEGER PRIMARY KEY, title TEXT NOT NULL, slug TEXT UNIQUE NOT NULL, excerpt TEXT, content TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, icatch_path TEXT, table_of_contents BOOLEAN NOT NULL DEFAULT false, deprecated BOOLEAN NOT NULL DEFAULT false, section TEXT NOT NULL DEFAULT 'blog')",
+            "CREATE TABLE article (id INTEGER PRIMARY KEY, title TEXT NOT NULL, slug TEXT UNIQUE NOT NULL, excerpt TEXT, content TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, icatch_path TEXT, table_of_contents BOOLEAN NOT NULL DEFAULT false, deprecated BOOLEAN NOT NULL DEFAULT false, adsense_sidebar BOOLEAN NOT NULL DEFAULT false, adsense_auto_ads BOOLEAN NOT NULL DEFAULT false, section TEXT NOT NULL DEFAULT 'blog')",
             "CREATE TABLE tag (id INTEGER PRIMARY KEY, name TEXT UNIQUE, slug TEXT UNIQUE)",
             "CREATE TABLE category (id INTEGER PRIMARY KEY, name TEXT UNIQUE, slug TEXT UNIQUE)",
             "CREATE TABLE article_tag (article_id INTEGER, tag_id INTEGER, PRIMARY KEY(article_id, tag_id))",

@@ -112,6 +112,7 @@ mod tests {
             )))
             .manage(db)
             .manage(RedirectMap::parse(map).unwrap())
+            .manage(rust_blog::adsense::AdSense::default())
             .manage(crate::utils::config::CommonConfig {
                 articles_per_page: 10,
                 site_name: Some("Test Blog".into()),

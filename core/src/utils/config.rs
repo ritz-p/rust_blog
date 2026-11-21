@@ -92,12 +92,14 @@ fn load_config_from_path(toml_path: &str) -> HashMap<String, String> {
     if let Ok(contents) = fs::read_to_string(toml_path) {
         match toml::from_str::<toml::Value>(&contents) {
             Ok(value) => {
-                if let Some(navigation) = value.get("navigation") {
-                    map.insert(
-                        "navigation".into(),
-                        toml::to_string(navigation)
-                            .unwrap_or_else(|error| format!("invalid navigation: {error}")),
-                    );
+                for key in ["navigation", "adsense"] {
+                    if let Some(section) = value.get(key) {
+                        map.insert(
+                            key.into(),
+                            toml::to_string(section)
+                                .unwrap_or_else(|error| format!("invalid {key}: {error}")),
+                        );
+                    }
                 }
             }
             Err(error) => {

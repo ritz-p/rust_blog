@@ -1,3 +1,4 @@
+pub mod adsense;
 pub mod discovery;
 pub mod domain;
 pub mod entity;

@@ -55,7 +55,7 @@
     </div>
   </footer>
   {% block scripts %}
-  <script src="/js/nav.js?v=code-copy-1" defer></script>
+  <script src="/js/nav.js?v=code-copy-1"{% if nav_integrity %} integrity="{{ nav_integrity | safe }}"{% endif %} defer></script>
   {% endblock scripts %}
 </body>
 </html>
