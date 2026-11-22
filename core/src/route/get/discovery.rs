@@ -51,6 +51,7 @@ mod tests {
                         articles_per_page: 10,
                         site_name: None,
                         description: None,
+                        timezone: chrono_tz::UTC,
                         default_icatch_path: None,
                         favicon_path: None,
                         public_url,

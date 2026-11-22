@@ -1,4 +1,5 @@
 [common]
+timezone = "UTC"
 # description = "ブログの紹介文"
 articles_per_page = 20
 "site_name" = "Ritz のブログ"

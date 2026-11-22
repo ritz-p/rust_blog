@@ -86,7 +86,7 @@ async fn render(
         },
         period,
         false,
-        config.default_icatch_path.as_deref(),
+        config,
     )
     .await
     .map_err(|error| {

@@ -2,7 +2,7 @@ use crate::domain::page::{Page, PageInfo};
 use crate::entity::{article, category, tag};
 use crate::repository::SQLITE_MAX;
 use chrono::{DateTime, Datelike, NaiveDate, TimeZone, Utc};
-use chrono_tz::Asia::Tokyo;
+use chrono_tz::{GapInfo, Tz};
 use sea_orm::{
     ColumnTrait, Condition, DatabaseConnection, DbErr, EntityTrait, QueryFilter, QueryOrder,
     QuerySelect,
@@ -36,21 +36,21 @@ impl ArticlePeriod {
         Some((start_date, end_date))
     }
 
-    fn range(self) -> Option<(DateTime<Utc>, DateTime<Utc>)> {
+    fn range(self, timezone: Tz) -> Option<(DateTime<Utc>, DateTime<Utc>)> {
         let (start_date, end_date) = Self::range_bounds(self.year, self.month)?;
-        let start = Tokyo
-            .from_local_datetime(&start_date.and_hms_opt(0, 0, 0)?)
-            .single()?
-            .with_timezone(&Utc);
-        let end = Tokyo
-            .from_local_datetime(&end_date.and_hms_opt(0, 0, 0)?)
-            .single()?
-            .with_timezone(&Utc);
-        Some((start, end))
+        let boundary = |date: NaiveDate| {
+            let midnight = date.and_hms_opt(0, 0, 0)?;
+            timezone
+                .from_local_datetime(&midnight)
+                .earliest()
+                .or_else(|| GapInfo::new(&midnight, &timezone)?.end)
+                .map(|date| date.to_utc())
+        };
+        Some((boundary(start_date)?, boundary(end_date)?))
     }
 
-    pub(crate) fn sqlite_datetime_range_filter(self) -> Option<SimpleExpr> {
-        let (start, end) = self.range()?;
+    pub(crate) fn sqlite_datetime_range_filter(self, timezone: Tz) -> Option<SimpleExpr> {
+        let (start, end) = self.range(timezone)?;
         let start = start.format("%Y-%m-%d %H:%M:%S").to_string();
         let end = end.format("%Y-%m-%d %H:%M:%S").to_string();
         Some(Expr::cust_with_values(
@@ -64,12 +64,14 @@ pub async fn get_all_articles(
     db: &DatabaseConnection,
     page: Page,
     period: Option<ArticlePeriod>,
+    timezone: Tz,
 ) -> Result<(Vec<article::Model>, PageInfo), DbErr> {
     let now = Utc::now();
     let mut base_query = article::Entity::find().filter(article::Column::CreatedAt.lte(now));
-    if let Some(period) = period
-        && let Some(filter) = period.sqlite_datetime_range_filter()
-    {
+    if let Some(period) = period {
+        let filter = period
+            .sqlite_datetime_range_filter(timezone)
+            .ok_or_else(|| DbErr::Custom("invalid article period".into()))?;
         base_query = base_query.filter(filter);
     }
 
@@ -92,12 +94,14 @@ pub async fn search_articles(
     page: Page,
     period: Option<ArticlePeriod>,
     query: &str,
+    timezone: Tz,
 ) -> Result<(Vec<article::Model>, PageInfo, u64), DbErr> {
     let terms = crate::utils::search::terms(query);
     let mut base = article::Entity::find().filter(article::Column::CreatedAt.lte(Utc::now()));
-    if let Some(period) = period
-        && let Some(filter) = period.sqlite_datetime_range_filter()
-    {
+    if let Some(period) = period {
+        let filter = period
+            .sqlite_datetime_range_filter(timezone)
+            .ok_or_else(|| DbErr::Custom("invalid article period".into()))?;
         base = base.filter(filter);
     }
     let articles = base
@@ -125,17 +129,10 @@ pub async fn search_articles(
 
 pub async fn get_article_periods(
     db: &DatabaseConnection,
-    period: Option<ArticlePeriod>,
+    timezone: Tz,
 ) -> Result<Vec<ArticlePeriod>, DbErr> {
-    let now = Utc::now();
-    let mut query = article::Entity::find().filter(article::Column::CreatedAt.lte(now));
-    if let Some(period) = period
-        && let Some(filter) = period.sqlite_datetime_range_filter()
-    {
-        query = query.filter(filter);
-    }
-
-    Ok(period_counts(db, query)
+    let query = article::Entity::find().filter(article::Column::CreatedAt.lte(Utc::now()));
+    Ok(period_counts(db, query, timezone)
         .await?
         .into_iter()
         .map(|(period, _)| period)
@@ -145,6 +142,7 @@ pub async fn get_article_periods(
 pub(crate) async fn period_counts(
     db: &DatabaseConnection,
     query: sea_orm::Select<article::Entity>,
+    timezone: Tz,
 ) -> Result<Vec<(ArticlePeriod, u64)>, DbErr> {
     let created_ats: Vec<DateTime<Utc>> = query
         .select_only()
@@ -156,10 +154,10 @@ pub(crate) async fn period_counts(
 
     let mut periods = Vec::<(ArticlePeriod, u64)>::new();
     for created_at in created_ats {
-        let created_at_jst = created_at.with_timezone(&Tokyo);
+        let local_date = created_at.with_timezone(&timezone);
         let period = ArticlePeriod {
-            year: created_at_jst.year(),
-            month: created_at_jst.month(),
+            year: local_date.year(),
+            month: local_date.month(),
         };
         if let Some((last, count)) = periods.last_mut()
             && *last == period
@@ -504,9 +502,19 @@ mod tests {
     }
 
     #[test]
+    fn article_period_range_resolves_each_boundary_in_the_configured_timezone() {
+        let period = ArticlePeriod::new(2026, 3).unwrap();
+        let (start, end) = period.range(chrono_tz::America::New_York).unwrap();
+        assert_eq!(start, Utc.with_ymd_and_hms(2026, 3, 1, 5, 0, 0).unwrap());
+        assert_eq!(end, Utc.with_ymd_and_hms(2026, 4, 1, 4, 0, 0).unwrap());
+    }
+
+    #[test]
     fn article_period_range_uses_jst_month_boundaries() {
         let period = ArticlePeriod::new(2026, 2).expect("valid period");
-        let (start, end) = period.range().expect("range should exist");
+        let (start, end) = period
+            .range(chrono_tz::Asia::Tokyo)
+            .expect("range should exist");
         assert_eq!(start, Utc.with_ymd_and_hms(2026, 1, 31, 15, 0, 0).unwrap());
         assert_eq!(end, Utc.with_ymd_and_hms(2026, 2, 28, 15, 0, 0).unwrap());
     }
