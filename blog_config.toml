@@ -4,7 +4,7 @@ timezone = "UTC"
 articles_per_page = 20
 "site_name" = "Ritz のブログ"
 "default_icatch_path" = "/image/rustacean-orig-noshadow.png"
-"favicon_path" = "/icon/fox_girl_black_line_white.png"
+"favicon_path" = "/image/powered_fox.png"
 image_dir = "content/image"
 icon_dir = "content/icon"
 
