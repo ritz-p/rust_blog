@@ -415,7 +415,7 @@ mod tests {
                 .contains("href=\"/posts/highlighted-rust%23intro\""),
             "{html}"
         );
-        assert!(html.contains("href=\"/css/site.css?v=link-cards-1\""));
+        assert!(html.contains("href=\"/css/site.css?v=footer-links-1\""));
         let content = html
             .split("<div class=\"content is-medium\">")
             .nth(1)
