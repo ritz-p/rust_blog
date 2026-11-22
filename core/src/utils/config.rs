@@ -6,6 +6,7 @@ use std::{collections::HashMap, fs, path::Path};
 pub struct CommonConfig {
     pub articles_per_page: u64,
     pub site_name: Option<String>,
+    pub description: Option<String>,
     pub default_icatch_path: Option<String>,
     pub favicon_path: Option<String>,
     pub public_url: Option<String>,

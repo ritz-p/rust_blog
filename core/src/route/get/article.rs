@@ -234,6 +234,7 @@ mod tests {
             .manage(CommonConfig {
                 articles_per_page: 10,
                 site_name: Some("Test".into()),
+                description: None,
                 default_icatch_path: None,
                 favicon_path: None,
                 public_url: None,
@@ -310,6 +311,7 @@ mod tests {
         .manage(CommonConfig {
             articles_per_page: 10,
             site_name: Some("Fixture tests".into()),
+            description: None,
             default_icatch_path: None,
             favicon_path: None,
             public_url: None,
@@ -387,6 +389,7 @@ mod tests {
         .manage(CommonConfig {
             articles_per_page: 10,
             site_name: Some("Test Blog".to_owned()),
+            description: None,
             default_icatch_path: None,
             favicon_path: None,
             public_url: Some("https://example.com".into()),

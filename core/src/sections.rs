@@ -727,6 +727,7 @@ mod export_regression_tests {
         crate::utils::config::CommonConfig {
             articles_per_page: 20,
             site_name: Some("Test".into()),
+            description: None,
             default_icatch_path: Some("/fallback.png".into()),
             favicon_path: None,
             public_url: None,
