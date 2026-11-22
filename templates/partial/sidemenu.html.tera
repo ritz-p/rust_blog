@@ -1,4 +1,5 @@
 <div class="column is-4">
+<div{% if static_listings %} data-article-sidebar{% endif %}>
 {% if latest_articles and latest_articles | length > 0 %}
     <aside class="menu">
         <p class="menu-label">
@@ -28,6 +29,7 @@
         </ul>
     </aside>
 {% endif %}
+</div>
 {% if article_ads and article_ads.sidebar_slot %}
     <aside class="mt-5" aria-label="広告">
         <ins class="adsbygoogle is-block"

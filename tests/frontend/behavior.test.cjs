@@ -7,14 +7,14 @@ const { JSDOM } = require('jsdom');
 
 const fixture = `<!doctype html><html><body>
   <button class="navbar-burger" data-target="menu"></button><div id="menu"></div>
-  <select data-period-filter><option data-href="/">All</option>
-    <option data-href="/archive/2026/09/">September</option></select>
+  <div data-period-control><select data-period-filter><option data-href="/">All</option>
+    <option data-href="/archive/2026/09/">September</option></select></div>
   <form id="article-search"><input id="search-query"><input name="per"></form>
   <a id="clear-search"></a><p id="search-status"></p>
   <div id="index-results" data-static-search="true" data-per="2"></div>
 </body></html>`;
 
-async function browser(t, script, query = '', fetch = undefined, html = fixture) {
+async function browser(t, script, query = '', fetch = undefined, html = fixture, now = Date.now()) {
   const dom = new JSDOM(html, { url: `https://blog.example/${query}` });
   t.after(() => dom.window.close());
   await new Promise(resolve => dom.window.document.addEventListener('DOMContentLoaded', resolve, { once: true }));
@@ -33,7 +33,7 @@ async function browser(t, script, query = '', fetch = undefined, html = fixture)
   };
   for (const name of [script].flat()) {
     const source = readFileSync(path.join(__dirname, '../../core/assets', name), 'utf8');
-    vm.runInNewContext(source, { document, window: { location, addEventListener: dom.window.addEventListener.bind(dom.window) }, URL, URLSearchParams, fetch });
+    vm.runInNewContext(source, { document, window: { location, addEventListener: dom.window.addEventListener.bind(dom.window) }, URL, URLSearchParams, fetch, Date: { now: () => now } });
     await handler();
   }
   return { document, navigations };
@@ -206,6 +206,25 @@ test('all-period selection preserves search without changing the clear-search de
         assert.equal(all.document.getElementById('clear-search').pathname, allUrl);
         assert.equal(all.document.querySelector('[data-period-filter]').selectedIndex, 0);
       }
+    }
+  }
+});
+
+test('one static build reveals scheduled listings and search at the browser clock boundary', async t => {
+  const due = Date.parse('2030-01-01T09:00:00+09:00');
+  const records = [
+    { ...articles[1], url: '/posts/scheduled/', published_at: due },
+    { ...articles[0], url: '/posts/existing/', published_at: due - 1000 }
+  ];
+  const html = fixture.replace('<body>', `<body data-schedule-at="${due}">`)
+    .replace('data-per="2"></div>', 'data-per="1"><a href="/posts/existing/">Existing</a></div>');
+  const fetchIndex = async () => ({ ok: true, json: async () => records });
+  for (const [now, expected] of [[due - 1, 'existing'], [due, 'scheduled']]) {
+    for (const query of ['', '?q=rust']) {
+      const { document } = await browser(t, 'search.js', query, fetchIndex, html, now);
+      const links = [...document.querySelectorAll('#index-results a[href^="/posts/"]')];
+      assert.ok(links.length > 0);
+      assert.ok(links.every(link => link.pathname === `/posts/${expected}/`));
     }
   }
 });

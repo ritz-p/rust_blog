@@ -1,41 +1,56 @@
 document.addEventListener('DOMContentLoaded', async () => {
-  const results = document.getElementById('index-results');
-  if (!results || results.dataset.staticSearch !== 'true') return;
-  const searchUrl = results.dataset.searchUrl || '/';
-  const allPeriodsUrl = results.dataset.allPeriodsUrl || '/';
+  const results = document.querySelector('[data-static-listing][data-per]') || document.getElementById('index-results');
+  const sidebar = document.querySelector('[data-article-sidebar]');
+  const catalog = document.querySelector('[data-taxonomy-index]');
+  if (!results && !sidebar && !catalog) return;
+  const indexPage = results?.dataset.staticSearch === 'true';
+  const dynamic = Date.now() >= Number(document.body.dataset.scheduleAt || Infinity);
+  const { pathname, origin } = window.location;
+  const base = pathname.replace(/page\/\d+\/$/, '');
+  const updatedSort = /^\/(?:tag|category)\/[^/]+\/updated\/$/.test(base);
+  const listingBase = base.replace(/archive\/\d{4}\/\d{2}\/$/, '');
+  const searchUrl = results?.dataset.searchUrl || '/';
+  const allPeriodsUrl = results?.dataset.allPeriodsUrl || listingBase;
   const params = new URLSearchParams(window.location.search);
   const query = (params.get('q') || '').trim();
-  const year = params.get('year') || results.dataset.year;
-  const month = params.get('month') || results.dataset.month;
+  const [pathYear, pathMonth] = (results?.dataset.period || '').split('/');
+  const year = params.get('year') || results?.dataset.year || pathYear;
+  const month = params.get('month') || results?.dataset.month || pathMonth;
   const validPeriod = /^\d{4}$/.test(year) && Number(month) >= 1 && Number(month) <= 12;
   const periodPath = validPeriod ? `/archive/${year}/${String(Number(month)).padStart(2, '0')}/` : allPeriodsUrl;
-  if (!query) {
+  if (!dynamic && !query) {
+    if (!indexPage) return;
     if (validPeriod && (window.location.pathname === '/' || window.location.pathname === searchUrl)) window.location.replace(periodPath);
     return;
   }
+  if (!dynamic && !indexPage) return;
+  const searching = indexPage && Boolean(query);
   const input = document.getElementById('search-query');
   const status = document.getElementById('search-status');
   const form = document.getElementById('article-search');
-  input.value = query;
-  document.getElementById('clear-search').href = periodPath;
-  const per = Math.max(1, Number.parseInt(params.get('per'), 10) || Number(results.dataset.per));
-  form.elements.per.value = String(per);
-  for (const [name, value] of [['year', year], ['month', month]]) {
-    if (!value) continue;
-    let field = form.elements[name];
-    if (!field) {
-      field = document.createElement('input');
-      field.type = 'hidden';
-      field.name = name;
-      form.append(field);
+  if (searching) {
+    input.value = query;
+    document.getElementById('clear-search').href = dynamic && validPeriod ? allPeriodsUrl + '?' + new URLSearchParams({year, month}) : periodPath;
+  }
+  const per = Math.max(1, (searching ? Number.parseInt(params.get('per'), 10) : 0) || Number(results?.dataset.per) || 10);
+  if (searching) {
+    form.elements.per.value = String(per);
+    for (const [name, value] of [['year', year], ['month', month]]) {
+      if (!value) continue;
+      let field = form.elements[name];
+      if (!field) {
+        field = document.createElement('input');
+        field.type = 'hidden';
+        field.name = name;
+        form.append(field);
+      }
+      field.value = value;
     }
-    field.value = value;
+    for (const option of document.querySelectorAll('[data-period-filter] option')) {
+      option.selected = option.dataset.href === periodPath;
+    }
+    status.textContent = '検索中…';
   }
-  for (const option of document.querySelectorAll('[data-period-filter] option')) {
-    option.selected = option.dataset.href === periodPath;
-  }
-  results.replaceChildren();
-  status.textContent = '検索中…';
 
   function element(tag, className, text) {
     const node = document.createElement(tag);
@@ -80,10 +95,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function pageUrl(page) {
-    const url = new URL(searchUrl, window.location.origin);
-    url.searchParams.set('q', query);
-    url.searchParams.set('page', String(page));
-    url.searchParams.set('per', String(per));
+    const url = new URL(searching ? searchUrl : base, origin);
+    if (searching) {
+      url.searchParams.set('q', query);
+      url.searchParams.set('per', String(per));
+    }
+    if (page > 1 || searching) url.searchParams.set('page', String(page));
     if (year) url.searchParams.set('year', year);
     if (month) url.searchParams.set('month', month);
     return url.pathname + url.search;
@@ -100,17 +117,91 @@ document.addEventListener('DOMContentLoaded', async () => {
   try {
     const response = await fetch('/search-index.json', { cache: 'no-cache' });
     if (!response.ok) throw new Error('search index unavailable');
-    const articles = await response.json();
-    const terms = query.toLowerCase().split(/\s+/u).filter(Boolean);
-    const matches = articles.filter(article =>
+    const records = await response.json();
+    const now = Date.now();
+    const articles = records.filter(article => article.published_at === undefined || article.published_at <= now);
+    if (sidebar) {
+      const index = articles.findIndex(article => article.url === pathname);
+      const groups = [['最新記事', articles.slice(0, 5)]];
+      if (index !== -1) groups.push(['前後の記事', articles.slice(Math.max(0, index - 3), index + 4).filter(article => article.url !== pathname)]);
+      const menus = groups.filter(([, items]) => items.length).map(([label, items]) => {
+        const menu = element('aside', 'menu mt-5');
+        menu.setAttribute('aria-label', label);
+        const list = element('ul', 'menu-list');
+        for (const item of items) {
+          const li = element('li');
+          const anchor = element('a', '', item.title);
+          anchor.href = item.url;
+          li.append(anchor);
+          list.append(li);
+        }
+        menu.append(element('p', 'menu-label', label), list);
+        return menu;
+      });
+      sidebar.replaceChildren(...menus);
+    }
+    if (catalog) {
+      const kind = catalog.dataset.taxonomyIndex;
+      const entries = new Map(articles.flatMap(article => (article[kind] || []).map(term => [term.url, term])));
+      if (entries.size || catalog.querySelector('a[href^="/tag/"], a[href^="/category/"]')) {
+        const list = element('ul', 'content');
+        for (const term of [...entries.values()].sort((a, b) => a.name.localeCompare(b.name))) {
+          const li = element('li', 'mb-3');
+          const anchor = element('a', 'tag is-light is-medium', (kind === 'tags' ? '#' : '') + term.name);
+          anchor.href = term.url;
+          li.append(anchor);
+          list.append(li);
+        }
+        catalog.replaceChildren(list);
+      }
+    }
+    if (!results) return;
+    const section = results.dataset.section;
+    const taxonomy = results.dataset.taxonomy;
+    const scope = articles.filter(article =>
+      (!section || section === 'all' || article.section === section) &&
+      (!taxonomy || article[taxonomy === 'tag' ? 'tags' : 'categories']?.some(term => decodeURI(term.url) === decodeURI(updatedSort ? base.slice(0, -'updated/'.length) : base)))
+    );
+    const filter = document.querySelector('[data-period-filter]');
+    if (filter && dynamic) {
+      for (const option of [...filter.options].slice(1)) option.remove();
+      const periods = new Set(scope.map(article => `${article.year}/${String(article.month).padStart(2, '0')}`));
+      for (const period of periods) {
+        const [year, month] = period.split('/');
+        const option = element('option', '', period);
+        option.dataset.href = allPeriodsUrl + '?' + new URLSearchParams({year, month});
+        option.selected = validPeriod && year === String(Number(params.get('year') || results.dataset.year || pathYear)) &&
+          Number(month) === Number(params.get('month') || results.dataset.month || pathMonth);
+        filter.append(option);
+      }
+      filter.closest('[data-period-control]').hidden = !periods.size;
+      if (form) {
+        for (const [name, value] of [['year', year], ['month', month]]) {
+          if (!value || !validPeriod) continue;
+          let field = form.elements[name];
+          if (!field) {
+            field = element('input');
+            field.type = 'hidden';
+            field.name = name;
+            form.append(field);
+          }
+          field.value = value;
+        }
+        document.getElementById('clear-search').href = validPeriod ? allPeriodsUrl + '?' + new URLSearchParams({year, month}) : allPeriodsUrl;
+      }
+    }
+    const terms = searching ? query.toLowerCase().split(/\s+/u).filter(Boolean) : [];
+    const matches = scope.filter(article =>
       terms.every(term => article.text.includes(term)) &&
       (!(year || month) || (validPeriod && article.year === Number(year) && article.month === Number(month)))
     );
+    if (taxonomy && updatedSort) matches.sort((a, b) => b.updated_at_ms - a.updated_at_ms);
     const totalPages = Math.max(1, Math.ceil(matches.length / per));
-    const page = Math.min(totalPages, Math.max(1, Number.parseInt(params.get('page'), 10) || 1));
-    status.textContent = `「${query}」の検索結果: ${matches.length}件`;
+    const page = Math.min(totalPages, Math.max(1, Number.parseInt(params.get('page'), 10) || Number(pathname.match(/page\/(\d+)\/$/)?.[1]) || 1));
+    if (searching) status.textContent = `「${query}」の検索結果: ${matches.length}件`;
+    results.replaceChildren();
     if (!matches.length) {
-      results.append(element('p', 'has-text-grey', '一致する記事がありません。'));
+      results.append(element('p', 'has-text-grey', searching ? '一致する記事がありません。' : 'まだ記事がありません。'));
       return;
     }
     const list = element('div', 'article-list');
@@ -139,8 +230,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       titleLink.href = article.url;
       title.append(titleLink);
       body.append(date, title);
-      const bodyParts = fragments(article.body, terms, true);
-      const parts = bodyParts.some(part => part.matched) ? bodyParts : fragments(article.excerpt, terms, true);
+      const bodyParts = searching ? fragments(article.body, terms, true) : [];
+      const parts = searching && bodyParts.some(part => part.matched) ? bodyParts : fragments(article.excerpt, terms, true);
       if (parts.length) {
         const excerpt = element('p', 'article-card-excerpt');
         appendFragments(excerpt, parts);
@@ -168,6 +259,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     nav.append(pages);
     results.append(nav, element('p', 'has-text-centered', `Page ${page} / ${totalPages}`));
   } catch (error) {
-    status.textContent = '検索データを読み込めませんでした。ページを再読み込みしてください。';
+    if (searching) status.textContent = '検索データを読み込めませんでした。ページを再読み込みしてください。';
   }
 });

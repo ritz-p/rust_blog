@@ -7,7 +7,8 @@
 {% block content %}
 <h1 class="title">Category: {{ category_slug }}</h1>
 
-{% if articles and articles | length > 0 %}
+<div data-static-listing{% if static_listings %} data-per="{{ listing_per }}" data-taxonomy="category"{% endif %}>
+{% if static_listings or (articles and articles | length > 0) %}
   <div class="mb-4">
     並び順:
     <a href="{{ sort_created_url | default(value='?sort_key=created_at') }}" class="mr-2">
@@ -26,4 +27,5 @@
   <p class="has-text-grey">このカテゴリには記事がありません。</p>
 {% endif %}
 {% include "partial/page" %}
+</div>
 {% endblock content %}

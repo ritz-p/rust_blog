@@ -1,5 +1,5 @@
-{% if period_links and period_links | length > 0 %}
-  <div class="mb-5">
+{% if static_listings or (period_links and period_links | length > 0) %}
+  <div class="mb-5" data-period-control{% if not period_links %} hidden{% endif %}>
     <p class="is-size-7 has-text-grey mb-2">時期別</p>
     <div class="select is-small">
       <select aria-label="時期別フィルタ" data-period-filter>
