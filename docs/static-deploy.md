@@ -28,7 +28,14 @@ docker run --rm -v "${PWD}/data:/data" -v "${PWD}/artifact:/export" rust-blog-pr
 created_at: "2026-09-20T10:00:00+09:00"
 ```
 
-日付のみの `"2026-09-20"` は日本時間の午前0時として扱います。
+オフセットを省略した日時は `blog_config.toml` の `[common].timezone` で解釈し、日付のみの `"2026-09-20"` はそのタイムゾーンの午前0時として扱います。未設定時は UTC です。
+
+```toml
+[common]
+timezone = "Asia/Tokyo"
+```
+
+日時の表示、月別アーカイブ、検索の年月もこの設定を使います。夏時間などで曖昧または存在しない現地時刻には、RFC3339 のオフセットを明示してください。従来どおり日本時間で扱う場合は、設定を追加してから seed と export を実行します。
 既存の日付未指定記事には Git 履歴の初回登録日時を補いました。
 実際の公開日時と異なる場合は `created_at` を修正してください。
 通常のサーバー向け seed は従来どおり、日付省略時に既存 DB の作成日時を維持します。
@@ -74,7 +81,7 @@ docker compose exec -T -e EXPORT_DATABASE_PATH=artifact/static-export/blog.db we
 トップ・年月別・タグ別・カテゴリ別の一覧に適用され、サーバーと静的exportで共通です。
 サーバーではURLの `per` パラメーターが指定されている場合、その値を優先します。
 
-サーバーの既定値は `blog_config.toml` です。サイト名・画像ディレクトリなどの共通設定に使います。seedも記事区分の設定を読みます。タグ・カテゴリは各記事のフロントマターだけで指定します。
+サーバーの既定値は `blog_config.toml` です。サイト名・画像ディレクトリなどの共通設定に使います。seed も記事区分とタイムゾーンの設定を読みます。`[common].timezone` の既定値は UTC です。タグ・カテゴリは各記事のフロントマターだけで指定します。
 `[common]` の `image_dir` / `icon_dir` はサーバーの配信元と export のコピー元に共通です。
 指定時は `RUST_BLOG_CONTENT_DIR` より優先し、相対パスは作業ディレクトリ基準です。
 未指定時の export は従来どおりコンテンツディレクトリ配下の `image` / `icon` を使います。

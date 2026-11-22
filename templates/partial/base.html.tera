@@ -6,24 +6,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}{{ site_name | default(value="My Blog") }}{% endblock title %}</title>
   {% if feed_url is defined and feed_url %}<link rel="alternate" type="application/atom+xml" title="Atom feed" href="{{ feed_url }}">{% endif %}
-  {% if metadata is defined %}
-  <meta name="description" content="{{ metadata.description | escape | safe }}">
-  <meta property="og:type" content="article">
-  <meta property="og:title" content="{{ metadata.title | escape | safe }}">
-  <meta property="og:description" content="{{ metadata.description | escape | safe }}">
-  <meta property="og:site_name" content="{{ site_name | default(value="My Blog") | escape | safe }}">
-  {% if metadata.url %}
-  <link rel="canonical" href="{{ metadata.url | escape | safe }}">
-  <meta property="og:url" content="{{ metadata.url | escape | safe }}">
-  {% endif %}
-  {% if metadata.image %}<meta property="og:image" content="{{ metadata.image | escape | safe }}">{% endif %}
-  {% endif %}
+  {% include "partial/share_metadata" %}
   <link rel="stylesheet" href="/css/bulma.min.css">
-  <link rel="stylesheet" href="/css/site.css?v=tab-alignment-1">
+  <link rel="stylesheet" href="/css/site.css?v=footer-links-1">
   <link rel="shortcut icon" href= "{{ favicon_path }}" >
   {% endblock head %}
 </head>
-<body>
+<body{% if static_listings %} data-static-listings{% set due = next_publication() %}{% if due %} data-schedule-at="{{ due }}"{% endif %}{% endif %}>
   <div class="container article-tabs">
     {% include "partial/navigation" ignore missing %}
   </div>
@@ -41,7 +30,6 @@
         <div class="navbar-start">
           <a class="navbar-item" href="{% if tags_url %}{{ tags_url }}{% else %}/tags{% endif %}">Tags</a>
           <a class="navbar-item" href="{% if categories_url %}{{ categories_url }}{% else %}/categories{% endif %}">Categories</a>
-          <a class="navbar-item" href="{% if about_url %}{{ about_url }}{% else %}/about{% endif %}">About</a>
         </div>
       </div>
     </div>
@@ -52,12 +40,14 @@
     </div>
   </section>
   <footer class="footer">
-    <div class="content has-text-centered">
-      <p>© {{ year | default(value=2025) }} {{ site_name }} </p>
+    <div class="footer-links">
+      <span>© {{ year | default(value=2025) }} {{ site_name }}</span>
+      <a href="{% if about_url %}{{ about_url }}{% else %}/about{% endif %}">About</a>
     </div>
   </footer>
   {% block scripts %}
   <script src="/js/nav.js?v=nav-menu-1"{% if nav_integrity %} integrity="{{ nav_integrity | safe }}"{% endif %} defer></script>
+  {% if static_listings %}<script src="/js/search.js?v=scheduled-1"{% if search_integrity %} integrity="{{ search_integrity | safe }}"{% endif %} defer></script>{% endif %}
   {% endblock scripts %}
 </body>
 </html>

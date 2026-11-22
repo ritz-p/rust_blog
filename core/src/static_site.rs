@@ -6,9 +6,10 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use crate::entity::{article, category, tag};
 use anyhow::{Context as AnyhowContext, Result};
 use chrono::{Datelike, Utc};
-use sea_orm::DatabaseConnection;
+use sea_orm::{DatabaseConnection, EntityTrait, QueryOrder};
 use serde_json::json;
 use tera::{Context, Tera};
 use walkdir::WalkDir;
@@ -17,9 +18,8 @@ use crate::{
     domain::page::Page,
     repository::{
         article::{
-            ArticlePeriod, get_all_articles, get_all_published_articles,
-            get_article_by_category_slug, get_article_periods, get_articles_by_tag_slug,
-            get_latest_articles,
+            ArticlePeriod, get_all_articles, get_article_by_category_slug, get_article_periods,
+            get_articles_by_tag_slug, get_latest_articles,
         },
         category::{get_all_categories, get_categories_by_article},
         fixed_content::get_all_fixed_contents,
@@ -27,9 +27,8 @@ use crate::{
     },
     utils::{
         config::CommonConfig,
-        cut_out_string,
+        cut_out_string, format_datetime,
         markdown::{markdown_to_html, markdown_to_text, toc},
-        utc_to_jst,
     },
 };
 
@@ -51,6 +50,8 @@ pub async fn export_site(
     out_dir: impl AsRef<Path>,
     paths: &ExportPaths,
 ) -> Result<()> {
+    let timezone = crate::utils::config::timezone(config_map)?;
+    let export_started = Utc::now();
     let out_dir = out_dir.as_ref();
     validate_content_slugs(db).await?;
     let redirects = crate::redirects::RedirectMap::load(config_map)?;
@@ -84,6 +85,8 @@ pub async fn export_site(
     let config = CommonConfig {
         articles_per_page: crate::utils::config::articles_per_page(config_map),
         site_name: config_map.get("site_name").cloned(),
+        description: config_map.get("description").cloned(),
+        timezone,
         default_icatch_path: config_map.get("default_icatch_path").cloned(),
         favicon_path: config_map.get("favicon_path").cloned(),
         public_url: config_map.get("public_url").cloned(),
@@ -93,7 +96,11 @@ pub async fn export_site(
     navigation.validate_database(db).await?;
     crate::sections::install_navigation(&mut tera, &navigation, true)?;
 
-    export_search_index(db, &config, out_dir).await?;
+    let next_publication = export_search_index(db, &config, out_dir, export_started).await?;
+    tera.register_function(
+        "next_publication",
+        move |_: &HashMap<String, serde_json::Value>| Ok(json!(next_publication)),
+    );
 
     let all_index_url = if navigation.home == "all" {
         "/"
@@ -111,6 +118,7 @@ pub async fn export_site(
     export_category_pages(&tera, db, &config, out_dir).await?;
     export_error_page(&tera, &config, out_dir, "404", "404.html")?;
     crate::sections::export(&tera, db, &navigation, &config, out_dir).await?;
+    add_home_metadata(&tera, &config, &out_dir.join("index.html"))?;
     write_cloudflare_support_files(out_dir, has_ads)?;
     if !redirects.articles.is_empty() || !redirects.pages.is_empty() {
         redirects.write_static(db, out_dir).await?;
@@ -201,29 +209,54 @@ async fn export_search_index(
     db: &DatabaseConnection,
     config: &CommonConfig,
     out_dir: &Path,
-) -> Result<()> {
-    let mut articles = get_all_published_articles(db).await?;
+    export_started: chrono::DateTime<Utc>,
+) -> Result<Option<i64>> {
+    let mut articles = article::Entity::find().all(db).await?;
     articles.sort_by_key(|article| std::cmp::Reverse((article.created_at, article.id)));
-    let records: Vec<_> = articles.iter().map(|article| {
-        let date = article.created_at.with_timezone(&chrono_tz::Asia::Tokyo);
-        json!({
+    let mut records = Vec::with_capacity(articles.len());
+    for article in &articles {
+        let date = article.created_at.with_timezone(&config.timezone);
+        let tags: Vec<_> = get_tags_by_article(db, article)
+            .await?
+            .into_iter()
+            .map(|tag| json!({"name": tag.name, "url": static_tag_url(&tag.slug, "created_at", 1)}))
+            .collect();
+        let categories: Vec<_> = get_categories_by_article(db, article).await?.into_iter().map(|category| json!({"name": category.name, "url": static_category_url(&category.slug, "created_at", 1)})).collect();
+        records.push(json!({
+            "published_at": article.created_at.timestamp() * 1000 + i64::from(article.created_at.timestamp_subsec_nanos().div_ceil(1_000_000)),
+            "updated_at_ms": article.updated_at.timestamp_millis(),
+            "section": article.section,
+            "tags": tags,
+            "categories": categories,
             "title": article.title,
             "url": static_article_url(&article.slug),
             "excerpt": article.excerpt.as_deref().map(markdown_to_text).unwrap_or_else(|| cut_out_string(&markdown_to_text(&article.content), 100)),
             "text": crate::utils::search::article_text(article),
             "body": markdown_to_text(&article.content),
             "icatch_path": article.icatch_path.as_ref().or(config.default_icatch_path.as_ref()),
-            "created_at": utc_to_jst(article.created_at),
-            "updated_at": utc_to_jst(article.updated_at),
+            "created_at": format_datetime(article.created_at, config.timezone),
+            "updated_at": format_datetime(article.updated_at, config.timezone),
             "year": date.year(),
             "month": date.month(),
-        })
-    }).collect();
+        }));
+    }
     fs::write(
         out_dir.join("search-index.json"),
         serde_json::to_vec(&records)?,
     )?;
-    Ok(())
+    Ok(articles
+        .iter()
+        .rev()
+        .find(|article| article.created_at > export_started)
+        .map(|article| {
+            article.created_at.timestamp() * 1000
+                + i64::from(
+                    article
+                        .created_at
+                        .timestamp_subsec_nanos()
+                        .div_ceil(1_000_000),
+                )
+        }))
 }
 
 async fn export_index_pages(
@@ -233,7 +266,7 @@ async fn export_index_pages(
     out_dir: &Path,
     all_index_url: &str,
 ) -> Result<()> {
-    let periods = get_article_periods(db, None).await?;
+    let periods = get_article_periods(db, config.timezone).await?;
     export_index_variant(tera, db, config, out_dir, None, &periods, all_index_url).await?;
     for period in &periods {
         export_index_variant(
@@ -266,6 +299,7 @@ async fn export_index_variant(
             per: config.articles_per_page,
         },
         period,
+        config.timezone,
     )
     .await?;
 
@@ -274,7 +308,7 @@ async fn export_index_variant(
             number: page_number,
             per: config.articles_per_page,
         };
-        let (models, page_info) = get_all_articles(db, page, period).await?;
+        let (models, page_info) = get_all_articles(db, page, period, config.timezone).await?;
         let default_icatch_path = config.default_icatch_path.clone().unwrap_or_default();
         let period_links: Vec<_> = all_periods
             .iter()
@@ -303,8 +337,8 @@ async fn export_index_variant(
                     "url": static_article_url(&m.slug),
                     "excerpt": excerpt,
                     "icatch_path": icatch_path,
-                    "created_at": utc_to_jst(m.created_at),
-                    "updated_at": utc_to_jst(m.updated_at),
+                    "created_at": format_datetime(m.created_at, config.timezone),
+                    "updated_at": format_datetime(m.updated_at, config.timezone),
                 })
             })
             .collect();
@@ -367,19 +401,27 @@ async fn export_article_pages(
     adsense: &crate::adsense::AdSense,
     out_dir: &Path,
 ) -> Result<bool> {
-    let mut articles = get_all_published_articles(db).await?;
+    let mut articles = article::Entity::find().all(db).await?;
     articles.sort_by_key(|a| std::cmp::Reverse((a.created_at, a.id)));
     let latest_articles = latest_articles_json(db).await?;
     let has_ads = adsense.ads_txt().is_some()
         && articles
             .iter()
             .any(|a| a.adsense_auto_ads || a.adsense_sidebar);
-    for (index, article) in articles.iter().enumerate() {
-        let surrounding: Vec<_> =
-            crate::repository::article::surrounding_articles(&articles, index)
-                .into_iter()
-                .map(|a| json!({"title": a.title, "url": static_article_url(&a.slug)}))
-                .collect();
+    let published: Vec<_> = articles
+        .iter()
+        .filter(|article| article.created_at <= Utc::now())
+        .cloned()
+        .collect();
+    for article in &articles {
+        let surrounding: Vec<_> = published
+            .iter()
+            .position(|a| a.id == article.id)
+            .map(|index| crate::repository::article::surrounding_articles(&published, index))
+            .unwrap_or_default()
+            .into_iter()
+            .map(|a| json!({"title": a.title, "url": static_article_url(&a.slug)}))
+            .collect();
         let tags: Vec<_> = get_tags_by_article(db, article)
             .await?
             .into_iter()
@@ -413,7 +455,7 @@ async fn export_article_pages(
             "metadata",
             &crate::utils::metadata::article_metadata(article, config, true),
         );
-        let content = markdown_to_html(&article.content);
+        let content = crate::link_cards::article_html(&article.content).await;
         let content = if article.table_of_contents {
             toc(&content)
         } else {
@@ -421,8 +463,14 @@ async fn export_article_pages(
         };
         ctx.insert("content_html", &content);
         ctx.insert("deprecated", &article.deprecated);
-        ctx.insert("created_at", &utc_to_jst(article.created_at));
-        ctx.insert("updated_at", &utc_to_jst(article.updated_at));
+        ctx.insert(
+            "created_at",
+            &format_datetime(article.created_at, config.timezone),
+        );
+        ctx.insert(
+            "updated_at",
+            &format_datetime(article.updated_at, config.timezone),
+        );
         ctx.insert("tags", &tags);
         ctx.insert("categories", &categories);
         ctx.insert("latest_articles", &latest_articles);
@@ -456,8 +504,14 @@ async fn export_fixed_content_pages(
         ctx.insert("title", &fixed_content.title);
         ctx.insert("excerpt", &excerpt);
         ctx.insert("content_html", &markdown_to_html(&fixed_content.content));
-        ctx.insert("created_at", &utc_to_jst(fixed_content.created_at));
-        ctx.insert("updated_at", &utc_to_jst(fixed_content.updated_at));
+        ctx.insert(
+            "created_at",
+            &format_datetime(fixed_content.created_at, config.timezone),
+        );
+        ctx.insert(
+            "updated_at",
+            &format_datetime(fixed_content.updated_at, config.timezone),
+        );
         ctx.insert("latest_articles", &latest_articles);
 
         render_to_path(
@@ -476,8 +530,12 @@ async fn export_tag_pages(
     config: &CommonConfig,
     out_dir: &Path,
 ) -> Result<()> {
-    let tags = get_all_tags(db).await?;
-    let tag_items: Vec<_> = tags
+    let published = get_all_tags(db).await?;
+    let tags = tag::Entity::find()
+        .order_by_asc(tag::Column::Id)
+        .all(db)
+        .await?;
+    let tag_items: Vec<_> = published
         .iter()
         .map(|tag| {
             let slug = tag.slug.clone();
@@ -548,8 +606,8 @@ async fn export_tag_variant(
                     "url": static_article_url(&slug),
                     "icatch_path": icatch_path,
                     "excerpt": excerpt,
-                    "created_at": utc_to_jst(article.created_at),
-                    "updated_at": utc_to_jst(article.updated_at),
+                    "created_at": format_datetime(article.created_at, config.timezone),
+                    "updated_at": format_datetime(article.updated_at, config.timezone),
                 })
             })
             .collect();
@@ -600,8 +658,12 @@ async fn export_category_pages(
     config: &CommonConfig,
     out_dir: &Path,
 ) -> Result<()> {
-    let categories = get_all_categories(db).await?;
-    let category_items: Vec<_> = categories
+    let published = get_all_categories(db).await?;
+    let categories = category::Entity::find()
+        .order_by_asc(category::Column::Id)
+        .all(db)
+        .await?;
+    let category_items: Vec<_> = published
         .iter()
         .map(|category| {
             let slug = category.slug.clone();
@@ -677,8 +739,8 @@ async fn export_category_variant(
                     "url": static_article_url(&slug),
                     "icatch_path": icatch_path,
                     "excerpt": excerpt,
-                    "created_at": utc_to_jst(article.created_at),
-                    "updated_at": utc_to_jst(article.updated_at),
+                    "created_at": format_datetime(article.created_at, config.timezone),
+                    "updated_at": format_datetime(article.updated_at, config.timezone),
                 })
             })
             .collect();
@@ -765,12 +827,35 @@ fn base_context(config: &CommonConfig) -> Context {
             .map(|_| "/feed.xml"),
     );
     ctx.insert("site_name", &config.site_name);
+    ctx.insert("static_listings", &true);
+    ctx.insert(
+        "search_integrity",
+        crate::adsense::SEARCH_INTEGRITY.as_str(),
+    );
+    ctx.insert("listing_per", &config.articles_per_page);
     ctx.insert("favicon_path", &config.favicon_path);
-    ctx.insert("year", &Utc::now().year());
+    ctx.insert("year", &Utc::now().with_timezone(&config.timezone).year());
     ctx.insert("tags_url", "/tags/");
     ctx.insert("categories_url", "/categories/");
     ctx.insert("about_url", "/about/");
     ctx
+}
+
+fn add_home_metadata(tera: &Tera, config: &CommonConfig, path: &Path) -> Result<()> {
+    use lol_html::{RewriteStrSettings, element, html_content::ContentType, rewrite_str};
+    let mut ctx = base_context(config);
+    ctx.insert("metadata", &crate::utils::metadata::site_metadata(config));
+    let tags = tera.render("partial/share_metadata", &ctx)?;
+    let html = fs::read_to_string(path)?;
+    let html = rewrite_str(
+        &html,
+        RewriteStrSettings::new().append_element_content_handler(element!("head", |head| {
+            head.append(&tags, ContentType::Html);
+            Ok(())
+        })),
+    )?;
+    fs::write(path, html)?;
+    Ok(())
 }
 
 fn render_to_path(tera: &Tera, template: &str, ctx: &Context, output: &Path) -> Result<()> {
@@ -801,6 +886,10 @@ fn load_templates(root: &Path) -> Result<Tera> {
         templates.push((name, contents));
     }
     let mut tera = Tera::default();
+    tera.register_function(
+        "next_publication",
+        |_: &HashMap<String, serde_json::Value>| Ok(serde_json::Value::Null),
+    );
     tera.add_raw_templates(templates)
         .context("failed to register templates")?;
     Ok(tera)
@@ -1070,7 +1159,7 @@ fn is_reserved_root_dir(name: &str) -> bool {
 #[cfg(test)]
 mod tests {
     #[rocket::async_test]
-    async fn scheduled_articles_are_stored_and_reexported_only_when_due() {
+    async fn scheduled_articles_are_exported_early_and_discovered_when_due() {
         use crate::{
             entity::{article, article_category, article_tag, category, fixed_content, tag},
             seed::article::{seed_article, seed_category, seed_tag},
@@ -1155,15 +1244,17 @@ mod tests {
                     .unwrap()
                     .contains("Sitemap: https://example.com/sitemap.xml")
             );
-            assert_eq!(out.join("posts/scheduled/index.html").exists(), published);
+            assert!(
+                fs::read_to_string(out.join("posts/scheduled/index.html"))
+                    .unwrap()
+                    .contains("Scheduled secret body")
+            );
             assert_eq!(out.join("archive/2020/01/index.html").exists(), published);
             assert!(!out.join("archive/2999/01/index.html").exists());
-            for path in ["index.html", "search-index.json"] {
-                let text = fs::read_to_string(out.join(path)).unwrap();
-                assert_eq!(text.contains("Scheduled secret title"), published, "{path}");
-            }
+            let home = fs::read_to_string(out.join("index.html")).unwrap();
+            assert_eq!(home.contains("Scheduled secret title"), published);
             for path in ["tag/rust/index.html", "category/dev/index.html"] {
-                assert_eq!(out.join(path).exists(), published);
+                assert!(out.join(path).exists());
                 if published {
                     assert!(
                         fs::read_to_string(out.join(path))
@@ -1172,17 +1263,13 @@ mod tests {
                     );
                 }
             }
-            if !published {
-                for entry in walkdir::WalkDir::new(&out)
-                    .into_iter()
-                    .map(Result::unwrap)
-                    .filter(|entry| entry.file_type().is_file())
-                {
-                    let text = fs::read_to_string(entry.path()).unwrap();
-                    assert!(!text.contains("Scheduled secret title"));
-                    assert!(!text.contains("Scheduled secret body"));
-                }
-            }
+            let records: serde_json::Value =
+                serde_json::from_slice(&fs::read(out.join("search-index.json")).unwrap()).unwrap();
+            let timestamp = records[0]["published_at"].as_i64().unwrap();
+            assert_eq!(
+                timestamp <= chrono::Utc::now().timestamp_millis(),
+                published
+            );
         }
         fs::remove_dir_all(root).unwrap();
     }
@@ -1212,14 +1299,23 @@ mod tests {
     }
 
     #[rocket::async_test]
-    async fn search_index_contains_only_published_plain_text_and_static_urls() {
-        use crate::entity::article;
+    async fn search_index_contains_scheduled_records_with_publication_timestamps() {
+        use crate::entity::{article, article_category, article_tag, category, tag};
         use sea_orm::{ActiveModelTrait, ConnectionTrait, Database, EntityTrait, Schema, Set};
         let db = Database::connect("sqlite::memory:").await.unwrap();
         let backend = db.get_database_backend();
         db.execute(backend.build(&Schema::new(backend).create_table_from_entity(article::Entity)))
             .await
             .unwrap();
+        let schema = Schema::new(backend);
+        for table in [
+            schema.create_table_from_entity(tag::Entity),
+            schema.create_table_from_entity(category::Entity),
+            schema.create_table_from_entity(article_tag::Entity),
+            schema.create_table_from_entity(article_category::Entity),
+        ] {
+            db.execute(backend.build(&table)).await.unwrap();
+        }
         for (id, title, created_at) in [
             (1, "Rust 入門", "2025-12-31T15:00:00Z"),
             (2, "Future secret", "2099-01-01T00:00:00Z"),
@@ -1251,28 +1347,30 @@ mod tests {
         let config = crate::utils::config::CommonConfig {
             articles_per_page: 10,
             site_name: None,
+            description: None,
+            timezone: chrono_tz::UTC,
             default_icatch_path: None,
             favicon_path: None,
             public_url: Some("https://example.com".into()),
         };
-        super::export_search_index(&db, &config, &root)
+        super::export_search_index(&db, &config, &root, chrono::Utc::now())
             .await
             .unwrap();
         let data: serde_json::Value =
             serde_json::from_slice(&fs::read(root.join("search-index.json")).unwrap()).unwrap();
-        assert_eq!(data.as_array().unwrap().len(), 1);
-        assert_eq!(data[0]["url"], "/posts/%E6%97%A5%E6%9C%AC%E8%AA%9E%201/");
-        assert_eq!(data[0]["year"], 2026);
-        assert_eq!(data[0]["month"], 1);
+        assert_eq!(data.as_array().unwrap().len(), 2);
+        assert_eq!(data[1]["url"], "/posts/%E6%97%A5%E6%9C%AC%E8%AA%9E%201/");
+        assert_eq!(data[1]["year"], 2025);
+        assert_eq!(data[1]["month"], 12);
         assert!(
-            data[0]["text"]
+            data[1]["text"]
                 .as_str()
                 .unwrap()
                 .contains("rust 入門\n概要\n")
         );
-        assert!(!data.to_string().contains("Future secret"));
+        assert!(data[0]["published_at"].as_i64().unwrap() > chrono::Utc::now().timestamp_millis());
         article::Entity::delete_many().exec(&db).await.unwrap();
-        super::export_search_index(&db, &config, &root)
+        super::export_search_index(&db, &config, &root, chrono::Utc::now())
             .await
             .unwrap();
         assert_eq!(
@@ -1427,6 +1525,8 @@ mod tests {
         let config = CommonConfig {
             articles_per_page: 10,
             site_name: Some("Test Blog".to_owned()),
+            description: None,
+            timezone: chrono_tz::UTC,
             default_icatch_path: None,
             favicon_path: None,
             public_url: Some("https://example.com".into()),
@@ -1450,7 +1550,7 @@ mod tests {
         );
         assert!(html.contains("property=\"og:title\" content=\"Highlighted Rust\""));
         assert!(html.contains("href=\"/posts/highlighted-rust/\""));
-        assert!(html.contains("href=\"/css/site.css?v=tab-alignment-1\""));
+        assert!(html.contains("href=\"/css/site.css?v=footer-links-1\""));
         let content = html
             .split("<div class=\"content is-medium\">")
             .nth(1)
@@ -1600,6 +1700,10 @@ mod home_navigation_tests {
             );
             let config = HashMap::from([
                 ("articles_per_page".into(), "1".into()),
+                ("public_url".into(), "https://example.com".into()),
+                ("site_name".into(), "Fixture blog".into()),
+                ("description".into(), "About the blog".into()),
+                ("default_icatch_path".into(), "/image/share.png".into()),
                 ("navigation".into(), navigation),
             ]);
             export_site(&db, &config, &out, &paths).await.unwrap();
@@ -1607,6 +1711,23 @@ mod home_navigation_tests {
                 html_escape::decode_html_entities(&fs::read_to_string(out.join(path)).unwrap())
                     .into_owned()
             };
+            let home_html = html("index.html");
+            for tag in [
+                r#"property="og:type" content="website""#,
+                r#"property="og:title" content="Fixture blog""#,
+                r#"property="og:site_name" content="Fixture blog""#,
+                r#"property="og:description" content="About the blog""#,
+                r#"property="og:url" content="https://example.com/""#,
+                r#"property="og:image" content="https://example.com/image/share.png""#,
+                r#"name="twitter:card" content="summary_large_image""#,
+            ] {
+                assert!(home_html.contains(tag), "{home}: {tag}");
+            }
+            let (_, footer) = home_html.split_once(r#"<footer class="footer">"#).unwrap();
+            assert!(footer.contains(r#"href="/about/">About</a>"#));
+            let article = html("posts/article-1/index.html");
+            assert!(article.contains(r#"property="og:type" content="article""#));
+            assert!(article.contains(r#"name="twitter:card" content="summary_large_image""#));
             let page = html("page/2/index.html");
             for link in [
                 format!("class=\"pagination-previous\" href=\"{first_url}\""),

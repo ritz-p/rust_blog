@@ -27,14 +27,21 @@ static EXTRA_SYNTAX_SET: LazyLock<SyntaxSet> = LazyLock::new(|| {
     builder.build()
 });
 
-pub fn markdown_to_html(input: &str) -> String {
+pub(crate) fn markdown_parser(input: &str) -> Parser<'_, '_> {
     let mut options = Options::empty();
     options.insert(Options::ENABLE_TABLES);
     options.insert(Options::ENABLE_FOOTNOTES);
     options.insert(Options::ENABLE_STRIKETHROUGH);
     options.insert(Options::ENABLE_TASKLISTS);
 
-    let mut parser = Parser::new_ext(input, options);
+    Parser::new_ext(input, options)
+}
+
+pub fn markdown_to_html(input: &str) -> String {
+    render_markdown(markdown_parser(input))
+}
+
+pub(crate) fn render_markdown<'a>(mut parser: impl Iterator<Item = Event<'a>>) -> String {
     let mut events = Vec::new();
     while let Some(event) = parser.next() {
         if let Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced(info))) = &event {

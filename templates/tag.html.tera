@@ -7,7 +7,7 @@
 {% block content %}
 <h1 class="title">Tag: #{{ tag_slug }}</h1>
 
-{% if articles and articles | length > 0 %}
+{% if static_listings or (articles and articles | length > 0) %}
   <div class="mb-4">
     並び順:
     <a href="{{ sort_created_url | default(value='?sort_key=created_at') }}" class="mr-2">
@@ -17,6 +17,9 @@
       更新日順
     </a>
   </div>
+{% endif %}
+<div data-static-listing{% if static_listings %} data-per="{{ listing_per }}" data-taxonomy="tag"{% endif %}>
+{% if articles and articles | length > 0 %}
   <div class="article-list">
     {% for article in articles %}
     {% include "partial/article_card" %}
@@ -26,4 +29,5 @@
   <p class="has-text-grey">このタグには記事がありません。</p>
 {% endif %}
 {% include "partial/page" %}
+</div>
 {% endblock content %}

@@ -4,11 +4,7 @@ use crate::{
         category::get_categories_by_article,
         tag::get_tags_by_article,
     },
-    utils::{
-        config::CommonConfig,
-        markdown::{markdown_to_html, toc},
-        utc_to_jst,
-    },
+    utils::{config::CommonConfig, format_datetime, markdown::toc},
 };
 use rocket::{State, http::Status};
 use rocket_dyn_templates::{Template, context};
@@ -39,7 +35,7 @@ pub async fn article_detail(
         Err(_) => return Err(Status::NotFound),
     };
 
-    let content = markdown_to_html(&article.content);
+    let content = rust_blog::link_cards::article_html(&article.content).await;
     let content = if article.table_of_contents {
         toc(&content)
     } else {
@@ -73,8 +69,8 @@ pub async fn article_detail(
             })
         })
         .collect();
-    let created_at = utc_to_jst(article.created_at);
-    let updated_at = utc_to_jst(article.updated_at);
+    let created_at = format_datetime(article.created_at, config.timezone);
+    let updated_at = format_datetime(article.updated_at, config.timezone);
 
     let surrounding: Vec<_> = get_surrounding_articles(db, &article)
         .await
@@ -238,6 +234,8 @@ mod tests {
             .manage(CommonConfig {
                 articles_per_page: 10,
                 site_name: Some("Test".into()),
+                description: None,
+                timezone: chrono_tz::UTC,
                 default_icatch_path: None,
                 favicon_path: None,
                 public_url: None,
@@ -314,6 +312,8 @@ mod tests {
         .manage(CommonConfig {
             articles_per_page: 10,
             site_name: Some("Fixture tests".into()),
+            description: None,
+            timezone: chrono_tz::UTC,
             default_icatch_path: None,
             favicon_path: None,
             public_url: None,
@@ -391,6 +391,8 @@ mod tests {
         .manage(CommonConfig {
             articles_per_page: 10,
             site_name: Some("Test Blog".to_owned()),
+            description: None,
+            timezone: chrono_tz::UTC,
             default_icatch_path: None,
             favicon_path: None,
             public_url: Some("https://example.com".into()),
@@ -416,7 +418,7 @@ mod tests {
                 .contains("href=\"/posts/highlighted-rust%23intro\""),
             "{html}"
         );
-        assert!(html.contains("href=\"/css/site.css?v=tab-alignment-1\""));
+        assert!(html.contains("href=\"/css/site.css?v=footer-links-1\""));
         let content = html
             .split("<div class=\"content is-medium\">")
             .nth(1)

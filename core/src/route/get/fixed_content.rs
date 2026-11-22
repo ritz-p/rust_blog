@@ -1,6 +1,6 @@
 use rocket::{State, futures::TryFutureExt, http::Status};
 use rocket_dyn_templates::{Template, context};
-use rust_blog::utils::utc_to_jst;
+use rust_blog::utils::format_datetime;
 use sea_orm::DatabaseConnection;
 use serde_json::json;
 
@@ -18,6 +18,7 @@ pub async fn fixed_content_detail(
     config: &State<CommonConfig>,
     db: &State<DatabaseConnection>,
     slug: &str,
+    navigation: &State<rust_blog::sections::Navigation>,
 ) -> Result<Template, Status> {
     let conn = db.inner();
     let maybe = get_fixed_content_by_slug(conn, slug)
@@ -50,10 +51,15 @@ pub async fn fixed_content_detail(
         })
         .collect();
 
+    let is_home = navigation.tabs.iter().any(|tab| {
+        matches!(tab, rust_blog::sections::Tab::Page { id, slug: home_slug, .. }
+            if id == &navigation.home && home_slug == slug)
+    });
     Ok(Template::render(
         "about",
         context! {
             site_name: &config.site_name,
+            metadata: is_home.then(|| crate::utils::metadata::site_metadata(config)),
             favicon_path: &config.favicon_path,
             tags_url: "/tags",
             categories_url: "/categories",
@@ -61,8 +67,8 @@ pub async fn fixed_content_detail(
             title: fixed_content.title,
             excerpt: excerpt,
             content_html: content,
-            created_at: utc_to_jst(fixed_content.created_at),
-            updated_at: utc_to_jst(fixed_content.updated_at),
+            created_at: format_datetime(fixed_content.created_at, config.timezone),
+            updated_at: format_datetime(fixed_content.updated_at, config.timezone),
             latest_articles: latest_articles,
         },
     ))

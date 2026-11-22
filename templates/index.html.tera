@@ -38,8 +38,3 @@
 {% include "partial/page" %}
 </div>
 {% endblock content %}
-
-{% block scripts %}
-{{ super() }}
-{% if static_search %}<script src="/js/search.js?v=search-route-1" defer></script>{% endif %}
-{% endblock scripts %}

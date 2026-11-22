@@ -561,3 +561,62 @@
   background-color: #ffedd5;
   border-left: 4px solid #ea580c;
 }
+
+.article-page .content .link-card > a {
+  display: flex;
+  align-items: stretch;
+  margin-block: 0.5rem;
+  max-width: 38rem;
+  border: 1px solid #d0d7de;
+  border-radius: 6px;
+  background: #fff;
+  color: #24354b;
+  text-decoration: none;
+  overflow: hidden;
+}
+
+.article-page .content .link-card > a:hover,
+.article-page .content .link-card > a:focus-visible {
+  border-color: #3273dc;
+}
+
+.article-page .content .link-card img {
+  width: min(26%, 8rem);
+  height: 6rem;
+  align-self: center;
+  flex: none;
+  object-fit: cover;
+}
+
+.link-card-body {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.25rem;
+  min-width: 0;
+  padding: 0.75rem 1rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.link-card-description,
+.link-card-domain {
+  color: #526176;
+  font-size: 0.875rem;
+}
+
+.link-card-description {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: baseline;
+  gap: 0.25rem 0.75rem;
+  text-align: center;
+}

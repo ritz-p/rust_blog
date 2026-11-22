@@ -6,7 +6,7 @@ pub mod markdown;
 mod taxonomy;
 
 use anyhow::{Context, Result, ensure};
-use article::{delete_article_by_slug, seed_article, seed_category, seed_tag};
+use article::{delete_article_by_slug, seed_article_in_timezone, seed_category, seed_tag};
 use config::{PathConfig, env::load_env};
 use fixed_content::seed_fixed_content;
 use markdown::{
@@ -31,6 +31,7 @@ async fn run_with_config(
     require_created_at: bool,
     file_timestamps: bool,
 ) -> Result<()> {
+    let timezone = crate::utils::config::timezone(&crate::utils::config::load_config())?;
     let mut errors = Vec::new();
     let mut succeeded = 0;
     let slug_errors = validate_input_slugs(config);
@@ -57,7 +58,7 @@ async fn run_with_config(
                 continue;
             }
             let result = if article {
-                seed_article_file(db, &path, require_created_at, file_timestamps).await
+                seed_article_file(db, &path, require_created_at, file_timestamps, timezone).await
             } else {
                 seed_fixed_file(db, &path, file_timestamps).await
             };
@@ -127,6 +128,7 @@ async fn seed_article_file(
     path: &Path,
     require_created_at: bool,
     file_timestamps: bool,
+    timezone: chrono_tz::Tz,
 ) -> Result<()> {
     let (mut matter, body) =
         parse_markdown_to_front_matter(path).map_err(|error| anyhow::anyhow!("parse: {error}"))?;
@@ -151,7 +153,7 @@ async fn seed_article_file(
     let tx = db.begin().await.context("begin article transaction")?;
     let result: Result<()> = async {
         let db = &tx;
-        let id = seed_article(db, &matter, &body)
+        let id = seed_article_in_timezone(db, &matter, &body, timezone)
             .await
             .context("save article")?;
         let mut errors = Vec::new();
@@ -249,12 +251,16 @@ mod tests {
             document("existing", "Before", "old-tag", "old-category"),
         )
         .unwrap();
-        seed_article_file(&db, &path, true, false).await.unwrap();
+        seed_article_file(&db, &path, true, false, chrono_tz::UTC)
+            .await
+            .unwrap();
         let before = article::Entity::find().one(&db).await.unwrap().unwrap();
         db.execute(Statement::from_string(backend, "CREATE TRIGGER reject_category BEFORE INSERT ON category WHEN NEW.slug = 'reject' BEGIN SELECT RAISE(FAIL, 'rejected category'); END;")).await.unwrap();
         for slug in ["existing", "new"] {
             std::fs::write(&path, document(slug, "After", "new-tag", "reject")).unwrap();
-            let error = seed_article_file(&db, &path, true, true).await.unwrap_err();
+            let error = seed_article_file(&db, &path, true, true, chrono_tz::UTC)
+                .await
+                .unwrap_err();
             assert!(format!("{error:#}").contains("rejected category"));
             assert_eq!(
                 article::Entity::find().all(&db).await.unwrap(),
@@ -295,7 +301,9 @@ mod tests {
             document("later", "Valid", "next-tag", "next-category"),
         )
         .unwrap();
-        seed_article_file(&db, &path, true, false).await.unwrap();
+        seed_article_file(&db, &path, true, false, chrono_tz::UTC)
+            .await
+            .unwrap();
         assert_eq!(article::Entity::find().all(&db).await.unwrap().len(), 2);
         std::fs::remove_dir_all(root).unwrap();
     }
@@ -328,7 +336,9 @@ mod tests {
             ] {
                 db.execute(backend.build(&table)).await.unwrap();
             }
-            seed_article_file(&db, &path, true, true).await.unwrap();
+            seed_article_file(&db, &path, true, true, chrono_tz::UTC)
+                .await
+                .unwrap();
             let saved = article::Entity::find().one(&db).await.unwrap().unwrap();
             assert_eq!(saved.updated_at, expected);
             assert!(saved.created_at < saved.updated_at);

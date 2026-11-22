@@ -8,7 +8,7 @@ use chrono::NaiveDateTime;
 use chrono::TimeZone;
 use chrono::Timelike;
 use chrono::Utc;
-use chrono_tz::Asia::Tokyo;
+use chrono_tz::Tz;
 use entity::{
     article::Column as ArticleColumn, article::Entity as ArticleEntity,
     article::Model as ArticleModel,
@@ -27,6 +27,7 @@ pub async fn prepare(
     db: &impl ConnectionTrait,
     front_matter: &FrontMatter,
     body: &str,
+    timezone: Tz,
 ) -> Result<ActiveModel, DbErr> {
     let now = Utc::now().with_nanosecond(0).unwrap_or_else(Utc::now);
     let model: Option<ArticleModel> = ArticleEntity::find()
@@ -38,7 +39,8 @@ pub async fn prepare(
         Some(model) => model.into_active_model(),
         None => Default::default(),
     };
-    if let Some(created_at) = resolve_created_at(existing_created_at, front_matter, now)? {
+    if let Some(created_at) = resolve_created_at(existing_created_at, front_matter, now, timezone)?
+    {
         active_model.created_at.set_if_not_equals(created_at);
     }
     active_model
@@ -79,9 +81,10 @@ fn resolve_created_at(
     existing_created_at: Option<DateTime<Utc>>,
     front_matter: &FrontMatter,
     now: DateTime<Utc>,
+    timezone: Tz,
 ) -> Result<Option<DateTime<Utc>>, DbErr> {
     match front_matter.created_at.as_deref() {
-        Some(raw) => Ok(Some(parse_created_at(raw)?)),
+        Some(raw) => Ok(Some(parse_created_at(raw, timezone)?)),
         None => {
             if existing_created_at.is_some() {
                 Ok(None)
@@ -92,40 +95,16 @@ fn resolve_created_at(
     }
 }
 
-pub fn parse_created_at(raw: &str) -> Result<DateTime<Utc>, DbErr> {
+pub fn parse_created_at(raw: &str, timezone: Tz) -> Result<DateTime<Utc>, DbErr> {
     if let Ok(dt) = DateTime::parse_from_rfc3339(raw) {
-        return Ok(dt.with_timezone(&Utc));
+        return Ok(dt.to_utc());
     }
-
-    if let Ok(naive_dt) = NaiveDateTime::parse_from_str(raw, "%Y-%m-%d %H:%M:%S") {
-        let dt = Tokyo
-            .from_local_datetime(&naive_dt)
-            .single()
-            .ok_or_else(|| DbErr::Custom(format!("invalid JST local datetime: {raw}")))?;
-        return Ok(dt.with_timezone(&Utc));
-    }
-
-    if let Ok(naive_dt) = NaiveDateTime::parse_from_str(raw, "%Y-%m-%dT%H:%M:%S") {
-        let dt = Tokyo
-            .from_local_datetime(&naive_dt)
-            .single()
-            .ok_or_else(|| DbErr::Custom(format!("invalid JST local datetime: {raw}")))?;
-        return Ok(dt.with_timezone(&Utc));
-    }
-
-    if let Ok(date) = NaiveDate::parse_from_str(raw, "%Y-%m-%d")
-        && let Some(naive_dt) = date.and_hms_opt(0, 0, 0)
-    {
-        let dt = Tokyo
-            .from_local_datetime(&naive_dt)
-            .single()
-            .ok_or_else(|| DbErr::Custom(format!("invalid JST local datetime: {raw}")))?;
-        return Ok(dt.with_timezone(&Utc));
-    }
-
-    Err(DbErr::Custom(format!(
-        "invalid created_at format: {raw} (expected RFC3339 or JST local datetime YYYY-MM-DD[ T]HH:MM:SS or YYYY-MM-DD)"
-    )))
+    let local = NaiveDateTime::parse_from_str(raw, "%Y-%m-%d %H:%M:%S")
+        .or_else(|_| NaiveDateTime::parse_from_str(raw, "%Y-%m-%dT%H:%M:%S"))
+        .or_else(|_| NaiveDate::parse_from_str(raw, "%Y-%m-%d").map(|date| date.and_time(chrono::NaiveTime::MIN)))
+        .map_err(|_| DbErr::Custom(format!("invalid created_at format: {raw} (expected RFC3339, YYYY-MM-DD[ T]HH:MM:SS or YYYY-MM-DD)")))?;
+    timezone.from_local_datetime(&local).single().map(|date| date.to_utc())
+        .ok_or_else(|| DbErr::Custom(format!("created_at {raw:?} is ambiguous or nonexistent in {timezone}; specify an RFC3339 offset")))
 }
 
 pub fn validate(front_matter: &FrontMatter, body: &str) -> Result<(), Report> {
@@ -183,7 +162,8 @@ mod tests {
     fn resolve_created_at_uses_front_matter_value_when_present() {
         let fm = front_matter_with_created_at(Some("2026-01-01T12:34:56Z"));
         let now = Utc.with_ymd_and_hms(2026, 2, 1, 0, 0, 0).unwrap();
-        let result = resolve_created_at(None, &fm, now).expect("created_at should parse");
+        let result = resolve_created_at(None, &fm, now, chrono_tz::Asia::Tokyo)
+            .expect("created_at should parse");
         assert_eq!(
             result,
             Some(Utc.with_ymd_and_hms(2026, 1, 1, 12, 34, 56).unwrap())
@@ -194,7 +174,8 @@ mod tests {
     fn resolve_created_at_uses_now_for_new_article_when_missing() {
         let fm = front_matter_with_created_at(None);
         let now = Utc.with_ymd_and_hms(2026, 2, 1, 0, 0, 0).unwrap();
-        let result = resolve_created_at(None, &fm, now).expect("should use now");
+        let result =
+            resolve_created_at(None, &fm, now, chrono_tz::Asia::Tokyo).expect("should use now");
         assert_eq!(result, Some(now));
     }
 
@@ -203,19 +184,46 @@ mod tests {
         let fm = front_matter_with_created_at(None);
         let now = Utc.with_ymd_and_hms(2026, 2, 1, 0, 0, 0).unwrap();
         let existing = Utc.with_ymd_and_hms(2025, 2, 1, 0, 0, 0).unwrap();
-        let result = resolve_created_at(Some(existing), &fm, now).expect("should keep existing");
+        let result = resolve_created_at(Some(existing), &fm, now, chrono_tz::Asia::Tokyo)
+            .expect("should keep existing");
         assert_eq!(result, None);
     }
 
     #[test]
+    fn local_times_use_utc_or_the_configured_zone_and_reject_ambiguous_times() {
+        let ny = chrono_tz::America::New_York;
+        assert_eq!(
+            parse_created_at("2026-07-01", chrono_tz::UTC)
+                .unwrap()
+                .to_rfc3339(),
+            "2026-07-01T00:00:00+00:00"
+        );
+        assert_eq!(
+            parse_created_at("2026-07-01T09:00:00", ny)
+                .unwrap()
+                .to_rfc3339(),
+            "2026-07-01T13:00:00+00:00"
+        );
+        assert!(parse_created_at("2026-03-08T02:30:00", ny).is_err());
+        assert!(parse_created_at("2026-11-01T01:30:00", ny).is_err());
+        assert_eq!(
+            parse_created_at("2026-11-01T01:30:00-05:00", chrono_tz::UTC)
+                .unwrap()
+                .to_rfc3339(),
+            "2026-11-01T06:30:00+00:00"
+        );
+    }
+
+    #[test]
     fn parse_created_at_treats_naive_datetime_as_jst() {
-        let parsed = parse_created_at("2026-02-18 09:30:00").expect("must parse");
+        let parsed =
+            parse_created_at("2026-02-18 09:30:00", chrono_tz::Asia::Tokyo).expect("must parse");
         assert_eq!(parsed, Utc.with_ymd_and_hms(2026, 2, 18, 0, 30, 0).unwrap());
     }
 
     #[test]
     fn parse_created_at_treats_date_only_as_jst_midnight() {
-        let parsed = parse_created_at("2026-02-18").expect("must parse");
+        let parsed = parse_created_at("2026-02-18", chrono_tz::Asia::Tokyo).expect("must parse");
         assert_eq!(parsed, Utc.with_ymd_and_hms(2026, 2, 17, 15, 0, 0).unwrap());
     }
 

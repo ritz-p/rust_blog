@@ -9,7 +9,7 @@ use crate::{
         query::{PagingQuery, tag::TagQuery},
     },
     repository::{article::get_articles_by_tag_slug, tag::get_all_tags},
-    utils::{config::CommonConfig, cut_out_string, markdown::markdown_to_text, utc_to_jst},
+    utils::{config::CommonConfig, cut_out_string, format_datetime, markdown::markdown_to_text},
 };
 
 fn sort_url(slug: &str, sort_key: &str) -> String {
@@ -97,8 +97,8 @@ pub async fn tag_detail(
                             "url": format!("/posts/{}", crate::utils::url_segment(&slug)),
                             "icatch_path": icatch_path,
                             "excerpt": excerpt,
-                            "created_at": utc_to_jst(article.created_at),
-                    "updated_at": utc_to_jst(article.updated_at),
+                            "created_at": format_datetime(article.created_at, config.timezone),
+                    "updated_at": format_datetime(article.updated_at, config.timezone),
                         })
                     }).collect::<Vec<_>>(),
                     page: page_info.current_page,
@@ -142,6 +142,8 @@ mod tests {
                 .manage(CommonConfig {
                     articles_per_page: 10,
                     site_name: Some("Test Blog".to_string()),
+                    description: None,
+                    timezone: chrono_tz::UTC,
                     default_icatch_path: Some("/default.png".to_string()),
                     favicon_path: Some("/favicon.ico".to_string()),
                     public_url: None,

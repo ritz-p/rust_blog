@@ -2,11 +2,10 @@
 extern crate rocket;
 
 mod domain;
-use rust_blog::entity;
+use rust_blog::{entity, utils};
 mod entity_extension;
 mod repository;
 mod route;
-mod utils;
 use sea_orm::{Database, DatabaseConnection};
 
 use crate::{route::launch, utils::config::load_config};

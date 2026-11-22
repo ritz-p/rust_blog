@@ -86,13 +86,17 @@ async fn render(
         },
         period,
         false,
-        config.default_icatch_path.as_deref(),
+        config,
     )
     .await
     .map_err(|error| {
         error!("section: {error:#}");
         Status::InternalServerError
     })?;
+    if section == Some(navigation.home.as_str()) && period.is_none() && query.page.unwrap_or(1) <= 1
+    {
+        context.insert("metadata", &crate::utils::metadata::site_metadata(config));
+    }
     context.insert("site_name", &config.site_name);
     context.insert("favicon_path", &config.favicon_path);
     Ok(Template::render("sections", context.into_json()))

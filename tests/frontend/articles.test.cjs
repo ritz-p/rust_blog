@@ -7,7 +7,6 @@ const base = process.env.STATIC_SITE_URL;
 test('confirmation articles preserve code and display conditions through nginx', { skip: !base && 'Set STATIC_SITE_URL to check the exported fixtures' }, async () => {
   for (const number of [31, 33, 34, 35, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50]) {
     const response = await fetch(new URL(`/posts/${number}/`, base));
-    if (number === 37) { assert.equal(response.status, 404); continue; }
     assert.equal(response.status, 200, `article ${number}`);
     const dom = new JSDOM(await response.text());
     try {

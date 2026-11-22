@@ -113,9 +113,12 @@ mod tests {
             .manage(db)
             .manage(RedirectMap::parse(map).unwrap())
             .manage(rust_blog::adsense::AdSense::default())
+            .manage(rust_blog::sections::Navigation::default())
             .manage(crate::utils::config::CommonConfig {
                 articles_per_page: 10,
                 site_name: Some("Test Blog".into()),
+                description: None,
+                timezone: chrono_tz::UTC,
                 default_icatch_path: None,
                 favicon_path: None,
                 public_url: Some("https://example.com".into()),

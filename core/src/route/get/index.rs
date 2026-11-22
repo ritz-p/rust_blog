@@ -9,7 +9,7 @@ use crate::{
         query::{PagingQuery, index::IndexQuery},
     },
     repository::article::{ArticlePeriod, get_all_articles, get_article_periods, search_articles},
-    utils::{config::CommonConfig, cut_out_string, markdown::markdown_to_text, utc_to_jst},
+    utils::{config::CommonConfig, cut_out_string, format_datetime, markdown::markdown_to_text},
 };
 
 #[derive(Clone, Copy)]
@@ -128,14 +128,19 @@ async fn render_index(
     let (models, page_info) = if has_period_query && selected_period.is_none() {
         (Vec::new(), PageInfo::new(page.normalize(u64::MAX), 0))
     } else if !search_query.is_empty() {
-        let (models, info, total) =
-            search_articles(db.inner(), page, selected_period, search_query)
-                .await
-                .map_err(|_| Status::InternalServerError)?;
+        let (models, info, total) = search_articles(
+            db.inner(),
+            page,
+            selected_period,
+            search_query,
+            config.timezone,
+        )
+        .await
+        .map_err(|_| Status::InternalServerError)?;
         search_count = Some(total);
         (models, info)
     } else {
-        get_all_articles(db.inner(), page, selected_period)
+        get_all_articles(db.inner(), page, selected_period, config.timezone)
             .await
             .map_err(|_| Status::InternalServerError)?
     };
@@ -162,7 +167,7 @@ async fn render_index(
         String::new()
     };
     let default_icatch_path = config.default_icatch_path.clone().unwrap_or_default();
-    let periods = get_article_periods(db.inner(), None)
+    let periods = get_article_periods(db.inner(), config.timezone)
         .await
         .unwrap_or_default();
     let period_links: Vec<_> = periods
@@ -205,8 +210,8 @@ async fn render_index(
                 "title_highlights": title_highlights,
                 "excerpt_highlights": excerpt_highlights,
                 "icatch_path": icatch_path,
-                "created_at": utc_to_jst(m.created_at),
-                "updated_at": utc_to_jst(m.updated_at),
+                "created_at": format_datetime(m.created_at, config.timezone),
+                "updated_at": format_datetime(m.updated_at, config.timezone),
             })
         })
         .collect();
@@ -215,6 +220,8 @@ async fn render_index(
         "index",
         context! {
             active_tab: "all",
+            metadata: (matches!(mode, IndexUrlMode::Query) && !has_period_query && search_query.is_empty()
+                && query.page.unwrap_or(1) <= 1).then(|| crate::utils::metadata::site_metadata(config)),
             site_name: &config.site_name,
             feed_url: rust_blog::discovery::site_origin(config.public_url.as_deref()).ok().flatten().map(|_| "/feed.xml"),
             favicon_path: &config.favicon_path,
@@ -280,6 +287,8 @@ mod tests {
                 .manage(CommonConfig {
                     articles_per_page: per,
                     site_name: Some("Test Blog".to_string()),
+                    description: Some("Example blog".into()),
+                    timezone: chrono_tz::Asia::Tokyo,
                     default_icatch_path: Some("/default.png".to_string()),
                     favicon_path: Some("/favicon.ico".to_string()),
                     public_url: None,
@@ -300,6 +309,22 @@ mod tests {
         Client::tracked(rocket)
             .await
             .expect("failed to build client")
+    }
+
+    #[rocket::async_test]
+    async fn home_has_share_metadata_in_the_response_head() {
+        let client = client_with_db(prepare_index_db().await).await;
+        let html = client
+            .get("/")
+            .dispatch()
+            .await
+            .into_string()
+            .await
+            .unwrap();
+        let (head, _) = html.split_once("</head>").unwrap();
+        assert!(head.contains(r#"property="og:type" content="website""#));
+        assert!(head.contains(r#"property="og:description" content="Example blog""#));
+        assert!(!head.contains(r#"name="twitter:card""#));
     }
 
     async fn prepare_index_db() -> DatabaseConnection {
@@ -346,7 +371,9 @@ mod tests {
             assert_eq!(response.status(), Status::Ok);
             let body = response.into_string().await.unwrap();
             let html = html_escape::decode_html_entities(&body);
-            assert!(html.contains(r#"href="/about">About</a>"#));
+            let (page, footer) = html.split_once(r#"<footer class="footer">"#).unwrap();
+            assert!(!page.contains(r#"class="navbar-item" href="/about""#));
+            assert!(footer.contains(r#"href="/about">About</a>"#));
             assert!(html.contains("href=\"/posts/dec-1\""));
             assert!(!html.contains("href=\"/posts/dec-2\""));
             assert!(html.contains(&format!("href=\"{base}?year=2025&month=12&page=1\"")));
