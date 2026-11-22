@@ -7,7 +7,6 @@
 {% block content %}
 <h1 class="title">Category: {{ category_slug }}</h1>
 
-<div data-static-listing{% if static_listings %} data-per="{{ listing_per }}" data-taxonomy="category"{% endif %}>
 {% if static_listings or (articles and articles | length > 0) %}
   <div class="mb-4">
     並び順:
@@ -18,6 +17,9 @@
       更新日順
     </a>
   </div>
+{% endif %}
+<div data-static-listing{% if static_listings %} data-per="{{ listing_per }}" data-taxonomy="category"{% endif %}>
+{% if articles and articles | length > 0 %}
   <div class="article-list">
     {% for article in articles %}
     {% include "partial/article_card" %}
