@@ -8,7 +8,7 @@
   {% if feed_url is defined and feed_url %}<link rel="alternate" type="application/atom+xml" title="Atom feed" href="{{ feed_url }}">{% endif %}
   {% include "partial/share_metadata" %}
   <link rel="stylesheet" href="/css/bulma.min.css">
-  <link rel="stylesheet" href="/css/site.css?v=link-cards-1">
+  <link rel="stylesheet" href="/css/site.css?v=footer-links-1">
   <link rel="shortcut icon" href= "{{ favicon_path }}" >
   {% endblock head %}
 </head>
@@ -30,7 +30,6 @@
         <div class="navbar-start">
           <a class="navbar-item" href="{% if tags_url %}{{ tags_url }}{% else %}/tags{% endif %}">Tags</a>
           <a class="navbar-item" href="{% if categories_url %}{{ categories_url }}{% else %}/categories{% endif %}">Categories</a>
-          <a class="navbar-item" href="{% if about_url %}{{ about_url }}{% else %}/about{% endif %}">About</a>
         </div>
       </div>
     </div>
@@ -41,8 +40,9 @@
     </div>
   </section>
   <footer class="footer">
-    <div class="content has-text-centered">
-      <p>© {{ year | default(value=2025) }} {{ site_name }} </p>
+    <div class="footer-links">
+      <span>© {{ year | default(value=2025) }} {{ site_name }}</span>
+      <a href="{% if about_url %}{{ about_url }}{% else %}/about{% endif %}">About</a>
     </div>
   </footer>
   {% block scripts %}

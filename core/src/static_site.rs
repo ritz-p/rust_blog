@@ -1534,7 +1534,7 @@ mod tests {
         );
         assert!(html.contains("property=\"og:title\" content=\"Highlighted Rust\""));
         assert!(html.contains("href=\"/posts/highlighted-rust/\""));
-        assert!(html.contains("href=\"/css/site.css?v=link-cards-1\""));
+        assert!(html.contains("href=\"/css/site.css?v=footer-links-1\""));
         let content = html
             .split("<div class=\"content is-medium\">")
             .nth(1)
@@ -1707,6 +1707,8 @@ mod home_navigation_tests {
             ] {
                 assert!(home_html.contains(tag), "{home}: {tag}");
             }
+            let (_, footer) = home_html.split_once(r#"<footer class="footer">"#).unwrap();
+            assert!(footer.contains(r#"href="/about/">About</a>"#));
             let article = html("posts/article-1/index.html");
             assert!(article.contains(r#"property="og:type" content="article""#));
             assert!(article.contains(r#"name="twitter:card" content="summary_large_image""#));

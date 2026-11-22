@@ -494,6 +494,7 @@ pub async fn export(
                 let mut context = listing.context(db, number, period).await?;
                 context.insert("site_name", &config.site_name);
                 context.insert("static_listings", &true);
+                context.insert("about_url", "/about/");
                 context.insert("listing_per", &config.articles_per_page);
                 context.insert(
                     "listing_period",
