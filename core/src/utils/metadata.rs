@@ -129,6 +129,7 @@ mod tests {
             articles_per_page: 10,
             site_name: None,
             description: None,
+            timezone: chrono_tz::UTC,
             default_icatch_path: Some("/image/default.png".into()),
             favicon_path: None,
             public_url: Some("https://example.com/".into()),

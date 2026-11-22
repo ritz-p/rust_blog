@@ -9,7 +9,7 @@ use crate::{
         query::{PagingQuery, index::IndexQuery},
     },
     repository::article::{ArticlePeriod, get_all_articles, get_article_periods, search_articles},
-    utils::{config::CommonConfig, cut_out_string, markdown::markdown_to_text, utc_to_jst},
+    utils::{config::CommonConfig, cut_out_string, format_datetime, markdown::markdown_to_text},
 };
 
 #[derive(Clone, Copy)]
@@ -128,14 +128,19 @@ async fn render_index(
     let (models, page_info) = if has_period_query && selected_period.is_none() {
         (Vec::new(), PageInfo::new(page.normalize(u64::MAX), 0))
     } else if !search_query.is_empty() {
-        let (models, info, total) =
-            search_articles(db.inner(), page, selected_period, search_query)
-                .await
-                .map_err(|_| Status::InternalServerError)?;
+        let (models, info, total) = search_articles(
+            db.inner(),
+            page,
+            selected_period,
+            search_query,
+            config.timezone,
+        )
+        .await
+        .map_err(|_| Status::InternalServerError)?;
         search_count = Some(total);
         (models, info)
     } else {
-        get_all_articles(db.inner(), page, selected_period)
+        get_all_articles(db.inner(), page, selected_period, config.timezone)
             .await
             .map_err(|_| Status::InternalServerError)?
     };
@@ -162,7 +167,7 @@ async fn render_index(
         String::new()
     };
     let default_icatch_path = config.default_icatch_path.clone().unwrap_or_default();
-    let periods = get_article_periods(db.inner(), None)
+    let periods = get_article_periods(db.inner(), config.timezone)
         .await
         .unwrap_or_default();
     let period_links: Vec<_> = periods
@@ -205,8 +210,8 @@ async fn render_index(
                 "title_highlights": title_highlights,
                 "excerpt_highlights": excerpt_highlights,
                 "icatch_path": icatch_path,
-                "created_at": utc_to_jst(m.created_at),
-                "updated_at": utc_to_jst(m.updated_at),
+                "created_at": format_datetime(m.created_at, config.timezone),
+                "updated_at": format_datetime(m.updated_at, config.timezone),
             })
         })
         .collect();
@@ -283,6 +288,7 @@ mod tests {
                     articles_per_page: per,
                     site_name: Some("Test Blog".to_string()),
                     description: Some("Example blog".into()),
+                    timezone: chrono_tz::Asia::Tokyo,
                     default_icatch_path: Some("/default.png".to_string()),
                     favicon_path: Some("/favicon.ico".to_string()),
                     public_url: None,

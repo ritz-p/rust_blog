@@ -1,6 +1,6 @@
 use rocket::{State, futures::TryFutureExt, http::Status};
 use rocket_dyn_templates::{Template, context};
-use rust_blog::utils::utc_to_jst;
+use rust_blog::utils::format_datetime;
 use sea_orm::DatabaseConnection;
 use serde_json::json;
 
@@ -67,8 +67,8 @@ pub async fn fixed_content_detail(
             title: fixed_content.title,
             excerpt: excerpt,
             content_html: content,
-            created_at: utc_to_jst(fixed_content.created_at),
-            updated_at: utc_to_jst(fixed_content.updated_at),
+            created_at: format_datetime(fixed_content.created_at, config.timezone),
+            updated_at: format_datetime(fixed_content.updated_at, config.timezone),
             latest_articles: latest_articles,
         },
     ))

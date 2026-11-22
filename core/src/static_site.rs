@@ -27,9 +27,8 @@ use crate::{
     },
     utils::{
         config::CommonConfig,
-        cut_out_string,
+        cut_out_string, format_datetime,
         markdown::{markdown_to_html, markdown_to_text, toc},
-        utc_to_jst,
     },
 };
 
@@ -51,6 +50,7 @@ pub async fn export_site(
     out_dir: impl AsRef<Path>,
     paths: &ExportPaths,
 ) -> Result<()> {
+    let timezone = crate::utils::config::timezone(config_map)?;
     let export_started = Utc::now();
     let out_dir = out_dir.as_ref();
     validate_content_slugs(db).await?;
@@ -86,6 +86,7 @@ pub async fn export_site(
         articles_per_page: crate::utils::config::articles_per_page(config_map),
         site_name: config_map.get("site_name").cloned(),
         description: config_map.get("description").cloned(),
+        timezone,
         default_icatch_path: config_map.get("default_icatch_path").cloned(),
         favicon_path: config_map.get("favicon_path").cloned(),
         public_url: config_map.get("public_url").cloned(),
@@ -214,7 +215,7 @@ async fn export_search_index(
     articles.sort_by_key(|article| std::cmp::Reverse((article.created_at, article.id)));
     let mut records = Vec::with_capacity(articles.len());
     for article in &articles {
-        let date = article.created_at.with_timezone(&chrono_tz::Asia::Tokyo);
+        let date = article.created_at.with_timezone(&config.timezone);
         let tags: Vec<_> = get_tags_by_article(db, article)
             .await?
             .into_iter()
@@ -233,8 +234,8 @@ async fn export_search_index(
             "text": crate::utils::search::article_text(article),
             "body": markdown_to_text(&article.content),
             "icatch_path": article.icatch_path.as_ref().or(config.default_icatch_path.as_ref()),
-            "created_at": utc_to_jst(article.created_at),
-            "updated_at": utc_to_jst(article.updated_at),
+            "created_at": format_datetime(article.created_at, config.timezone),
+            "updated_at": format_datetime(article.updated_at, config.timezone),
             "year": date.year(),
             "month": date.month(),
         }));
@@ -265,7 +266,7 @@ async fn export_index_pages(
     out_dir: &Path,
     all_index_url: &str,
 ) -> Result<()> {
-    let periods = get_article_periods(db, None).await?;
+    let periods = get_article_periods(db, config.timezone).await?;
     export_index_variant(tera, db, config, out_dir, None, &periods, all_index_url).await?;
     for period in &periods {
         export_index_variant(
@@ -298,6 +299,7 @@ async fn export_index_variant(
             per: config.articles_per_page,
         },
         period,
+        config.timezone,
     )
     .await?;
 
@@ -306,7 +308,7 @@ async fn export_index_variant(
             number: page_number,
             per: config.articles_per_page,
         };
-        let (models, page_info) = get_all_articles(db, page, period).await?;
+        let (models, page_info) = get_all_articles(db, page, period, config.timezone).await?;
         let default_icatch_path = config.default_icatch_path.clone().unwrap_or_default();
         let period_links: Vec<_> = all_periods
             .iter()
@@ -335,8 +337,8 @@ async fn export_index_variant(
                     "url": static_article_url(&m.slug),
                     "excerpt": excerpt,
                     "icatch_path": icatch_path,
-                    "created_at": utc_to_jst(m.created_at),
-                    "updated_at": utc_to_jst(m.updated_at),
+                    "created_at": format_datetime(m.created_at, config.timezone),
+                    "updated_at": format_datetime(m.updated_at, config.timezone),
                 })
             })
             .collect();
@@ -461,8 +463,14 @@ async fn export_article_pages(
         };
         ctx.insert("content_html", &content);
         ctx.insert("deprecated", &article.deprecated);
-        ctx.insert("created_at", &utc_to_jst(article.created_at));
-        ctx.insert("updated_at", &utc_to_jst(article.updated_at));
+        ctx.insert(
+            "created_at",
+            &format_datetime(article.created_at, config.timezone),
+        );
+        ctx.insert(
+            "updated_at",
+            &format_datetime(article.updated_at, config.timezone),
+        );
         ctx.insert("tags", &tags);
         ctx.insert("categories", &categories);
         ctx.insert("latest_articles", &latest_articles);
@@ -496,8 +504,14 @@ async fn export_fixed_content_pages(
         ctx.insert("title", &fixed_content.title);
         ctx.insert("excerpt", &excerpt);
         ctx.insert("content_html", &markdown_to_html(&fixed_content.content));
-        ctx.insert("created_at", &utc_to_jst(fixed_content.created_at));
-        ctx.insert("updated_at", &utc_to_jst(fixed_content.updated_at));
+        ctx.insert(
+            "created_at",
+            &format_datetime(fixed_content.created_at, config.timezone),
+        );
+        ctx.insert(
+            "updated_at",
+            &format_datetime(fixed_content.updated_at, config.timezone),
+        );
         ctx.insert("latest_articles", &latest_articles);
 
         render_to_path(
@@ -592,8 +606,8 @@ async fn export_tag_variant(
                     "url": static_article_url(&slug),
                     "icatch_path": icatch_path,
                     "excerpt": excerpt,
-                    "created_at": utc_to_jst(article.created_at),
-                    "updated_at": utc_to_jst(article.updated_at),
+                    "created_at": format_datetime(article.created_at, config.timezone),
+                    "updated_at": format_datetime(article.updated_at, config.timezone),
                 })
             })
             .collect();
@@ -725,8 +739,8 @@ async fn export_category_variant(
                     "url": static_article_url(&slug),
                     "icatch_path": icatch_path,
                     "excerpt": excerpt,
-                    "created_at": utc_to_jst(article.created_at),
-                    "updated_at": utc_to_jst(article.updated_at),
+                    "created_at": format_datetime(article.created_at, config.timezone),
+                    "updated_at": format_datetime(article.updated_at, config.timezone),
                 })
             })
             .collect();
@@ -820,7 +834,7 @@ fn base_context(config: &CommonConfig) -> Context {
     );
     ctx.insert("listing_per", &config.articles_per_page);
     ctx.insert("favicon_path", &config.favicon_path);
-    ctx.insert("year", &Utc::now().year());
+    ctx.insert("year", &Utc::now().with_timezone(&config.timezone).year());
     ctx.insert("tags_url", "/tags/");
     ctx.insert("categories_url", "/categories/");
     ctx.insert("about_url", "/about/");
@@ -1334,6 +1348,7 @@ mod tests {
             articles_per_page: 10,
             site_name: None,
             description: None,
+            timezone: chrono_tz::UTC,
             default_icatch_path: None,
             favicon_path: None,
             public_url: Some("https://example.com".into()),
@@ -1345,8 +1360,8 @@ mod tests {
             serde_json::from_slice(&fs::read(root.join("search-index.json")).unwrap()).unwrap();
         assert_eq!(data.as_array().unwrap().len(), 2);
         assert_eq!(data[1]["url"], "/posts/%E6%97%A5%E6%9C%AC%E8%AA%9E%201/");
-        assert_eq!(data[1]["year"], 2026);
-        assert_eq!(data[1]["month"], 1);
+        assert_eq!(data[1]["year"], 2025);
+        assert_eq!(data[1]["month"], 12);
         assert!(
             data[1]["text"]
                 .as_str()
@@ -1511,6 +1526,7 @@ mod tests {
             articles_per_page: 10,
             site_name: Some("Test Blog".to_owned()),
             description: None,
+            timezone: chrono_tz::UTC,
             default_icatch_path: None,
             favicon_path: None,
             public_url: Some("https://example.com".into()),

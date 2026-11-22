@@ -1,4 +1,4 @@
-use chrono::{DateTime, FixedOffset, Utc};
+use chrono::{DateTime, Utc};
 
 pub mod config;
 pub mod fixed_content_matter;
@@ -25,10 +25,8 @@ pub fn cut_out_string(base: &str, limit: usize) -> String {
     base.chars().take(l).collect()
 }
 
-pub fn utc_to_jst(utc: DateTime<Utc>) -> String {
-    let jst_offset =
-        FixedOffset::east_opt(9 * 3600).unwrap_or_else(|| FixedOffset::east_opt(0).unwrap());
-    utc.with_timezone(&jst_offset)
+pub fn format_datetime(utc: DateTime<Utc>, timezone: chrono_tz::Tz) -> String {
+    utc.with_timezone(&timezone)
         .format("%Y-%m-%d %H:%M:%S")
         .to_string()
 }
@@ -53,10 +51,10 @@ mod tests {
     }
 
     #[test]
-    fn test_utc_to_jst_format() {
+    fn test_format_datetime_uses_timezone() {
         use chrono::{TimeZone, Utc};
         let utc_time = Utc.with_ymd_and_hms(2025, 1, 1, 0, 0, 0);
-        let jst_string = utc_to_jst(utc_time.unwrap());
+        let jst_string = format_datetime(utc_time.unwrap(), chrono_tz::Asia::Tokyo);
         assert!(
             jst_string.starts_with("2025-01-01 09:00:00"),
             "JST time should be 9 hours ahead of UTC"

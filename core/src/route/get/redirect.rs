@@ -118,6 +118,7 @@ mod tests {
                 articles_per_page: 10,
                 site_name: Some("Test Blog".into()),
                 description: None,
+                timezone: chrono_tz::UTC,
                 default_icatch_path: None,
                 favicon_path: None,
                 public_url: Some("https://example.com".into()),

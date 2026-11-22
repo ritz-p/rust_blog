@@ -15,10 +15,19 @@ pub async fn seed_article(
     front_matter: &FrontMatter,
     body: &str,
 ) -> Result<i32, anyhow::Error> {
+    seed_article_in_timezone(db, front_matter, body, chrono_tz::UTC).await
+}
+
+pub(super) async fn seed_article_in_timezone(
+    db: &impl ConnectionTrait,
+    front_matter: &FrontMatter,
+    body: &str,
+    timezone: chrono_tz::Tz,
+) -> Result<i32, anyhow::Error> {
     crate::slug::validate(&front_matter.slug, 100)?;
     validate(front_matter, body)?;
     crate::slug::validate_database_collision(db, "article", &front_matter.slug).await?;
-    let active_model: ActiveModel = prepare(db, front_matter, body).await?;
+    let active_model: ActiveModel = prepare(db, front_matter, body, timezone).await?;
     let article_id = upsert(db, active_model).await?;
     Ok(article_id)
 }

@@ -6,7 +6,7 @@ Set an article's `created_at` (or `date`) to its publication time:
 created_at: "2026-10-01T09:00:00+09:00"
 ```
 
-RFC3339 offsets are respected. A datetime without an offset is interpreted as JST; a date alone means midnight JST. Static export requires an explicit article date.
+RFC3339 offsets are respected. A datetime without an offset uses `[common].timezone` (UTC by default), and a date alone means midnight in that timezone. Specify an explicit offset for local times repeated or skipped during a timezone transition. Static export requires an explicit article date.
 
 Export writes the article page and search data even before the publication time. Anyone with the article URL can read it after deployment. Opening or reloading a page with JavaScript at or after the scheduled time includes the article in lists, search and sidebar links using the browser clock. Without JavaScript, the lists show the export-time snapshot. Atom and the sitemap reflect the next export after the publication time.
 

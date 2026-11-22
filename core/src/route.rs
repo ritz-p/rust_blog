@@ -81,6 +81,7 @@ pub async fn launch(
             articles_per_page: crate::utils::config::articles_per_page(&config_map),
             site_name: config_map.get("site_name").cloned(),
             description: config_map.get("description").cloned(),
+            timezone: crate::utils::config::timezone(&config_map)?,
             default_icatch_path: config_map.get("default_icatch_path").cloned(),
             favicon_path: config_map.get("favicon_path").cloned(),
             public_url: config_map.get("public_url").cloned(),

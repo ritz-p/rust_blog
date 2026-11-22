@@ -80,9 +80,9 @@ fn validate_slug(slug: &str) -> Result<()> {
     rust_blog::slug::validate(slug, 100)
 }
 
-fn validate_created_at(created_at: Option<&str>) -> Result<()> {
+fn validate_created_at(created_at: Option<&str>, timezone: chrono_tz::Tz) -> Result<()> {
     if let Some(value) = created_at {
-        seed::parse_created_at(value)?;
+        seed::parse_created_at(value, timezone)?;
     }
     Ok(())
 }
@@ -135,7 +135,7 @@ fn validate_field<T: serde::de::DeserializeOwned>(
     validate(value).with_context(|| field.to_string())
 }
 
-fn validate(source: &Mapping) -> Result<()> {
+fn validate(source: &Mapping, timezone: chrono_tz::Tz) -> Result<()> {
     let mut errors = Vec::new();
     for key in source.keys() {
         if !key
@@ -173,7 +173,7 @@ fn validate(source: &Mapping) -> Result<()> {
             source,
             date_field,
             Some(Value::Null),
-            |value: Option<String>| validate_created_at(value.as_deref()),
+            |value: Option<String>| validate_created_at(value.as_deref(), timezone),
         ),
         validate_field(
             source,
@@ -333,6 +333,7 @@ fn process_with_writer(
     mut write: impl FnMut(&std::path::Path, &str) -> std::io::Result<()>,
 ) -> Result<()> {
     let mut errors = Vec::new();
+    let timezone = rust_blog::utils::config::timezone(&rust_blog::utils::config::load_config())?;
     let paths = collect_paths(roots, &mut errors);
     let mut groups: HashMap<String, Vec<PathBuf>> = HashMap::new();
     let mut prepared = Vec::new();
@@ -350,7 +351,7 @@ fn process_with_writer(
                     .or_default()
                     .push(path.clone());
             }
-            validate(&document.matter).context("validate")?;
+            validate(&document.matter, timezone).context("validate")?;
             let formatted = render(&document, &format(&document.matter)).context("format")?;
             Ok((text, formatted))
         })();
@@ -463,7 +464,7 @@ mod tests {
             "slug: ''\ntags: false\ncategories: []\ncreated_at: yesterday\nextra: true\n",
         )
         .unwrap();
-        let error = validate(&source).unwrap_err().to_string();
+        let error = validate(&source, chrono_tz::UTC).unwrap_err().to_string();
         for field in ["title", "slug", "tags", "created_at", "extra"] {
             assert!(error.contains(field), "{error}");
         }
@@ -544,7 +545,7 @@ mod tests {
 
     fn checked_format(text: &str) -> Result<String> {
         let document = parse(text)?;
-        validate(&document.matter)?;
+        validate(&document.matter, chrono_tz::UTC)?;
         render(&document, &format(&document.matter))
     }
 
@@ -616,7 +617,7 @@ mod tests {
     fn format_only_reorders_without_validation_or_renaming() {
         let source: Mapping =
             serde_yaml::from_str("date: invalid\nslug: ''\ntitle: ''\ncustom: keep\n").unwrap();
-        assert!(validate(&source).is_err());
+        assert!(validate(&source, chrono_tz::UTC).is_err());
         let ordered = format(&source);
         assert_eq!(ordered.len(), source.len());
         for (key, value) in &source {
@@ -639,9 +640,9 @@ mod tests {
         assert!(validate_excerpt(Some(&"a".repeat(101))).is_err());
         assert!(validate_icatch_path(None).is_ok());
         assert!(validate_icatch_path(Some(&"a".repeat(201))).is_err());
-        assert!(validate_created_at(None).is_ok());
-        assert!(validate_created_at(Some("2026-01-01")).is_ok());
-        assert!(validate_created_at(Some("2026-02-30")).is_err());
+        assert!(validate_created_at(None, chrono_tz::UTC).is_ok());
+        assert!(validate_created_at(Some("2026-01-01"), chrono_tz::UTC).is_ok());
+        assert!(validate_created_at(Some("2026-02-30"), chrono_tz::UTC).is_err());
         assert!(validate_tags(&[]).is_ok());
         assert!(validate_tags(&[" ".into()]).is_err());
         assert!(validate_categories(&["a".repeat(51)]).is_err());

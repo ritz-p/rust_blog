@@ -9,6 +9,8 @@ pub struct CommonConfig {
     pub description: Option<String>,
     pub default_icatch_path: Option<String>,
     pub favicon_path: Option<String>,
+    #[serde(default)]
+    pub timezone: chrono_tz::Tz,
     pub public_url: Option<String>,
 }
 
@@ -111,8 +113,29 @@ fn load_config_from_path(toml_path: &str) -> HashMap<String, String> {
     with_defaults(map)
 }
 
+pub fn timezone(map: &HashMap<String, String>) -> Result<chrono_tz::Tz> {
+    let name = map.get("timezone").map(String::as_str).unwrap_or("UTC");
+    name.parse().map_err(|_| {
+        anyhow::anyhow!(
+            "invalid [common].timezone {name:?}; use an IANA timezone such as UTC or Asia/Tokyo"
+        )
+    })
+}
+
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn timezone_defaults_to_utc_and_validates_iana_names() {
+        use std::collections::HashMap;
+        assert_eq!(super::timezone(&HashMap::new()).unwrap(), chrono_tz::UTC);
+        let settings = |name: &str| HashMap::from([("timezone".into(), name.into())]);
+        assert_eq!(
+            super::timezone(&settings("America/New_York")).unwrap(),
+            chrono_tz::America::New_York
+        );
+        assert!(super::timezone(&settings("invalid")).is_err());
+    }
+
     #[test]
     fn page_size_accepts_integer_and_defaults_for_missing_or_invalid_values() {
         for (setting, expected) in [
