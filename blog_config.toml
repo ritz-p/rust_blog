@@ -1,4 +1,5 @@
 [common]
+# description = "ブログの紹介文"
 articles_per_page = 20
 "site_name" = "Ritz のブログ"
 "default_icatch_path" = "/image/rustacean-orig-noshadow.png"

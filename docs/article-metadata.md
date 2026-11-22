@@ -6,6 +6,18 @@ Article pages include a plain-text description (excerpt, or the first 160 charac
 
 Server URLs use `/posts/slug`; static URLs use `/posts/slug/`. Slugs are URL encoded and metadata is HTML escaped. Re-export after changing configuration.
 
+## ブログトップの共有
+
+```toml
+[common]
+site_name = "Ritz のブログ"
+description = "Rust と Web 開発についてのブログ"
+public_url = "https://blog.example.com"
+default_icatch_path = "/image/cover.png"
+```
+
+トップは `og:type=website` とサイト共通の画像を使います。記事は `og:type=article` と記事ごとの画像を使い、省略時はサイト共通の画像を使います。画像 URL を出力するときは X 向けに `twitter:card=summary_large_image` も出力します。相対画像 URL は `public_url` から絶対 URL に解決します。
+
 ## 記事本文のリンクカード
 
 記事の段落に URL を1つだけ書くと、リンク先のタイトルとドメインが表示されます。箇条書きでも同じ書き方が使えます。

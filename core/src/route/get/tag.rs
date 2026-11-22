@@ -142,6 +142,7 @@ mod tests {
                 .manage(CommonConfig {
                     articles_per_page: 10,
                     site_name: Some("Test Blog".to_string()),
+                    description: None,
                     default_icatch_path: Some("/default.png".to_string()),
                     favicon_path: Some("/favicon.ico".to_string()),
                     public_url: None,

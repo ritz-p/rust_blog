@@ -85,6 +85,7 @@ pub async fn export_site(
     let config = CommonConfig {
         articles_per_page: crate::utils::config::articles_per_page(config_map),
         site_name: config_map.get("site_name").cloned(),
+        description: config_map.get("description").cloned(),
         default_icatch_path: config_map.get("default_icatch_path").cloned(),
         favicon_path: config_map.get("favicon_path").cloned(),
         public_url: config_map.get("public_url").cloned(),
@@ -116,6 +117,7 @@ pub async fn export_site(
     export_category_pages(&tera, db, &config, out_dir).await?;
     export_error_page(&tera, &config, out_dir, "404", "404.html")?;
     crate::sections::export(&tera, db, &navigation, &config, out_dir).await?;
+    add_home_metadata(&tera, &config, &out_dir.join("index.html"))?;
     write_cloudflare_support_files(out_dir, has_ads)?;
     if !redirects.articles.is_empty() || !redirects.pages.is_empty() {
         redirects.write_static(db, out_dir).await?;
@@ -825,6 +827,23 @@ fn base_context(config: &CommonConfig) -> Context {
     ctx
 }
 
+fn add_home_metadata(tera: &Tera, config: &CommonConfig, path: &Path) -> Result<()> {
+    use lol_html::{RewriteStrSettings, element, html_content::ContentType, rewrite_str};
+    let mut ctx = base_context(config);
+    ctx.insert("metadata", &crate::utils::metadata::site_metadata(config));
+    let tags = tera.render("partial/share_metadata", &ctx)?;
+    let html = fs::read_to_string(path)?;
+    let html = rewrite_str(
+        &html,
+        RewriteStrSettings::new().append_element_content_handler(element!("head", |head| {
+            head.append(&tags, ContentType::Html);
+            Ok(())
+        })),
+    )?;
+    fs::write(path, html)?;
+    Ok(())
+}
+
 fn render_to_path(tera: &Tera, template: &str, ctx: &Context, output: &Path) -> Result<()> {
     let rendered = tera
         .render(template, ctx)
@@ -1314,6 +1333,7 @@ mod tests {
         let config = crate::utils::config::CommonConfig {
             articles_per_page: 10,
             site_name: None,
+            description: None,
             default_icatch_path: None,
             favicon_path: None,
             public_url: Some("https://example.com".into()),
@@ -1490,6 +1510,7 @@ mod tests {
         let config = CommonConfig {
             articles_per_page: 10,
             site_name: Some("Test Blog".to_owned()),
+            description: None,
             default_icatch_path: None,
             favicon_path: None,
             public_url: Some("https://example.com".into()),
@@ -1663,6 +1684,10 @@ mod home_navigation_tests {
             );
             let config = HashMap::from([
                 ("articles_per_page".into(), "1".into()),
+                ("public_url".into(), "https://example.com".into()),
+                ("site_name".into(), "Fixture blog".into()),
+                ("description".into(), "About the blog".into()),
+                ("default_icatch_path".into(), "/image/share.png".into()),
                 ("navigation".into(), navigation),
             ]);
             export_site(&db, &config, &out, &paths).await.unwrap();
@@ -1670,6 +1695,21 @@ mod home_navigation_tests {
                 html_escape::decode_html_entities(&fs::read_to_string(out.join(path)).unwrap())
                     .into_owned()
             };
+            let home_html = html("index.html");
+            for tag in [
+                r#"property="og:type" content="website""#,
+                r#"property="og:title" content="Fixture blog""#,
+                r#"property="og:site_name" content="Fixture blog""#,
+                r#"property="og:description" content="About the blog""#,
+                r#"property="og:url" content="https://example.com/""#,
+                r#"property="og:image" content="https://example.com/image/share.png""#,
+                r#"name="twitter:card" content="summary_large_image""#,
+            ] {
+                assert!(home_html.contains(tag), "{home}: {tag}");
+            }
+            let article = html("posts/article-1/index.html");
+            assert!(article.contains(r#"property="og:type" content="article""#));
+            assert!(article.contains(r#"name="twitter:card" content="summary_large_image""#));
             let page = html("page/2/index.html");
             for link in [
                 format!("class=\"pagination-previous\" href=\"{first_url}\""),

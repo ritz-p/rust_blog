@@ -5,9 +5,11 @@ use crate::{
 use serde::Serialize;
 
 #[derive(Serialize)]
-pub struct ArticleMetadata {
+pub struct PageMetadata {
+    pub kind: &'static str,
+    pub site_name: String,
     pub title: String,
-    pub description: String,
+    pub description: Option<String>,
     pub url: Option<String>,
     pub image: Option<String>,
 }
@@ -16,12 +18,8 @@ pub fn article_metadata(
     article: &article::Model,
     config: &CommonConfig,
     is_static: bool,
-) -> ArticleMetadata {
-    let base = config
-        .public_url
-        .as_deref()
-        .map(str::trim)
-        .filter(|url| url.starts_with("https://") || url.starts_with("http://"));
+) -> PageMetadata {
+    let origin = site_origin(config);
     let description = markdown_to_text(
         article
             .excerpt
@@ -33,35 +31,77 @@ pub fn article_metadata(
     let image = article
         .icatch_path
         .as_deref()
-        .filter(|s| !s.is_empty())
-        .or(config.default_icatch_path.as_deref())
-        .filter(|s| !s.is_empty())
-        .and_then(|path| {
-            if path.starts_with("https://") || path.starts_with("http://") {
-                Some(path.to_owned())
-            } else {
-                base.map(|base| {
-                    format!(
-                        "{}/{}",
-                        base.trim_end_matches('/'),
-                        path.trim_start_matches('/')
-                    )
-                })
-            }
-        });
-    ArticleMetadata {
+        .and_then(|path| image_url(path, origin.as_ref()))
+        .or_else(|| default_image(config, origin.as_ref()));
+    PageMetadata {
+        kind: "article",
+        site_name: site_name(config).to_owned(),
         title: article.title.clone(),
-        description: cut_out_string(&description, 160),
-        url: base.map(|base| {
+        description: Some(cut_out_string(&description, 160)),
+        url: origin.map(|base| {
             format!(
                 "{}/posts/{}{}",
-                base.trim_end_matches('/'),
+                base.as_str().trim_end_matches('/'),
                 url_segment(&article.slug),
                 if is_static { "/" } else { "" }
             )
         }),
         image,
     }
+}
+
+pub fn site_metadata(config: &CommonConfig) -> PageMetadata {
+    let origin = site_origin(config);
+    PageMetadata {
+        kind: "website",
+        title: site_name(config).to_owned(),
+        site_name: site_name(config).to_owned(),
+        description: config
+            .description
+            .as_deref()
+            .map(str::trim)
+            .filter(|description| !description.is_empty())
+            .map(str::to_owned),
+        image: default_image(config, origin.as_ref()),
+        url: origin.map(|url| url.to_string()),
+    }
+}
+
+fn site_name(config: &CommonConfig) -> &str {
+    config
+        .site_name
+        .as_deref()
+        .map(str::trim)
+        .filter(|name| !name.is_empty())
+        .unwrap_or("My Blog")
+}
+
+fn site_origin(config: &CommonConfig) -> Option<url::Url> {
+    crate::discovery::site_origin(config.public_url.as_deref())
+        .ok()
+        .flatten()
+        .and_then(|origin| url::Url::parse(&origin).ok())
+}
+
+fn default_image(config: &CommonConfig, origin: Option<&url::Url>) -> Option<String> {
+    image_url(config.default_icatch_path.as_deref()?, origin)
+}
+
+fn image_url(path: &str, origin: Option<&url::Url>) -> Option<String> {
+    let path = path.trim();
+    if path.is_empty() {
+        return None;
+    }
+    let url = match origin {
+        Some(base) => base.join(path),
+        None => url::Url::parse(path),
+    }
+    .ok()?;
+    (matches!(url.scheme(), "http" | "https")
+        && url.host_str().is_some()
+        && url.username().is_empty()
+        && url.password().is_none())
+    .then(|| url.to_string())
 }
 
 #[cfg(test)]
@@ -88,6 +128,7 @@ mod tests {
         let mut config = CommonConfig {
             articles_per_page: 10,
             site_name: None,
+            description: None,
             default_icatch_path: Some("/image/default.png".into()),
             favicon_path: None,
             public_url: Some("https://example.com/".into()),
@@ -99,7 +140,7 @@ mod tests {
             }))
             .unwrap();
             let html = tera::Tera::one_off(
-                include_str!("../../../templates/partial/base.html.tera"),
+                include_str!("../../../templates/partial/share_metadata.html.tera"),
                 &context,
                 autoescape,
             )
@@ -107,7 +148,7 @@ mod tests {
             assert!(html.contains("A &quot;title&quot; &lt;&amp;&gt;"), "{html}");
             assert!(!html.contains("&amp;quot;"));
         }
-        assert_eq!(metadata.description, "Summary link");
+        assert_eq!(metadata.description.as_deref(), Some("Summary link"));
         assert_eq!(
             metadata.url.as_deref(),
             Some("https://example.com/posts/%E6%97%A5%E6%9C%AC%E8%AA%9E%20%231")
@@ -126,6 +167,7 @@ mod tests {
         assert_eq!(
             article_metadata(&article, &config, false)
                 .description
+                .unwrap()
                 .chars()
                 .count(),
             160

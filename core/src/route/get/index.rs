@@ -215,6 +215,8 @@ async fn render_index(
         "index",
         context! {
             active_tab: "all",
+            metadata: (matches!(mode, IndexUrlMode::Query) && !has_period_query && search_query.is_empty()
+                && query.page.unwrap_or(1) <= 1).then(|| crate::utils::metadata::site_metadata(config)),
             site_name: &config.site_name,
             feed_url: rust_blog::discovery::site_origin(config.public_url.as_deref()).ok().flatten().map(|_| "/feed.xml"),
             favicon_path: &config.favicon_path,
@@ -280,6 +282,7 @@ mod tests {
                 .manage(CommonConfig {
                     articles_per_page: per,
                     site_name: Some("Test Blog".to_string()),
+                    description: Some("Example blog".into()),
                     default_icatch_path: Some("/default.png".to_string()),
                     favicon_path: Some("/favicon.ico".to_string()),
                     public_url: None,
@@ -300,6 +303,22 @@ mod tests {
         Client::tracked(rocket)
             .await
             .expect("failed to build client")
+    }
+
+    #[rocket::async_test]
+    async fn home_has_share_metadata_in_the_response_head() {
+        let client = client_with_db(prepare_index_db().await).await;
+        let html = client
+            .get("/")
+            .dispatch()
+            .await
+            .into_string()
+            .await
+            .unwrap();
+        let (head, _) = html.split_once("</head>").unwrap();
+        assert!(head.contains(r#"property="og:type" content="website""#));
+        assert!(head.contains(r#"property="og:description" content="Example blog""#));
+        assert!(!head.contains(r#"name="twitter:card""#));
     }
 
     async fn prepare_index_db() -> DatabaseConnection {
