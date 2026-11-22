@@ -217,6 +217,7 @@ test('one static build reveals scheduled listings and search at the browser cloc
     { ...articles[0], url: '/posts/existing/', published_at: due - 1000 }
   ];
   const html = fixture.replace('<body>', `<body data-schedule-at="${due}">`)
+    .replace('data-static-search="true"', 'data-static-search="true" data-search-url="/search/" data-all-periods-url="/all/"')
     .replace('data-per="2"></div>', 'data-per="1"><a href="/posts/existing/">Existing</a></div>');
   const fetchIndex = async () => ({ ok: true, json: async () => records });
   for (const [now, expected] of [[due - 1, 'existing'], [due, 'scheduled']]) {
@@ -225,6 +226,10 @@ test('one static build reveals scheduled listings and search at the browser cloc
       const links = [...document.querySelectorAll('#index-results a[href^="/posts/"]')];
       assert.ok(links.length > 0);
       assert.ok(links.every(link => link.pathname === `/posts/${expected}/`));
+      if (now === due) {
+        const option = document.querySelector('[data-period-filter] option:last-child');
+        assert.equal(option.dataset.searchHref, '/search/?year=2026&month=09');
+      }
     }
   }
 });

@@ -169,7 +169,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       for (const period of periods) {
         const [year, month] = period.split('/');
         const option = element('option', '', period);
-        option.dataset.href = allPeriodsUrl + '?' + new URLSearchParams({year, month});
+        const periodQuery = new URLSearchParams({year, month});
+        option.dataset.href = allPeriodsUrl + '?' + periodQuery;
+        if (indexPage) option.dataset.searchHref = searchUrl + '?' + periodQuery;
         option.selected = validPeriod && year === String(Number(params.get('year') || results.dataset.year || pathYear)) &&
           Number(month) === Number(params.get('month') || results.dataset.month || pathMonth);
         filter.append(option);
