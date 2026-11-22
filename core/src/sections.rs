@@ -355,31 +355,39 @@ impl<'a> Listing<'a> {
         period: Option<ArticlePeriod>,
     ) -> Result<tera::Context> {
         use crate::entity::article;
+        use crate::repository::article::{articles_in_period, paginate};
         use sea_orm::{QueryFilter, QueryOrder, QuerySelect};
         let navigation = self.navigation;
         let section = self.section;
         let static_mode = self.static_mode;
-        let page = crate::domain::page::PageInfo::new(
-            crate::domain::page::Page {
-                number,
-                per: self.per,
-            },
-            self.total(period),
-        );
+        let requested = Page {
+            number,
+            per: self.per,
+        };
         let mut query = self.query.clone();
+        let mut ambiguous_period = None;
         if let Some(month) = period {
-            let filter = month
-                .sqlite_datetime_range_filter(self.timezone)
-                .ok_or_else(|| anyhow::anyhow!("invalid article period"))?;
-            query = query.filter(filter);
+            match month.sqlite_datetime_range_filter(self.timezone)? {
+                Some(filter) => query = query.filter(filter),
+                None => ambiguous_period = Some(month),
+            }
         }
-        let models = query
-            .order_by_desc(article::Column::CreatedAt)
-            .order_by_desc(article::Column::Id)
-            .limit(page.per)
-            .offset((page.current_page - 1) * page.per)
-            .all(db)
-            .await?;
+        let (models, page) = if let Some(month) = ambiguous_period {
+            paginate(
+                articles_in_period(db, query, month, self.timezone).await?,
+                requested,
+            )
+        } else {
+            let page = crate::domain::page::PageInfo::new(requested, self.total(period));
+            let models = query
+                .order_by_desc(article::Column::CreatedAt)
+                .order_by_desc(article::Column::Id)
+                .limit(page.per)
+                .offset((page.current_page - 1) * page.per)
+                .all(db)
+                .await?;
+            (models, page)
+        };
         let suffix = if static_mode { "/" } else { "" };
         let articles: Vec<_> = models.iter().map(|model| serde_json::json!({
             "title": model.title,

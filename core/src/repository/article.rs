@@ -1,7 +1,7 @@
 use crate::domain::page::{Page, PageInfo};
 use crate::entity::{article, category, tag};
 use crate::repository::SQLITE_MAX;
-use chrono::{DateTime, Datelike, NaiveDate, TimeZone, Utc};
+use chrono::{DateTime, Datelike, Days, LocalResult, NaiveDate, TimeZone, Utc};
 use chrono_tz::{GapInfo, Tz};
 use sea_orm::{
     ColumnTrait, Condition, DatabaseConnection, DbErr, EntityTrait, QueryFilter, QueryOrder,
@@ -9,8 +9,9 @@ use sea_orm::{
     prelude::*,
     sea_query::{Expr, SimpleExpr},
 };
+use std::collections::BTreeMap;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ArticlePeriod {
     pub year: i32,
     pub month: u32,
@@ -36,28 +37,112 @@ impl ArticlePeriod {
         Some((start_date, end_date))
     }
 
-    fn range(self, timezone: Tz) -> Option<(DateTime<Utc>, DateTime<Utc>)> {
-        let (start_date, end_date) = Self::range_bounds(self.year, self.month)?;
-        let boundary = |date: NaiveDate| {
-            let midnight = date.and_hms_opt(0, 0, 0)?;
-            timezone
-                .from_local_datetime(&midnight)
-                .earliest()
-                .or_else(|| GapInfo::new(&midnight, &timezone)?.end)
-                .map(|date| date.to_utc())
+    pub(crate) fn sqlite_datetime_range_filter(
+        self,
+        timezone: Tz,
+    ) -> Result<Option<SimpleExpr>, DbErr> {
+        let invalid = || DbErr::Custom("invalid article period".into());
+        let (start, end) = Self::range_bounds(self.year, self.month).ok_or_else(invalid)?;
+        let boundary = |date: NaiveDate| match timezone
+            .from_local_datetime(&date.and_time(chrono::NaiveTime::MIN))
+        {
+            LocalResult::Single(date) => Ok(Some(date.to_utc())),
+            LocalResult::Ambiguous(..) => Ok(None),
+            LocalResult::None => GapInfo::new(&date.and_time(chrono::NaiveTime::MIN), &timezone)
+                .and_then(|gap| gap.end)
+                .map(|date| Some(date.to_utc()))
+                .ok_or_else(invalid),
         };
-        Some((boundary(start_date)?, boundary(end_date)?))
+        let (Some(start), Some(end)) = (boundary(start)?, boundary(end)?) else {
+            return Ok(None);
+        };
+        Ok(Some(Expr::cust_with_values(
+            "datetime(created_at) >= datetime(?) AND datetime(created_at) < datetime(?)",
+            [start.naive_utc().to_string(), end.naive_utc().to_string()],
+        )))
     }
 
-    pub(crate) fn sqlite_datetime_range_filter(self, timezone: Tz) -> Option<SimpleExpr> {
-        let (start, end) = self.range(timezone)?;
-        let start = start.format("%Y-%m-%d %H:%M:%S").to_string();
-        let end = end.format("%Y-%m-%d %H:%M:%S").to_string();
-        Some(Expr::cust_with_values(
+    fn from_timestamp(timestamp: DateTime<Utc>, timezone: Tz) -> Self {
+        let local = timestamp.with_timezone(&timezone);
+        Self {
+            year: local.year(),
+            month: local.month(),
+        }
+    }
+}
+
+pub(crate) async fn articles_in_period(
+    db: &DatabaseConnection,
+    query: Select<article::Entity>,
+    period: ArticlePeriod,
+    timezone: Tz,
+) -> Result<Vec<article::Model>, DbErr> {
+    let (start, end) = ArticlePeriod::range_bounds(period.year, period.month)
+        .ok_or_else(|| DbErr::Custom("invalid article period".into()))?;
+    // UTC offsets are less than one day in magnitude. Local month membership
+    // is decided below so a rollback across midnight can split the month.
+    let start = start
+        .checked_sub_days(Days::new(1))
+        .unwrap_or(start)
+        .to_string();
+    let end = end
+        .checked_add_days(Days::new(1))
+        .unwrap_or(end)
+        .to_string();
+    let mut articles = query
+        .filter(Expr::cust_with_values(
             "datetime(created_at) >= datetime(?) AND datetime(created_at) < datetime(?)",
             [start, end],
         ))
+        .order_by_desc(article::Column::CreatedAt)
+        .order_by_desc(article::Column::Id)
+        .all(db)
+        .await?;
+    articles
+        .retain(|article| ArticlePeriod::from_timestamp(article.created_at, timezone) == period);
+    Ok(articles)
+}
+
+pub(crate) fn paginate(
+    articles: Vec<article::Model>,
+    page: Page,
+) -> (Vec<article::Model>, PageInfo) {
+    let info = PageInfo::new(page.normalize(SQLITE_MAX), articles.len() as u64);
+    let offset = (info.current_page - 1) * info.per;
+    let articles = articles
+        .into_iter()
+        .skip(offset as usize)
+        .take(info.per as usize)
+        .collect();
+    (articles, info)
+}
+
+pub(crate) async fn article_page(
+    db: &DatabaseConnection,
+    mut query: Select<article::Entity>,
+    page: Page,
+    period: Option<ArticlePeriod>,
+    timezone: Tz,
+) -> Result<(Vec<article::Model>, PageInfo), DbErr> {
+    if let Some(period) = period {
+        let Some(filter) = period.sqlite_datetime_range_filter(timezone)? else {
+            return Ok(paginate(
+                articles_in_period(db, query, period, timezone).await?,
+                page,
+            ));
+        };
+        query = query.filter(filter);
     }
+    let total = query.clone().count(db).await?;
+    let info = PageInfo::new(page.normalize(SQLITE_MAX), total);
+    let articles = query
+        .order_by_desc(article::Column::CreatedAt)
+        .order_by_desc(article::Column::Id)
+        .offset((info.current_page - 1) * info.per)
+        .limit(info.per)
+        .all(db)
+        .await?;
+    Ok((articles, info))
 }
 
 pub async fn get_all_articles(
@@ -66,27 +151,8 @@ pub async fn get_all_articles(
     period: Option<ArticlePeriod>,
     timezone: Tz,
 ) -> Result<(Vec<article::Model>, PageInfo), DbErr> {
-    let now = Utc::now();
-    let mut base_query = article::Entity::find().filter(article::Column::CreatedAt.lte(now));
-    if let Some(period) = period {
-        let filter = period
-            .sqlite_datetime_range_filter(timezone)
-            .ok_or_else(|| DbErr::Custom("invalid article period".into()))?;
-        base_query = base_query.filter(filter);
-    }
-
-    let total = base_query.clone().count(db).await?;
-    let page = page.normalize(SQLITE_MAX);
-    let page_info = PageInfo::new(page, total);
-    let offset = (page_info.current_page - 1) * page_info.per;
-    let articles = base_query
-        .order_by_desc(article::Column::CreatedAt)
-        .order_by_desc(article::Column::Id)
-        .offset(offset)
-        .limit(page_info.per)
-        .all(db)
-        .await?;
-    Ok((articles, page_info))
+    let query = article::Entity::find().filter(article::Column::CreatedAt.lte(Utc::now()));
+    article_page(db, query, page, period, timezone).await
 }
 
 pub async fn search_articles(
@@ -98,17 +164,21 @@ pub async fn search_articles(
 ) -> Result<(Vec<article::Model>, PageInfo, u64), DbErr> {
     let terms = crate::utils::search::terms(query);
     let mut base = article::Entity::find().filter(article::Column::CreatedAt.lte(Utc::now()));
+    let mut ambiguous_period = None;
     if let Some(period) = period {
-        let filter = period
-            .sqlite_datetime_range_filter(timezone)
-            .ok_or_else(|| DbErr::Custom("invalid article period".into()))?;
-        base = base.filter(filter);
+        match period.sqlite_datetime_range_filter(timezone)? {
+            Some(filter) => base = base.filter(filter),
+            None => ambiguous_period = Some(period),
+        }
     }
-    let articles = base
-        .order_by_desc(article::Column::CreatedAt)
-        .order_by_desc(article::Column::Id)
-        .all(db)
-        .await?;
+    let articles = if let Some(period) = ambiguous_period {
+        articles_in_period(db, base, period, timezone).await?
+    } else {
+        base.order_by_desc(article::Column::CreatedAt)
+            .order_by_desc(article::Column::Id)
+            .all(db)
+            .await?
+    };
     let matches: Vec<_> = articles
         .into_iter()
         .filter(|article| {
@@ -117,13 +187,7 @@ pub async fn search_articles(
         })
         .collect();
     let total = matches.len() as u64;
-    let info = PageInfo::new(page.normalize(SQLITE_MAX), total);
-    let offset = (info.current_page - 1) * info.per;
-    let articles = matches
-        .into_iter()
-        .skip(offset as usize)
-        .take(info.per as usize)
-        .collect();
+    let (articles, info) = paginate(matches, page);
     Ok((articles, info, total))
 }
 
@@ -152,22 +216,12 @@ pub(crate) async fn period_counts(
         .all(db)
         .await?;
 
-    let mut periods = Vec::<(ArticlePeriod, u64)>::new();
+    let mut periods = BTreeMap::new();
     for created_at in created_ats {
-        let local_date = created_at.with_timezone(&timezone);
-        let period = ArticlePeriod {
-            year: local_date.year(),
-            month: local_date.month(),
-        };
-        if let Some((last, count)) = periods.last_mut()
-            && *last == period
-        {
-            *count += 1;
-        } else {
-            periods.push((period, 1));
-        }
+        let period = ArticlePeriod::from_timestamp(created_at, timezone);
+        *periods.entry(period).or_default() += 1;
     }
-    Ok(periods)
+    Ok(periods.into_iter().rev().collect())
 }
 pub async fn get_article_by_slug(
     db: &DatabaseConnection,
@@ -476,7 +530,6 @@ mod tests {
         assert!(super::surrounding_articles(&[], 1).is_empty());
     }
     use super::ArticlePeriod;
-    use chrono::{TimeZone, Utc};
 
     #[test]
     fn article_period_new_rejects_invalid_month() {
@@ -501,21 +554,52 @@ mod tests {
         );
     }
 
-    #[test]
-    fn article_period_range_resolves_each_boundary_in_the_configured_timezone() {
-        let period = ArticlePeriod::new(2026, 3).unwrap();
-        let (start, end) = period.range(chrono_tz::America::New_York).unwrap();
-        assert_eq!(start, Utc.with_ymd_and_hms(2026, 3, 1, 5, 0, 0).unwrap());
-        assert_eq!(end, Utc.with_ymd_and_hms(2026, 4, 1, 4, 0, 0).unwrap());
-    }
+    #[rocket::async_test]
+    async fn rollback_across_midnight_keeps_month_counts_pages_and_search_in_sync() {
+        use super::{Page, article, get_all_articles, period_counts, search_articles};
+        use sea_orm::{ConnectionTrait, Database, EntityTrait, Schema};
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        let backend = db.get_database_backend();
+        db.execute(backend.build(&Schema::new(backend).create_table_from_entity(article::Entity)))
+            .await
+            .unwrap();
 
-    #[test]
-    fn article_period_range_uses_jst_month_boundaries() {
-        let period = ArticlePeriod::new(2026, 2).expect("valid period");
-        let (start, end) = period
-            .range(chrono_tz::Asia::Tokyo)
-            .expect("range should exist");
-        assert_eq!(start, Utc.with_ymd_and_hms(2026, 1, 31, 15, 0, 0).unwrap());
-        assert_eq!(end, Utc.with_ymd_and_hms(2026, 2, 28, 15, 0, 0).unwrap());
+        for (slug, utc) in [
+            ("first-november", "2009-11-01T02:30:00Z"),
+            ("back-in-october", "2009-11-01T03:00:00Z"),
+            ("second-november", "2009-11-01T03:30:00Z"),
+        ] {
+            db.execute(sea_orm::Statement::from_sql_and_values(
+                backend,
+                "INSERT INTO article (title, slug, created_at, updated_at, content, table_of_contents, deprecated, adsense_sidebar, adsense_auto_ads, section) VALUES (?, ?, ?, ?, 'rollback test', false, false, false, false, 'blog')",
+                [slug.into(), slug.into(), utc.into(), utc.into()],
+            )).await.unwrap();
+        }
+
+        let timezone = chrono_tz::America::St_Johns;
+        let october = ArticlePeriod::new(2009, 10).unwrap();
+        let november = ArticlePeriod::new(2009, 11).unwrap();
+        let counts = period_counts(&db, article::Entity::find(), timezone)
+            .await
+            .unwrap();
+        assert_eq!(counts, [(november, 2), (october, 1)]);
+        for (period, number, expected, total) in [
+            (october, 1, "back-in-october", 1),
+            (november, 1, "second-november", 2),
+            (november, 2, "first-november", 2),
+        ] {
+            let page = Page { number, per: 1 };
+            let (articles, info) = get_all_articles(&db, page, Some(period), timezone)
+                .await
+                .unwrap();
+            assert_eq!(info.total_pages, total);
+            assert_eq!(articles[0].slug, expected);
+            let (matches, _, count) =
+                search_articles(&db, page, Some(period), "rollback", timezone)
+                    .await
+                    .unwrap();
+            assert_eq!(count, total);
+            assert_eq!(matches[0].slug, expected);
+        }
     }
 }
