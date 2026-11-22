@@ -4,6 +4,7 @@
 {% block content %}
 <h1 class="title">Categories</h1>
 
+<div{% if static_listings %} data-taxonomy-index="categories"{% endif %}>
 {% if categories and categories | length > 0 %}
   <div class="columns is-multiline">
     {% for category in categories %}
@@ -25,4 +26,5 @@
 {% else %}
   <div class="taxonomy-empty-state"><p>記事にカテゴリが設定されていません。</p><p><a href="/">記事一覧を見る</a></p></div>
 {% endif %}
+</div>
 {% endblock content %}

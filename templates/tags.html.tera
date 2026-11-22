@@ -4,6 +4,7 @@
 {% block content %}
 <h1 class="title">Tags - {{ site_name }}</h1>
 
+<div{% if static_listings %} data-taxonomy-index="tags"{% endif %}>
 {% if tags and tags | length > 0 %}
   <div class="content">
     <ul>
@@ -20,4 +21,5 @@
 {% else %}
   <div class="taxonomy-empty-state"><p>記事にタグが設定されていません。</p><p><a href="/">記事一覧を見る</a></p></div>
 {% endif %}
+</div>
 {% endblock content %}

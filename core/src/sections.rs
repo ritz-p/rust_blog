@@ -493,6 +493,12 @@ pub async fn export(
             for number in 1..=pages {
                 let mut context = listing.context(db, number, period).await?;
                 context.insert("site_name", &config.site_name);
+                context.insert("static_listings", &true);
+                context.insert("listing_per", &config.articles_per_page);
+                context.insert(
+                    "listing_period",
+                    &period.map(|p| format!("{}/{:02}", p.year, p.month)),
+                );
                 context.insert("favicon_path", &config.favicon_path);
                 let url = listing_url(&base, true, period, number);
                 let directory = out.join(url.trim_matches('/'));

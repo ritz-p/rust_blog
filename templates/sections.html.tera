@@ -4,8 +4,10 @@
 <h1 class="title">{{ tab_title }}</h1>
 {% include "partial/period_filter" %}
 {% if active_tab == "all" %}<p class="mb-5"><a href="{{ search_url }}">記事を検索</a></p>{% endif %}
+<div data-static-listing{% if static_listings %} data-per="{{ listing_per }}" data-section="{{ active_tab }}" data-period="{{ listing_period | default(value='') }}"{% endif %}>
 <div class="article-list">
 {% for article in articles %}{% include "partial/article_card" %}{% else %}<p>まだ記事がありません。</p>{% endfor %}
 </div>
 {% include "partial/page" %}
+</div>
 {% endblock content %}

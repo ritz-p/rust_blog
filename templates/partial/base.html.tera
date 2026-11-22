@@ -23,7 +23,7 @@
   <link rel="shortcut icon" href= "{{ favicon_path }}" >
   {% endblock head %}
 </head>
-<body>
+<body{% if static_listings %} data-static-listings{% set due = next_publication() %}{% if due %} data-schedule-at="{{ due }}"{% endif %}{% endif %}>
   <div class="container article-tabs">
     {% include "partial/navigation" ignore missing %}
   </div>
@@ -58,6 +58,7 @@
   </footer>
   {% block scripts %}
   <script src="/js/nav.js?v=nav-menu-1"{% if nav_integrity %} integrity="{{ nav_integrity | safe }}"{% endif %} defer></script>
+  {% if static_listings %}<script src="/js/search.js?v=scheduled-1"{% if search_integrity %} integrity="{{ search_integrity | safe }}"{% endif %} defer></script>{% endif %}
   {% endblock scripts %}
 </body>
 </html>

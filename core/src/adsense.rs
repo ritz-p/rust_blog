@@ -15,11 +15,13 @@ fn integrity(bytes: &[u8]) -> String {
 
 pub static NAV_INTEGRITY: LazyLock<String> =
     LazyLock::new(|| integrity(include_bytes!("../assets/nav.js")));
+pub static SEARCH_INTEGRITY: LazyLock<String> =
+    LazyLock::new(|| integrity(include_bytes!("../assets/search.js")));
 pub static AD_INTEGRITY: LazyLock<String> = LazyLock::new(|| integrity(SCRIPT.as_bytes()));
 pub static AD_CSP: LazyLock<String> = LazyLock::new(|| {
     format!(
-        "default-src 'self'; script-src '{}' '{}' 'strict-dynamic' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https:; img-src 'self' https: data:; connect-src 'self' https:; frame-src https:; font-src 'self' https: data:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'",
-        *NAV_INTEGRITY, *AD_INTEGRITY
+        "default-src 'self'; script-src '{}' '{}' '{}' 'strict-dynamic' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https:; img-src 'self' https: data:; connect-src 'self' https:; frame-src https:; font-src 'self' https: data:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'",
+        *NAV_INTEGRITY, *AD_INTEGRITY, *SEARCH_INTEGRITY
     )
 });
 
