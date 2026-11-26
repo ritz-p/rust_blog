@@ -208,12 +208,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     const list = element('div', 'article-list');
     for (const article of matches.slice((page - 1) * per, page * per)) {
+      const cardUrl = section === 'all' ? article.url + '?from=all' : article.url;
       const card = element('article', 'article-card');
       if (article.icatch_path) {
         const imageUrl = new URL(article.icatch_path, window.location.origin);
         if (['http:', 'https:'].includes(imageUrl.protocol)) {
           const imageLink = element('a', 'article-card-image');
-          imageLink.href = article.url;
+          imageLink.href = cardUrl;
           imageLink.tabIndex = -1;
           imageLink.setAttribute('aria-hidden', 'true');
           const image = element('img');
@@ -235,7 +236,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const title = element('h2', 'article-card-title');
       const titleLink = element('a');
       appendFragments(titleLink, fragments(article.title, terms, false));
-      titleLink.href = article.url;
+      titleLink.href = cardUrl;
       title.append(titleLink);
       body.append(date, title);
       const bodyParts = searching ? fragments(article.body, terms, true) : [];

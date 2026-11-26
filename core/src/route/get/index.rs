@@ -374,7 +374,8 @@ mod tests {
             let (page, footer) = html.split_once(r#"<footer class="footer">"#).unwrap();
             assert!(!page.contains(r#"class="navbar-item" href="/about""#));
             assert!(footer.contains(r#"href="/about">About</a>"#));
-            assert!(html.contains("href=\"/posts/dec-1\""));
+            let suffix = if base == "/all" { "?from=all" } else { "" };
+            assert!(html.contains(&format!("href=\"/posts/dec-1{suffix}\"")));
             assert!(!html.contains("href=\"/posts/dec-2\""));
             assert!(html.contains(&format!("href=\"{base}?year=2025&month=12&page=1\"")));
             assert!(html.contains(&format!("data-href=\"{base}\"")));

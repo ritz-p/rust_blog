@@ -22,6 +22,7 @@ pub async fn article_detail(
     config: &State<CommonConfig>,
     db: &State<DatabaseConnection>,
     adsense: &State<rust_blog::adsense::AdSense>,
+    navigation: &State<rust_blog::sections::Navigation>,
     slug: &str,
 ) -> Result<ArticlePage, Status> {
     let conn = db.inner();
@@ -121,6 +122,7 @@ pub async fn article_detail(
             metadata: crate::utils::metadata::article_metadata(&article, config, false),
             title: article.title,
             content_html: content,
+            listing: navigation.article_listing(&article.section, false),
             deprecated: article.deprecated,
             created_at: created_at,
             updated_at: updated_at,
@@ -230,6 +232,7 @@ mod tests {
                 rocket::Config::figment().merge(("template_dir", &paths.templates_dir)),
             )
             .manage(db)
+            .manage(rust_blog::sections::Navigation::default())
             .manage(AdSense::from_config(&map).unwrap())
             .manage(CommonConfig {
                 articles_per_page: 10,
@@ -308,6 +311,7 @@ mod tests {
             concat!(env!("CARGO_MANIFEST_DIR"), "/../templates"),
         )))
         .manage(db)
+        .manage(rust_blog::sections::Navigation::default())
         .manage(rust_blog::adsense::AdSense::default())
         .manage(CommonConfig {
             articles_per_page: 10,
@@ -387,6 +391,7 @@ mod tests {
             concat!(env!("CARGO_MANIFEST_DIR"), "/../templates"),
         )))
         .manage(db)
+        .manage(rust_blog::sections::Navigation::default())
         .manage(rust_blog::adsense::AdSense::default())
         .manage(CommonConfig {
             articles_per_page: 10,
