@@ -7,8 +7,9 @@
   <title>{% block title %}{{ site_name | default(value="My Blog") }}{% endblock title %}</title>
   {% if feed_url is defined and feed_url %}<link rel="alternate" type="application/atom+xml" title="Atom feed" href="{{ feed_url }}">{% endif %}
   {% include "partial/share_metadata" %}
+  <script src="/js/nav.js?v=theme-1"{% if nav_integrity %} integrity="{{ nav_integrity | safe }}"{% endif %}></script>
   <link rel="stylesheet" href="/css/bulma.min.css">
-  <link rel="stylesheet" href="/css/site.css?v=footer-links-1">
+  <link rel="stylesheet" href="/css/site.css?v=theme-6">
   <link rel="shortcut icon" href= "{{ favicon_path }}" >
   {% endblock head %}
 </head>
@@ -43,11 +44,13 @@
   <footer class="footer">
     <div class="footer-links">
       <span>© {{ year | default(value=2025) }} {{ site_name }}</span>
+      <label>配色 <select id="theme-choice">
+        <option value="system">システム設定</option><option value="light">ライト</option><option value="dark">ダーク</option>
+      </select></label>
       <a href="{% if about_url %}{{ about_url }}{% else %}/about{% endif %}">About</a>
     </div>
   </footer>
   {% block scripts %}
-  <script src="/js/nav.js?v=nav-menu-1"{% if nav_integrity %} integrity="{{ nav_integrity | safe }}"{% endif %} defer></script>
   {% if static_listings %}<script src="/js/search.js?v=scheduled-1"{% if search_integrity %} integrity="{{ search_integrity | safe }}"{% endif %} defer></script>{% endif %}
   {% endblock scripts %}
 </body>

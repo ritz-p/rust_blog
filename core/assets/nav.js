@@ -1,3 +1,10 @@
+let selectedTheme = 'system';
+try {
+  const stored = window.localStorage.getItem('theme');
+  if (stored === 'light' || stored === 'dark') selectedTheme = stored;
+} catch { /* Storage is optional. */ }
+document.documentElement.dataset.theme = selectedTheme;
+
 function highlightLines(code) {
   const ranges = code.dataset.lines.split(',').flatMap(part => {
     const match = /^([1-9]\d*)(?:-([1-9]\d*))?$/.exec(part);
@@ -26,6 +33,14 @@ function highlightLines(code) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  const theme = document.getElementById('theme-choice');
+  if (theme) {
+    theme.value = selectedTheme;
+    theme.addEventListener('change', () => {
+      document.documentElement.dataset.theme = theme.value;
+      try { window.localStorage.setItem('theme', theme.value); } catch { /* Storage is optional. */ }
+    });
+  }
   const back = document.querySelector('[data-return-listing]');
   if (back && new URLSearchParams(window.location.search).get('from') === 'all') {
     const all = document.querySelector('.article-tabs a[href="/all"], .article-tabs a[href="/all/"]');
