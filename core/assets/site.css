@@ -636,3 +636,6 @@
 }
 .scroll-frame.more-left::before { content: ""; left: 0; background: linear-gradient(to right, #64748b70, transparent); }
 .scroll-frame.more-right::after { content: ""; right: 0; background: linear-gradient(to left, #64748b70, transparent); }
+
+.code-highlight { background: #ffdd744d; }
+.code-toolbar > span:first-child { min-width: 0; overflow-wrap: anywhere; }
