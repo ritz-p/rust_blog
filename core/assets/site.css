@@ -620,3 +620,7 @@
   gap: 0.25rem 0.75rem;
   text-align: center;
 }
+
+.table-of-contents summary { cursor: pointer; }
+.table-of-contents summary::after { content: "開く"; margin-inline-start: auto; }
+.table-of-contents details[open] > summary::after { content: "閉じる"; }
