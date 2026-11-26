@@ -48,6 +48,23 @@ document.addEventListener('DOMContentLoaded', () => {
     toolbar.append(label, button, status);
     code.parentElement.before(toolbar);
   }
+  for (const scroller of document.querySelectorAll('.content table, .content pre')) {
+    const frame = document.createElement('div');
+    frame.className = 'scroll-frame';
+    scroller.before(frame);
+    frame.append(scroller);
+    const update = () => {
+      const remaining = scroller.scrollWidth - scroller.clientWidth;
+      frame.classList.toggle('more-left', scroller.scrollLeft > 1);
+      frame.classList.toggle('more-right', remaining - scroller.scrollLeft > 1);
+      if (remaining > 1) scroller.tabIndex = 0;
+      else scroller.removeAttribute('tabindex');
+    };
+    scroller.addEventListener('scroll', update, { passive: true });
+    if (window.ResizeObserver) new window.ResizeObserver(update).observe(scroller);
+    window.addEventListener('load', update, { once: true });
+    update();
+  }
   const focusLegacyHeading = () => {
     let id;
     try {
