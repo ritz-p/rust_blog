@@ -19,6 +19,7 @@
   <nav class="navbar is-light" role="navigation" aria-label="main navigation">
     <div class="container">
       <div class="navbar-brand">
+        {% if site_name %}<a class="navbar-item site-name" href="/">{{ site_name }}</a>{% endif %}
         <button type="button" class="navbar-burger" aria-label="メニュー" aria-expanded="false" aria-controls="mainNav" data-target="mainNav">
           <span aria-hidden="true"></span>
           <span aria-hidden="true"></span>

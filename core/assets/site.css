@@ -639,3 +639,7 @@
 
 .code-highlight { background: #ffdd744d; }
 .code-toolbar > span:first-child { min-width: 0; overflow-wrap: anywhere; }
+
+.navbar-brand { min-width: 0; }
+.navbar-brand .site-name { display: block; align-self: center; min-width: 0; max-width: min(60vw, 28rem); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600; }
+.navbar-burger { flex-shrink: 0; }
