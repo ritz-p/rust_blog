@@ -1,4 +1,9 @@
 document.addEventListener('DOMContentLoaded', () => {
+  if (window.matchMedia?.('(max-width: 768px)').matches) {
+    for (const toc of document.querySelectorAll('.table-of-contents details')) {
+      if (toc.querySelectorAll('li').length > 6) toc.open = false;
+    }
+  }
   for (const image of document.querySelectorAll('.article-page .content img[src]')) {
     if (image.closest('a') || !/^https?:/i.test(image.src)) continue;
     const link = document.createElement('a');

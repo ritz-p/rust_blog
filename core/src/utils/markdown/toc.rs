@@ -102,11 +102,11 @@ fn decorate(input: &str, with_toc: bool) -> String {
         return content;
     }
     let mut output = format!(
-        "<nav class=\"table-of-contents\" aria-label=\"目次\"><div class=\"toc-header\"><span class=\"toc-title\">目次</span><span class=\"toc-count\">{}項目</span></div>",
+        "<nav class=\"table-of-contents\" aria-label=\"目次\"><details open><summary class=\"toc-header\"><span class=\"toc-title\">目次</span><span class=\"toc-count\">{}項目</span></summary>",
         headings.len()
     );
     render_toc(&headings, &mut 0, 0, &mut output);
-    output.push_str("</nav>\n");
+    output.push_str("</details></nav>\n");
     output.push_str(&content);
     output
 }
