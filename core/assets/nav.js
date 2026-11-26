@@ -1,4 +1,12 @@
 document.addEventListener('DOMContentLoaded', () => {
+  for (const image of document.querySelectorAll('.article-page .content img[src]')) {
+    if (image.closest('a') || !/^https?:/i.test(image.src)) continue;
+    const link = document.createElement('a');
+    link.href = image.src;
+    link.setAttribute('aria-label', (image.alt || '画像') + 'を原寸で開く');
+    image.before(link);
+    link.append(image);
+  }
   for (const code of document.querySelectorAll('.content pre > code')) {
     const toolbar = document.createElement('div');
     toolbar.className = 'code-toolbar';
