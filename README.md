@@ -222,3 +222,9 @@ docker compose exec -e ARTICLE_PATH=markdown_output/articles -e FIXED_CONTENT_PA
 スマホ幅では7項目以上の目次を最初に折りたたみます。PCではサイドバーと本文幅を保ち、高さのある目次でも全項目に届くよう、目次は本文と一緒にスクロールします。
 
 コードフェンスの開始行に `` ```rust filename=src/main.rs lines=1,3-5 `` を指定すると、ファイル名と強調行を表示します。ファイル名には空白を含めず、行は1始まりで指定します。不正な範囲は無視します。
+
+新規記事は次のコマンドで作成し、出力された Markdown に本文を書きます。
+
+```sh
+docker compose run --rm web cargo run --bin new_article -- "Rust の所有権" rust-ownership
+```

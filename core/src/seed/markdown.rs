@@ -21,7 +21,7 @@ pub fn markdown_files(
         })
 }
 
-pub(super) fn parse_markdown_slug(path: &std::path::Path) -> anyhow::Result<String> {
+pub fn parse_markdown_slug(path: &std::path::Path) -> anyhow::Result<String> {
     use anyhow::Context;
     let text = fs::read_to_string(path)?;
     let (yaml, _) = split_front_matter(&text)?;
