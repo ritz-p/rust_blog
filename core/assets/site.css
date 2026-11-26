@@ -629,3 +629,10 @@
 .article-adjacent a { flex: 1; overflow-wrap: anywhere; }
 .article-adjacent small { display: block; }
 @media (max-width: 768px) { .article-adjacent { flex-direction: column; } }
+
+.scroll-frame { position: relative; min-width: 0; }
+.scroll-frame::before, .scroll-frame::after {
+  position: absolute; inset-block: 0; width: 6px; pointer-events: none;
+}
+.scroll-frame.more-left::before { content: ""; left: 0; background: linear-gradient(to right, #64748b70, transparent); }
+.scroll-frame.more-right::after { content: ""; right: 0; background: linear-gradient(to left, #64748b70, transparent); }
