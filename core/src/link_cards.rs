@@ -1,3 +1,4 @@
+mod disk_cache;
 mod preview;
 
 use crate::utils::markdown::{markdown_parser, render_markdown};
@@ -6,7 +7,7 @@ use html_escape::{encode_double_quoted_attribute, encode_text};
 use moka::future::Cache;
 use preview::Preview;
 use pulldown_cmark::{Event, LinkType, Tag};
-use std::{ops::Range, sync::LazyLock, time::Duration};
+use std::{ops::Range, path::Path, sync::LazyLock, time::Duration};
 use url::Url;
 
 static PREVIEWS: LazyLock<Cache<Url, Option<Preview>>> = LazyLock::new(|| {
@@ -22,6 +23,37 @@ pub async fn article_html(markdown: &str) -> String {
         PREVIEWS.get_with(url.clone(), preview::fetch(url)).await
     })
     .await
+}
+
+pub(crate) struct ExportPreviews<'a> {
+    directory: &'a Path,
+    results: Cache<Url, Option<Preview>>,
+}
+
+impl<'a> ExportPreviews<'a> {
+    pub(crate) fn new(directory: &'a Path) -> Self {
+        Self {
+            directory,
+            results: Cache::builder().build(),
+        }
+    }
+
+    async fn lookup<F, Fut>(&self, mut url: Url, fetch: F) -> Option<Preview>
+    where
+        F: FnOnce(Url) -> Fut,
+        Fut: Future<Output = Option<Preview>>,
+    {
+        url.set_fragment(None);
+        self.results
+            .get_with(url.clone(), async {
+                disk_cache::lookup(self.directory, url.clone(), || fetch(url)).await
+            })
+            .await
+    }
+
+    pub(crate) async fn article_html(&self, markdown: &str) -> String {
+        render_with(markdown, |url| self.lookup(url, preview::fetch)).await
+    }
 }
 
 async fn render_with<F, Fut>(markdown: &str, lookup: F) -> String
@@ -126,6 +158,30 @@ fn card_html(text: &str, url: &Url, preview: Option<Preview>) -> String {
 mod tests {
     use super::*;
     use scraper::{Html, Selector};
+
+    #[rocket::async_test]
+    async fn failed_fetch_is_shared_within_one_export_and_retried_on_the_next() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+
+        let directory = tempfile::tempdir().unwrap();
+        let calls = AtomicUsize::new(0);
+        let fetch = |_| async {
+            calls.fetch_add(1, Ordering::SeqCst);
+            None
+        };
+        let url = Url::parse("https://example.org/").unwrap();
+        let fragment = url.join("#section").unwrap();
+        for run in 1..=2 {
+            let previews = ExportPreviews::new(directory.path());
+            let (first, second) = futures::join!(
+                previews.lookup(url.clone(), fetch),
+                previews.lookup(fragment.clone(), fetch)
+            );
+            assert!(first.is_none() && second.is_none());
+            assert!(previews.lookup(url.clone(), fetch).await.is_none());
+            assert_eq!(calls.load(Ordering::SeqCst), run);
+        }
+    }
 
     #[rocket::async_test]
     async fn previews_for_paragraphs_and_list_items_preserve_other_markdown() {

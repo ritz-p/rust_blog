@@ -11,7 +11,7 @@ use std::{
 };
 use url::{Host, Url};
 
-#[derive(Clone)]
+#[derive(Clone, serde::Deserialize, serde::Serialize)]
 pub(super) struct Preview {
     pub title: Option<String>,
     pub description: Option<String>,

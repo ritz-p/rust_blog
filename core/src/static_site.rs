@@ -78,6 +78,7 @@ pub async fn export_site(
         ),
         None => None,
     };
+    let cache_dir = out_dir.with_file_name(".link-card-cache");
     let output = output::StagedOutput::new(out_dir)?;
     let out_dir = output.path();
     write_static_assets(out_dir, &paths.content_dir, config_map)?;
@@ -112,7 +113,16 @@ pub async fn export_site(
     if let Some(body) = adsense.ads_txt() {
         fs::write(out_dir.join("ads.txt"), body)?;
     }
-    let has_ads = export_article_pages(&tera, db, &config, &navigation, &adsense, out_dir).await?;
+    let has_ads = export_article_pages(
+        &tera,
+        db,
+        &config,
+        &navigation,
+        &adsense,
+        &cache_dir,
+        out_dir,
+    )
+    .await?;
     export_fixed_content_pages(&tera, db, &config, out_dir).await?;
     export_tag_pages(&tera, db, &config, out_dir).await?;
     export_category_pages(&tera, db, &config, out_dir).await?;
@@ -402,6 +412,7 @@ async fn export_article_pages(
     config: &CommonConfig,
     navigation: &crate::sections::Navigation,
     adsense: &crate::adsense::AdSense,
+    cache_dir: &Path,
     out_dir: &Path,
 ) -> Result<bool> {
     let mut articles = article::Entity::find().all(db).await?;
@@ -416,6 +427,7 @@ async fn export_article_pages(
         .filter(|article| article.created_at <= Utc::now())
         .cloned()
         .collect();
+    let previews = crate::link_cards::ExportPreviews::new(cache_dir);
     for article in &articles {
         let current_index = published.iter().position(|a| a.id == article.id);
         let adjacent: Vec<_> = current_index.into_iter().flat_map(|i| [
@@ -460,7 +472,7 @@ async fn export_article_pages(
             "metadata",
             &crate::utils::metadata::article_metadata(article, config, true),
         );
-        let content = crate::link_cards::article_html(&article.content).await;
+        let content = previews.article_html(&article.content).await;
         let content = if article.table_of_contents {
             toc(&content)
         } else {
@@ -1563,6 +1575,7 @@ mod tests {
             &config,
             &Default::default(),
             &Default::default(),
+            &output.0.join("cache"),
             &output.0,
         )
         .await
