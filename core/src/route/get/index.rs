@@ -9,7 +9,7 @@ use crate::{
         query::{PagingQuery, index::IndexQuery},
     },
     repository::article::{ArticlePeriod, get_all_articles, get_article_periods, search_articles},
-    utils::{config::CommonConfig, cut_out_string,  markdown::markdown_to_text},
+    utils::{config::CommonConfig, cut_out_string, markdown::markdown_to_text},
 };
 
 #[derive(Clone, Copy)]

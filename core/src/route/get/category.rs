@@ -9,7 +9,7 @@ use crate::{
         query::{PagingQuery, category::CategoryQuery},
     },
     repository::{article::get_article_by_category_slug, category::get_all_categories},
-    utils::{config::CommonConfig, cut_out_string,  markdown::markdown_to_text},
+    utils::{config::CommonConfig, cut_out_string, markdown::markdown_to_text},
 };
 
 fn sort_url(slug: &str, sort_key: &str) -> String {
