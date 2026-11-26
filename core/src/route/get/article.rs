@@ -118,6 +118,12 @@ pub async fn article_detail(
     } else {
         rust_blog::adsense::DEFAULT_CSP.as_str()
     };
+    let successor = if let Some(slug) = article.successor.as_deref() {
+        get_article_by_slug(conn, slug).await.map_err(|_| Status::InternalServerError)?
+            .map(|a| json!({"title": a.title, "url": format!("/posts/{}", crate::utils::url_segment(&a.slug))}))
+    } else {
+        None
+    };
     let template = Template::render(
         "article_detail",
         context! {
@@ -130,6 +136,7 @@ pub async fn article_detail(
             metadata: crate::utils::metadata::article_metadata(&article, config, false),
             title: article.title,
             content_html: content,
+            successor: successor,
             listing: navigation.article_listing(&article.section, false),
             deprecated: article.deprecated,
             created_at: created_at,
@@ -383,6 +390,7 @@ mod tests {
             icatch_path: None,
             table_of_contents: false,
             deprecated: false,
+            successor: None,
             adsense_sidebar: false,
             adsense_auto_ads: false,
             section: "blog".into(),

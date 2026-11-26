@@ -34,7 +34,29 @@ async fn run_with_config(
     let timezone = crate::utils::config::timezone(&crate::utils::config::load_config())?;
     let mut errors = Vec::new();
     let mut succeeded = 0;
-    let slug_errors = validate_input_slugs(config);
+    let mut slug_errors = validate_input_slugs(config);
+    let mut live = std::collections::HashSet::new();
+    let mut successors = Vec::new();
+    for path in markdown_files(&config.article_path).flatten() {
+        if let Ok((matter, _)) = parse_markdown_to_front_matter(&path)
+            && !matter.deleted
+        {
+            if let Some(target) = matter.successor {
+                successors.push((path, matter.slug.clone(), target));
+            }
+            live.insert(matter.slug);
+        }
+    }
+    for (path, source, target) in successors {
+        if target == source {
+            slug_errors.insert(path, format!("{source}: successor points to itself"));
+        } else if !live.contains(&target) {
+            slug_errors.insert(
+                path,
+                format!("{source}: successor {target:?} does not exist"),
+            );
+        }
+    }
     if let Err(error) = taxonomy::normalize(db).await {
         errors.push(format!("taxonomy normalization: {error:#}"));
     }

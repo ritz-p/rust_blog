@@ -15,6 +15,7 @@ const ORDER: &[&str] = &[
     "deleted",
     "table_of_contents",
     "deprecated",
+    "successor",
     "adsense_sidebar",
     "adsense_auto_ads",
     "created_at",
@@ -216,6 +217,17 @@ fn validate(source: &Mapping, timezone: chrono_tz::Tz) -> Result<()> {
             "adsense_auto_ads",
             Some(Value::Bool(false)),
             |_: bool| Ok(()),
+        ),
+        validate_field(
+            source,
+            "successor",
+            Some(Value::Null),
+            |value: Option<String>| {
+                if let Some(slug) = value {
+                    validate_slug(&slug)?;
+                }
+                Ok(())
+            },
         ),
         validate_field(source, "deprecated", Some(Value::Bool(false)), |_: bool| {
             Ok(())
