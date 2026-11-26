@@ -73,9 +73,17 @@ pub async fn article_detail(
     let created_at = format_datetime(article.created_at, config.timezone);
     let updated_at = format_datetime(article.updated_at, config.timezone);
 
-    let surrounding: Vec<_> = get_surrounding_articles(db, &article)
+    let neighbors = get_surrounding_articles(db, &article)
         .await
-        .map_err(|_| Status::InternalServerError)?
+        .map_err(|_| Status::InternalServerError)?;
+    let key = (article.created_at, article.id);
+    let adjacent = [
+        ("前の記事", neighbors.iter().find(|a| (a.created_at, a.id) < key)),
+        ("次の記事", neighbors.iter().rev().find(|a| (a.created_at, a.id) > key)),
+    ].into_iter().filter_map(|(label, item)| item.map(|a| json!({
+        "label": label, "title": a.title, "url": format!("/posts/{}", crate::utils::url_segment(&a.slug))
+    }))).collect::<Vec<_>>();
+    let surrounding: Vec<_> = neighbors
         .into_iter()
         .map(|model| {
             let slug = model.slug.clone();
@@ -131,6 +139,7 @@ pub async fn article_detail(
             latest_articles: latest_articles,
             article_ads: article_ads,
             nav_integrity: rust_blog::adsense::NAV_INTEGRITY.as_str(),
+            adjacent: adjacent,
             surrounding_articles: surrounding
         },
     );

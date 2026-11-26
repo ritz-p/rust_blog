@@ -416,9 +416,11 @@ async fn export_article_pages(
         .cloned()
         .collect();
     for article in &articles {
-        let surrounding: Vec<_> = published
-            .iter()
-            .position(|a| a.id == article.id)
+        let current_index = published.iter().position(|a| a.id == article.id);
+        let adjacent: Vec<_> = current_index.into_iter().flat_map(|i| [
+            ("前の記事", published.get(i + 1)), ("次の記事", i.checked_sub(1).and_then(|j| published.get(j)))
+        ]).filter_map(|(label, item)| item.map(|a| json!({"label": label, "title": a.title, "url": static_article_url(&a.slug)}))).collect();
+        let surrounding: Vec<_> = current_index
             .map(|index| crate::repository::article::surrounding_articles(&published, index))
             .unwrap_or_default()
             .into_iter()
@@ -480,6 +482,7 @@ async fn export_article_pages(
         ctx.insert("tags", &tags);
         ctx.insert("categories", &categories);
         ctx.insert("latest_articles", &latest_articles);
+        ctx.insert("adjacent", &adjacent);
         ctx.insert("surrounding_articles", &surrounding);
 
         render_to_path(

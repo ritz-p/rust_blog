@@ -138,6 +138,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         menu.append(element('p', 'menu-label', label), list);
         return menu;
       });
+      const adjacent = document.querySelector('.article-adjacent');
+      if (adjacent && index >= 0) {
+        adjacent.replaceChildren();
+        for (const [label, item] of [['前の記事', articles[index + 1]], ['次の記事', articles[index - 1]]]) {
+          if (!item) continue;
+          const link = element('a');
+          link.href = item.url;
+          link.append(element('small', '', label), item.title);
+          adjacent.append(link);
+        }
+      }
       sidebar.replaceChildren(...menus);
     }
     if (catalog) {

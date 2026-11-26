@@ -27,6 +27,9 @@
       {{ categories_macro::input(items=categories) }}
       {{ tags_macro::input(items=tags) }}
       <hr>
+      <nav class="article-adjacent" aria-label="記事の移動">
+        {% for item in adjacent %}<a href="{{ item.url }}"><small>{{ item.label }}</small>{{ item.title }}</a>{% endfor %}
+      </nav>
       <nav class="level">
         <div class="level-left">
           <a class="button is-light" data-return-listing href="{% if listing %}{{ listing.url }}{% else %}/{% endif %}">← {% if listing %}{{ listing.label }}の{% endif %}一覧へ</a>
