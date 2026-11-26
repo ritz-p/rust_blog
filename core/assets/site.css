@@ -3,7 +3,7 @@
 :root[data-theme="dark"] { color-scheme: dark; }
 html, body, .navbar, .navbar-menu { background-color: var(--surface); color: var(--ink); }
 .navbar.is-light, .footer, .button.is-light, .tag.is-light, .tag.is-info.is-light { background-color: var(--panel); color: var(--ink); }
-.title, .subtitle, .content :is(h1,h2,h3,h4,h5,h6,strong,th),
+.title, .subtitle, .label, .content :is(h1,h2,h3,h4,h5,h6,strong,th),
 .navbar.is-light :is(.navbar-start, .navbar-brand) > .navbar-item,
 .navbar.is-light .navbar-burger, .tabs a, .menu-label, .menu-list a { color: var(--ink); }
 .navbar.is-light :is(.navbar-start, .navbar-brand) > a.navbar-item:is(:hover, :focus, .is-active) {
