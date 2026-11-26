@@ -9,7 +9,7 @@ use crate::{
         query::{PagingQuery, category::CategoryQuery},
     },
     repository::{article::get_article_by_category_slug, category::get_all_categories},
-    utils::{config::CommonConfig, cut_out_string, format_datetime, markdown::markdown_to_text},
+    utils::{config::CommonConfig, cut_out_string, markdown::markdown_to_text},
 };
 
 fn sort_url(slug: &str, sort_key: &str) -> String {
@@ -98,8 +98,8 @@ pub async fn category_detail(
                             "url": format!("/posts/{}", crate::utils::url_segment(&slug)),
                             "icatch_path": icatch_path,
                             "excerpt": excerpt,
-                            "created_at": format_datetime(article.created_at, config.timezone),
-                    "updated_at": format_datetime(article.updated_at, config.timezone),
+                            "created_at": article.created_at.with_timezone(&config.timezone).to_rfc3339(),
+                    "updated_at": article.updated_at.with_timezone(&config.timezone).to_rfc3339(),
                         })
                     }).collect::<Vec<_>>(),
                     page: page_info.current_page,

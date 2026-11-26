@@ -394,8 +394,8 @@ impl<'a> Listing<'a> {
             "url": format!("/posts/{}{suffix}", crate::utils::url_segment(&model.slug)),
             "excerpt": crate::utils::cut_out_string(&crate::utils::markdown::markdown_to_text(model.excerpt.as_deref().unwrap_or(&model.content)), 100),
             "icatch_path": model.icatch_path.as_deref().or(self.default_icatch_path),
-            "created_at": crate::utils::format_datetime(model.created_at, self.timezone),
-            "updated_at": crate::utils::format_datetime(model.updated_at, self.timezone),
+            "created_at": model.created_at.with_timezone(&self.timezone).to_rfc3339(),
+            "updated_at": model.updated_at.with_timezone(&self.timezone).to_rfc3339(),
         })).collect();
         let tab = navigation
             .tabs

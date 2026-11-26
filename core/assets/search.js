@@ -224,8 +224,14 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
       const body = element('div', 'article-card-body');
       const date = element('p', 'article-card-date');
-      date.append(element('span', 'date-item', `公開日 ${article.created_at}`));
-      date.append(element('span', 'date-item date-updated', ` / 更新日 ${article.updated_at}`));
+      for (const [stamp, label] of [[article.created_at, '公開日'], [article.updated_at, '更新日']]) {
+        if (!stamp || (label === '更新日' && stamp.slice(0, 10) === article.created_at.slice(0, 10))) continue;
+        const time = element('time', '', stamp.slice(0, 10).replaceAll('-', '/'));
+        time.dateTime = stamp;
+        const item = element('span', 'date-item', label === '更新日' ? ' / 更新日 ' : '公開日 ');
+        item.append(time);
+        date.append(item);
+      }
       const title = element('h2', 'article-card-title');
       const titleLink = element('a');
       appendFragments(titleLink, fragments(article.title, terms, false));
