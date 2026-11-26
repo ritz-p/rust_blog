@@ -21,6 +21,11 @@ a:hover { color: var(--ink); }
   color: var(--ink);
 }
 .button, .input, .select select, .pagination-link, .pagination-next, .pagination-previous { color: var(--ink); background-color: var(--panel); }
+.button:not(.is-link):is(:hover, :focus, :active) {
+  color: var(--ink);
+  background-color: var(--panel);
+  border-color: var(--link);
+}
 .pagination a[href]:is(:hover, :focus) {
   color: var(--link);
   border-color: currentColor;
