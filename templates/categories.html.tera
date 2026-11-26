@@ -14,7 +14,7 @@
           <a href="{{ category.url }}">{{ category.name }}</a>
         </h2>
         {% if category.count is defined %}
-          <p class="is-size-7 has-text-grey">記事数: {{ category.count }}</p>
+          <p class="is-size-7">記事数: {{ category.count }}</p>
         {% endif %}
         <div class="tags mt-2">
           <a class="tag is-info is-light" href="{{ category.url }}">{{ category.name }}</a>

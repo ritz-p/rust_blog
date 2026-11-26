@@ -11,6 +11,11 @@ html, body, .navbar, .navbar-menu { background-color: var(--surface); color: var
   color: var(--link);
 }
 a, .menu-list a:hover, .tabs li.is-active a { color: var(--link); }
+a:hover { color: var(--ink); }
+.box {
+  background-color: light-dark(#fff, var(--panel));
+  color: var(--ink);
+}
 .button, .input, .select select, .pagination-link, .pagination-next, .pagination-previous { color: var(--ink); background-color: var(--panel); }
 .content :not(pre) > code { background: var(--panel); color: light-dark(#a91f45, #ff9fb7); }
 mark { color: light-dark(#302405, #fff1b9); background: light-dark(#ffe38d, #664d12); }

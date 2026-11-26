@@ -440,7 +440,7 @@ mod tests {
                 .contains("href=\"/posts/highlighted-rust%23intro\""),
             "{html}"
         );
-        assert!(html.contains("href=\"/css/site.css?v=theme-1\""));
+        assert!(html.contains("href=\"/css/site.css?v=theme-2\""));
         let content = html
             .split("<div class=\"content is-medium\">")
             .nth(1)
