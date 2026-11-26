@@ -25,7 +25,7 @@
 
 {% include "partial/period_filter" %}
 
-<div id="index-results" data-static-search="{{ static_search }}" data-search-url="{{ search_url | default(value='/') }}" data-all-periods-url="{{ all_periods_url }}" data-per="{{ per }}" data-year="{{ search_year | default(value='') }}" data-month="{{ search_month | default(value='') }}">
+<div id="index-results" data-section="all" data-static-search="{{ static_search }}" data-search-url="{{ search_url | default(value='/') }}" data-all-periods-url="{{ all_periods_url }}" data-per="{{ per }}" data-year="{{ search_year | default(value='') }}" data-month="{{ search_month | default(value='') }}">
 {% if articles and articles | length > 0 %}
   <div class="article-list">
     {% for article in articles %}

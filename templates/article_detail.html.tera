@@ -29,7 +29,7 @@
       <hr>
       <nav class="level">
         <div class="level-left">
-          <a class="button is-light" href="/">← 一覧へ</a>
+          <a class="button is-light" data-return-listing href="{% if listing %}{{ listing.url }}{% else %}/{% endif %}">← {% if listing %}{{ listing.label }}の{% endif %}一覧へ</a>
         </div>
       </nav>
     </article>

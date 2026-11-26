@@ -249,6 +249,20 @@ impl Navigation {
         Ok(config.navigation)
     }
 
+    pub fn article_listing(&self, section: &str, static_mode: bool) -> serde_json::Value {
+        let tab = self
+            .tabs
+            .iter()
+            .find(|tab| matches!(tab, Tab::Section { id, .. } if id == section))
+            .or_else(|| {
+                self.tabs
+                    .iter()
+                    .find(|tab| tab.id() == self.default_section)
+            });
+        tab.map(|tab| serde_json::json!({"url": self.url(tab, static_mode), "label": tab.label()}))
+            .unwrap_or_else(|| serde_json::json!({"url": "/", "label": "記事"}))
+    }
+
     pub fn links(&self, static_mode: bool) -> serde_json::Value {
         let mut tabs: Vec<_> = self.tabs.iter().collect();
         tabs.sort_by_key(|tab| !matches!(tab, Tab::All { .. }));

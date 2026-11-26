@@ -1,4 +1,12 @@
 document.addEventListener('DOMContentLoaded', () => {
+  const back = document.querySelector('[data-return-listing]');
+  if (back && new URLSearchParams(window.location.search).get('from') === 'all') {
+    const all = document.querySelector('.article-tabs a[href="/all"], .article-tabs a[href="/all/"]');
+    if (all) {
+      back.href = all.href;
+      back.textContent = '← ' + all.textContent + 'の一覧へ';
+    }
+  }
   if (window.matchMedia?.('(max-width: 768px)').matches) {
     for (const toc of document.querySelectorAll('.table-of-contents details')) {
       if (toc.querySelectorAll('li').length > 6) toc.open = false;

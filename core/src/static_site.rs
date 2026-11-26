@@ -112,7 +112,7 @@ pub async fn export_site(
     if let Some(body) = adsense.ads_txt() {
         fs::write(out_dir.join("ads.txt"), body)?;
     }
-    let has_ads = export_article_pages(&tera, db, &config, &adsense, out_dir).await?;
+    let has_ads = export_article_pages(&tera, db, &config, &navigation, &adsense, out_dir).await?;
     export_fixed_content_pages(&tera, db, &config, out_dir).await?;
     export_tag_pages(&tera, db, &config, out_dir).await?;
     export_category_pages(&tera, db, &config, out_dir).await?;
@@ -344,6 +344,7 @@ async fn export_index_variant(
             .collect();
 
         let mut ctx = base_context(config);
+        ctx.insert("active_tab", "all");
         ctx.insert("search_url", "/search/");
         ctx.insert("search_query", "");
         ctx.insert("static_search", &true);
@@ -398,6 +399,7 @@ async fn export_article_pages(
     tera: &Tera,
     db: &DatabaseConnection,
     config: &CommonConfig,
+    navigation: &crate::sections::Navigation,
     adsense: &crate::adsense::AdSense,
     out_dir: &Path,
 ) -> Result<bool> {
@@ -462,6 +464,10 @@ async fn export_article_pages(
             content
         };
         ctx.insert("content_html", &content);
+        ctx.insert(
+            "listing",
+            &navigation.article_listing(&article.section, true),
+        );
         ctx.insert("deprecated", &article.deprecated);
         ctx.insert(
             "created_at",
@@ -1539,9 +1545,16 @@ mod tests {
             &Default::default(),
         )
         .expect("failed to export assets");
-        export_article_pages(&tera, &db, &config, &Default::default(), &output.0)
-            .await
-            .expect("failed to export article");
+        export_article_pages(
+            &tera,
+            &db,
+            &config,
+            &Default::default(),
+            &Default::default(),
+            &output.0,
+        )
+        .await
+        .expect("failed to export article");
         let html = fs::read_to_string(output.0.join("posts/highlighted-rust/index.html"))
             .expect("missing exported article");
         assert!(
@@ -1756,7 +1769,8 @@ mod home_navigation_tests {
                 let tab_page = html(&format!("{tab}/index.html"));
                 assert!(tab_page.contains(&format!("data-href=\"{month}\"")));
                 let second = html(&format!("{tab}/archive/2020/01/page/2/index.html"));
-                assert!(second.contains("href=\"/posts/article-2/\""));
+                let suffix = if tab == "all" { "?from=all" } else { "" };
+                assert!(second.contains(&format!("href=\"/posts/article-2/{suffix}\"")));
                 assert!(second.contains(&format!("data-href=\"{base}\"")));
                 assert!(
                     second.contains(&format!("class=\"pagination-previous\" href=\"{month}\""))
@@ -1769,9 +1783,9 @@ mod home_navigation_tests {
             } else {
                 "all/index.html"
             };
-            assert!(html(destination).contains("href=\"/posts/article-3/\""));
-            assert!(html("page/2/index.html").contains("href=\"/posts/article-2/\""));
-            assert!(html("page/3/index.html").contains("href=\"/posts/article-1/\""));
+            assert!(html(destination).contains("href=\"/posts/article-3/?from=all\""));
+            assert!(html("page/2/index.html").contains("href=\"/posts/article-2/?from=all\""));
+            assert!(html("page/3/index.html").contains("href=\"/posts/article-1/?from=all\""));
             for path in [
                 "search/index.html",
                 "archive/2020/01/index.html",
@@ -1782,7 +1796,7 @@ mod home_navigation_tests {
                 assert!(page.contains("data-search-url=\"/search/\""));
                 assert!(page.contains("data-static-search=\"true\""));
             }
-            assert!(html("search/index.html").contains("href=\"/posts/article-3/\""));
+            assert!(html("search/index.html").contains("href=\"/posts/article-3/?from=all\""));
             if home == "about" {
                 assert!(
                     html("index.html")
