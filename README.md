@@ -228,3 +228,5 @@ docker compose exec -e ARTICLE_PATH=markdown_output/articles -e FIXED_CONTENT_PA
 ```sh
 docker compose run --rm web cargo run --bin new_article -- "Rust の所有権" rust-ownership
 ```
+
+静的 export は出力ディレクトリと同じ親の `.link-card-cache/` に成功したリンクカードを24時間保存します。CIではこのディレクトリを復元・保存してください。期限切れ後の再取得に失敗した場合は直前の成功結果を使います。
