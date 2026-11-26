@@ -234,8 +234,8 @@ async fn export_search_index(
             "text": crate::utils::search::article_text(article),
             "body": markdown_to_text(&article.content),
             "icatch_path": article.icatch_path.as_ref().or(config.default_icatch_path.as_ref()),
-            "created_at": format_datetime(article.created_at, config.timezone),
-            "updated_at": format_datetime(article.updated_at, config.timezone),
+            "created_at": article.created_at.with_timezone(&config.timezone).to_rfc3339(),
+            "updated_at": article.updated_at.with_timezone(&config.timezone).to_rfc3339(),
             "year": date.year(),
             "month": date.month(),
         }));
@@ -337,8 +337,8 @@ async fn export_index_variant(
                     "url": static_article_url(&m.slug),
                     "excerpt": excerpt,
                     "icatch_path": icatch_path,
-                    "created_at": format_datetime(m.created_at, config.timezone),
-                    "updated_at": format_datetime(m.updated_at, config.timezone),
+                    "created_at": m.created_at.with_timezone(&config.timezone).to_rfc3339(),
+                    "updated_at": m.updated_at.with_timezone(&config.timezone).to_rfc3339(),
                 })
             })
             .collect();
@@ -606,8 +606,8 @@ async fn export_tag_variant(
                     "url": static_article_url(&slug),
                     "icatch_path": icatch_path,
                     "excerpt": excerpt,
-                    "created_at": format_datetime(article.created_at, config.timezone),
-                    "updated_at": format_datetime(article.updated_at, config.timezone),
+                    "created_at": article.created_at.with_timezone(&config.timezone).to_rfc3339(),
+                    "updated_at": article.updated_at.with_timezone(&config.timezone).to_rfc3339(),
                 })
             })
             .collect();
@@ -739,8 +739,8 @@ async fn export_category_variant(
                     "url": static_article_url(&slug),
                     "icatch_path": icatch_path,
                     "excerpt": excerpt,
-                    "created_at": format_datetime(article.created_at, config.timezone),
-                    "updated_at": format_datetime(article.updated_at, config.timezone),
+                    "created_at": article.created_at.with_timezone(&config.timezone).to_rfc3339(),
+                    "updated_at": article.updated_at.with_timezone(&config.timezone).to_rfc3339(),
                 })
             })
             .collect();

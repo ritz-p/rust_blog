@@ -9,7 +9,7 @@ use crate::{
         query::{PagingQuery, index::IndexQuery},
     },
     repository::article::{ArticlePeriod, get_all_articles, get_article_periods, search_articles},
-    utils::{config::CommonConfig, cut_out_string, format_datetime, markdown::markdown_to_text},
+    utils::{config::CommonConfig, cut_out_string,  markdown::markdown_to_text},
 };
 
 #[derive(Clone, Copy)]
@@ -210,8 +210,8 @@ async fn render_index(
                 "title_highlights": title_highlights,
                 "excerpt_highlights": excerpt_highlights,
                 "icatch_path": icatch_path,
-                "created_at": format_datetime(m.created_at, config.timezone),
-                "updated_at": format_datetime(m.updated_at, config.timezone),
+                "created_at": m.created_at.with_timezone(&config.timezone).to_rfc3339(),
+                "updated_at": m.updated_at.with_timezone(&config.timezone).to_rfc3339(),
             })
         })
         .collect();

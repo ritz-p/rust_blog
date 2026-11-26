@@ -5,7 +5,8 @@
   </a>
   {% endif %}
   <div class="article-card-body">
-    <p class="article-card-date"><span class="date-item">公開日 {{ article.created_at }}</span>{% if article.updated_at is defined and article.updated_at %}<span class="date-item date-updated"><span class="date-separator" aria-hidden="true">/</span>更新日 {{ article.updated_at }}</span>{% endif %}</p>
+    {% set created_day = article.created_at | split(pat="T") | first | replace(from="-", to="/") %}
+    <p class="article-card-date"><span class="date-item">公開日 <time datetime="{{ article.created_at }}">{{ created_day }}</time></span>{% if article.updated_at %}{% set updated_day = article.updated_at | split(pat="T") | first | replace(from="-", to="/") %}{% if updated_day != created_day %}<span class="date-item date-updated"><span class="date-separator" aria-hidden="true">/</span>更新日 <time datetime="{{ article.updated_at }}">{{ updated_day }}</time></span>{% endif %}{% endif %}</p>
     <h2 class="article-card-title"><a href="{{ article.url }}">{% if article.title_highlights is defined and article.title_highlights | length > 0 %}{% for part in article.title_highlights %}{% if part.matched %}<mark>{{ part.text }}</mark>{% else %}{{ part.text }}{% endif %}{% endfor %}{% else %}{{ article.title }}{% endif %}</a></h2>
     {% if article.excerpt_highlights is defined and article.excerpt_highlights | length > 0 %}
     <p class="article-card-excerpt">{% for part in article.excerpt_highlights %}{% if part.matched %}<mark>{{ part.text }}</mark>{% else %}{{ part.text }}{% endif %}{% endfor %}</p>
