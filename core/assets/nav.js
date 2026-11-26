@@ -1,3 +1,30 @@
+function highlightLines(code) {
+  const ranges = code.dataset.lines.split(',').flatMap(part => {
+    const match = /^([1-9]\d*)(?:-([1-9]\d*))?$/.exec(part);
+    if (!match) return [];
+    return [[Number(match[1]), Number(match[2] || match[1])]];
+  });
+  const walker = document.createTreeWalker(code, 4);
+  const nodes = [];
+  while (walker.nextNode()) nodes.push(walker.currentNode);
+  let line = 1;
+  for (const node of nodes) {
+    const fragment = document.createDocumentFragment();
+    for (const part of node.data.split(/(\n)/)) {
+      if (part === '\n') line++;
+      if (part && part !== '\n' && ranges.some(([start, end]) => line >= start && line <= end)) {
+        const mark = document.createElement('span');
+        mark.className = 'code-highlight';
+        mark.textContent = part;
+        fragment.append(mark);
+      } else {
+        fragment.append(part);
+      }
+    }
+    node.replaceWith(fragment);
+  }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   const back = document.querySelector('[data-return-listing]');
   if (back && new URLSearchParams(window.location.search).get('from') === 'all') {
@@ -24,7 +51,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const toolbar = document.createElement('div');
     toolbar.className = 'code-toolbar';
     const label = document.createElement('span');
-    label.textContent = code.dataset.language || 'Text';
+    label.textContent = [code.dataset.language || 'Text', code.dataset.filename].filter(Boolean).join(' · ');
+    if (code.dataset.lines) highlightLines(code);
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'button is-small';
