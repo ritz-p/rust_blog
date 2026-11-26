@@ -624,3 +624,8 @@
 .table-of-contents summary { cursor: pointer; }
 .table-of-contents summary::after { content: "開く"; margin-inline-start: auto; }
 .table-of-contents details[open] > summary::after { content: "閉じる"; }
+
+.article-adjacent { display: flex; gap: 1rem; margin-block: 1rem; }
+.article-adjacent a { flex: 1; overflow-wrap: anywhere; }
+.article-adjacent small { display: block; }
+@media (max-width: 768px) { .article-adjacent { flex-direction: column; } }
