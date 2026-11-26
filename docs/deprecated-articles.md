@@ -17,3 +17,5 @@ categories: []
 設定を変更したら seed を再実行します。静的サイトでは export 後に `static` を `--force-recreate` で再作成してください。記事の公開・非公開や本文は変更しません。設定を削除するか `false` に戻して seed すると注意表示を解除できます。
 
 Markdown 整形 CLI は真偽値を検証し、DB からの Markdown 書き出しでも設定を保持します。確認用の記事は `content/articles/50.md` です。
+
+successor: current-guide を併記すると、注意欄からその slug の記事へ移動できます。seed は自己参照と、削除済みまたは存在しない後継記事をエラーにします。

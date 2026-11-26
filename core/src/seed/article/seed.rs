@@ -61,6 +61,9 @@ pub async fn prepare(
             .clone()
             .unwrap_or_else(|| "blog".into()),
     );
+    active_model
+        .successor
+        .set_if_not_equals(front_matter.successor.clone());
     active_model.content.set_if_not_equals(body.to_string());
     active_model
         .table_of_contents

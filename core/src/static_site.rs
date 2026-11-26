@@ -177,6 +177,7 @@ mod slug_tests {
             updated_at: Set(Utc::now()),
             table_of_contents: Set(false),
             deprecated: Set(false),
+            successor: Set(None),
             ..Default::default()
         }
         .insert(&db)
@@ -470,6 +471,12 @@ async fn export_article_pages(
             "listing",
             &navigation.article_listing(&article.section, true),
         );
+        let successor = article
+            .successor
+            .as_deref()
+            .and_then(|slug| published.iter().find(|a| a.slug == slug))
+            .map(|a| json!({"title": a.title, "url": static_article_url(&a.slug)}));
+        ctx.insert("successor", &successor);
         ctx.insert("deprecated", &article.deprecated);
         ctx.insert(
             "created_at",
@@ -1343,6 +1350,7 @@ mod tests {
                 icatch_path: Set(None),
                 table_of_contents: Set(false),
                 deprecated: Set(false),
+                successor: Set(None),
                 adsense_sidebar: Set(false),
                 adsense_auto_ads: Set(false),
                 section: Set("blog".into()),
@@ -1521,6 +1529,7 @@ mod tests {
             icatch_path: None,
             table_of_contents: false,
             deprecated: false,
+            successor: None,
             adsense_sidebar: false,
             adsense_auto_ads: false,
             section: "blog".into(),

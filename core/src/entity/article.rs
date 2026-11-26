@@ -19,6 +19,7 @@ pub struct Model {
     pub icatch_path: Option<String>,
     pub table_of_contents: bool,
     pub deprecated: bool,
+    pub successor: Option<String>,
     #[sea_orm(default_value = false)]
     pub adsense_sidebar: bool,
     #[sea_orm(default_value = false)]
