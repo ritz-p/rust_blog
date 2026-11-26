@@ -10,7 +10,7 @@ html, body, .navbar, .navbar-menu { background-color: var(--surface); color: var
   background-color: var(--surface);
   color: var(--link);
 }
-a, .tabs li.is-active a { color: var(--link); }
+a, .tabs li.is-active a, .tabs a:is(:hover, :focus-visible) { color: var(--link); }
 .menu-list a[href]:is(:hover, :focus-visible) {
   color: var(--link);
   background-color: var(--panel);
@@ -21,6 +21,10 @@ a:hover { color: var(--ink); }
   color: var(--ink);
 }
 .button, .input, .select select, .pagination-link, .pagination-next, .pagination-previous { color: var(--ink); background-color: var(--panel); }
+.input::placeholder {
+  color: light-dark(#526176, #b2c0d1);
+  opacity: 1;
+}
 .button:not(.is-link):is(:hover, :focus, :active) {
   color: var(--ink);
   background-color: var(--panel);
