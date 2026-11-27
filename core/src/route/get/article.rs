@@ -307,21 +307,7 @@ mod tests {
         fs::remove_dir_all(root).unwrap();
     }
 
-    #[rocket::async_test]
-    async fn confirmation_articles_render_through_server_routes() {
-        let db = fixture_db().await;
-        let cases = [
-            31, 33, 34, 35, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50,
-        ];
-        for number in cases {
-            let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-                .join(format!("../content/articles/{number}.md"));
-            let (matter, body) =
-                rust_blog::seed::markdown::parse_markdown_to_front_matter(&path).unwrap();
-            rust_blog::seed::article::seed_article(&db, &matter, &body)
-                .await
-                .unwrap();
-        }
+    async fn article_client(db: sea_orm::DatabaseConnection) -> Client {
         let rocket = rocket::custom(rocket::Config::figment().merge((
             "template_dir",
             concat!(env!("CARGO_MANIFEST_DIR"), "/../templates"),
@@ -340,7 +326,64 @@ mod tests {
         })
         .attach(Template::fairing())
         .mount("/", routes![article_detail]);
-        let client = Client::tracked(rocket).await.unwrap();
+        Client::tracked(rocket).await.unwrap()
+    }
+
+    #[rocket::async_test]
+    async fn deprecated_notice_links_only_to_a_published_successor() {
+        use rust_blog::seed::article::seed_article;
+        use scraper::{Html, Selector};
+
+        let client = article_client(fixture_db().await).await;
+        let db = client
+            .rocket()
+            .state::<sea_orm::DatabaseConnection>()
+            .unwrap();
+        let old = serde_yaml::from_str("title: Old\nslug: old\ncreated_at: '2020-01-01'\ndeprecated: true\nsuccessor: 'guide #2'").unwrap();
+        seed_article(db, &old, "Body").await.unwrap();
+        let mut guide: rust_blog::utils::front_matter::FrontMatter =
+            serde_yaml::from_str("title: New guide\nslug: 'guide #2'").unwrap();
+        for (date, published) in [("2999-01-01", false), ("2020-01-02", true)] {
+            guide.created_at = Some(date.into());
+            seed_article(db, &guide, "Body").await.unwrap();
+            let response = client.get("/posts/old").dispatch().await;
+            assert_eq!(response.status(), Status::Ok);
+            let html = Html::parse_document(&response.into_string().await.unwrap());
+            let notice = html
+                .select(&Selector::parse(".article-deprecated").unwrap())
+                .next()
+                .unwrap();
+            let links: Vec<_> = notice.select(&Selector::parse("a").unwrap()).collect();
+            if published {
+                assert_eq!(links.len(), 1);
+                assert_eq!(links[0].text().collect::<String>(), "New guide");
+                assert_eq!(links[0].attr("href"), Some("/posts/guide%20%232"));
+            } else {
+                assert!(links.is_empty());
+                assert_eq!(
+                    notice.text().collect::<String>(),
+                    "この記事の内容は古いです"
+                );
+            }
+        }
+    }
+
+    #[rocket::async_test]
+    async fn confirmation_articles_render_through_server_routes() {
+        let db = fixture_db().await;
+        let cases = [
+            31, 33, 34, 35, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50,
+        ];
+        for number in cases {
+            let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join(format!("../content/articles/{number}.md"));
+            let (matter, body) =
+                rust_blog::seed::markdown::parse_markdown_to_front_matter(&path).unwrap();
+            rust_blog::seed::article::seed_article(&db, &matter, &body)
+                .await
+                .unwrap();
+        }
+        let client = article_client(db).await;
         for number in cases {
             let response = client.get(format!("/posts/{number}")).dispatch().await;
             if number == 37 {
