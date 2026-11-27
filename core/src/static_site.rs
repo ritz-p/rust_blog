@@ -78,6 +78,7 @@ pub async fn export_site(
         ),
         None => None,
     };
+    let cache_dir = out_dir.with_file_name(".link-card-cache");
     let output = output::StagedOutput::new(out_dir)?;
     let out_dir = output.path();
     write_static_assets(out_dir, &paths.content_dir, config_map)?;
@@ -112,7 +113,16 @@ pub async fn export_site(
     if let Some(body) = adsense.ads_txt() {
         fs::write(out_dir.join("ads.txt"), body)?;
     }
-    let has_ads = export_article_pages(&tera, db, &config, &adsense, out_dir).await?;
+    let has_ads = export_article_pages(
+        &tera,
+        db,
+        &config,
+        &navigation,
+        &adsense,
+        &cache_dir,
+        out_dir,
+    )
+    .await?;
     export_fixed_content_pages(&tera, db, &config, out_dir).await?;
     export_tag_pages(&tera, db, &config, out_dir).await?;
     export_category_pages(&tera, db, &config, out_dir).await?;
@@ -177,6 +187,7 @@ mod slug_tests {
             updated_at: Set(Utc::now()),
             table_of_contents: Set(false),
             deprecated: Set(false),
+            successor: Set(None),
             ..Default::default()
         }
         .insert(&db)
@@ -234,8 +245,8 @@ async fn export_search_index(
             "text": crate::utils::search::article_text(article),
             "body": markdown_to_text(&article.content),
             "icatch_path": article.icatch_path.as_ref().or(config.default_icatch_path.as_ref()),
-            "created_at": format_datetime(article.created_at, config.timezone),
-            "updated_at": format_datetime(article.updated_at, config.timezone),
+            "created_at": article.created_at.with_timezone(&config.timezone).to_rfc3339(),
+            "updated_at": article.updated_at.with_timezone(&config.timezone).to_rfc3339(),
             "year": date.year(),
             "month": date.month(),
         }));
@@ -337,13 +348,14 @@ async fn export_index_variant(
                     "url": static_article_url(&m.slug),
                     "excerpt": excerpt,
                     "icatch_path": icatch_path,
-                    "created_at": format_datetime(m.created_at, config.timezone),
-                    "updated_at": format_datetime(m.updated_at, config.timezone),
+                    "created_at": m.created_at.with_timezone(&config.timezone).to_rfc3339(),
+                    "updated_at": m.updated_at.with_timezone(&config.timezone).to_rfc3339(),
                 })
             })
             .collect();
 
         let mut ctx = base_context(config);
+        ctx.insert("active_tab", "all");
         ctx.insert("search_url", "/search/");
         ctx.insert("search_query", "");
         ctx.insert("static_search", &true);
@@ -398,7 +410,9 @@ async fn export_article_pages(
     tera: &Tera,
     db: &DatabaseConnection,
     config: &CommonConfig,
+    navigation: &crate::sections::Navigation,
     adsense: &crate::adsense::AdSense,
+    cache_dir: &Path,
     out_dir: &Path,
 ) -> Result<bool> {
     let mut articles = article::Entity::find().all(db).await?;
@@ -413,10 +427,13 @@ async fn export_article_pages(
         .filter(|article| article.created_at <= Utc::now())
         .cloned()
         .collect();
+    let previews = crate::link_cards::ExportPreviews::new(cache_dir);
     for article in &articles {
-        let surrounding: Vec<_> = published
-            .iter()
-            .position(|a| a.id == article.id)
+        let current_index = published.iter().position(|a| a.id == article.id);
+        let adjacent: Vec<_> = current_index.into_iter().flat_map(|i| [
+            ("前の記事", published.get(i + 1)), ("次の記事", i.checked_sub(1).and_then(|j| published.get(j)))
+        ]).filter_map(|(label, item)| item.map(|a| json!({"label": label, "title": a.title, "url": static_article_url(&a.slug)}))).collect();
+        let surrounding: Vec<_> = current_index
             .map(|index| crate::repository::article::surrounding_articles(&published, index))
             .unwrap_or_default()
             .into_iter()
@@ -455,13 +472,28 @@ async fn export_article_pages(
             "metadata",
             &crate::utils::metadata::article_metadata(article, config, true),
         );
-        let content = crate::link_cards::article_html(&article.content).await;
+        let content = previews.article_html(&article.content).await;
         let content = if article.table_of_contents {
             toc(&content)
         } else {
             content
         };
         ctx.insert("content_html", &content);
+        ctx.insert(
+            "listing",
+            &navigation.article_listing(&article.section, true),
+        );
+        let successor = article
+            .successor
+            .as_deref()
+            .and_then(|slug| published.iter().find(|a| a.slug == slug))
+            .map(|a| json!({"title": a.title, "url": static_article_url(&a.slug)}));
+        if successor.is_none()
+            && let Some(slug) = article.successor.as_deref()
+        {
+            ctx.insert("pending_successor_url", &static_article_url(slug));
+        }
+        ctx.insert("successor", &successor);
         ctx.insert("deprecated", &article.deprecated);
         ctx.insert(
             "created_at",
@@ -474,6 +506,7 @@ async fn export_article_pages(
         ctx.insert("tags", &tags);
         ctx.insert("categories", &categories);
         ctx.insert("latest_articles", &latest_articles);
+        ctx.insert("adjacent", &adjacent);
         ctx.insert("surrounding_articles", &surrounding);
 
         render_to_path(
@@ -606,8 +639,8 @@ async fn export_tag_variant(
                     "url": static_article_url(&slug),
                     "icatch_path": icatch_path,
                     "excerpt": excerpt,
-                    "created_at": format_datetime(article.created_at, config.timezone),
-                    "updated_at": format_datetime(article.updated_at, config.timezone),
+                    "created_at": article.created_at.with_timezone(&config.timezone).to_rfc3339(),
+                    "updated_at": article.updated_at.with_timezone(&config.timezone).to_rfc3339(),
                 })
             })
             .collect();
@@ -739,8 +772,8 @@ async fn export_category_variant(
                     "url": static_article_url(&slug),
                     "icatch_path": icatch_path,
                     "excerpt": excerpt,
-                    "created_at": format_datetime(article.created_at, config.timezone),
-                    "updated_at": format_datetime(article.updated_at, config.timezone),
+                    "created_at": article.created_at.with_timezone(&config.timezone).to_rfc3339(),
+                    "updated_at": article.updated_at.with_timezone(&config.timezone).to_rfc3339(),
                 })
             })
             .collect();
@@ -1334,6 +1367,7 @@ mod tests {
                 icatch_path: Set(None),
                 table_of_contents: Set(false),
                 deprecated: Set(false),
+                successor: Set(None),
                 adsense_sidebar: Set(false),
                 adsense_auto_ads: Set(false),
                 section: Set("blog".into()),
@@ -1512,6 +1546,7 @@ mod tests {
             icatch_path: None,
             table_of_contents: false,
             deprecated: false,
+            successor: None,
             adsense_sidebar: false,
             adsense_auto_ads: false,
             section: "blog".into(),
@@ -1539,9 +1574,17 @@ mod tests {
             &Default::default(),
         )
         .expect("failed to export assets");
-        export_article_pages(&tera, &db, &config, &Default::default(), &output.0)
-            .await
-            .expect("failed to export article");
+        export_article_pages(
+            &tera,
+            &db,
+            &config,
+            &Default::default(),
+            &Default::default(),
+            &output.0.join("cache"),
+            &output.0,
+        )
+        .await
+        .expect("failed to export article");
         let html = fs::read_to_string(output.0.join("posts/highlighted-rust/index.html"))
             .expect("missing exported article");
         assert!(
@@ -1550,7 +1593,7 @@ mod tests {
         );
         assert!(html.contains("property=\"og:title\" content=\"Highlighted Rust\""));
         assert!(html.contains("href=\"/posts/highlighted-rust/\""));
-        assert!(html.contains("href=\"/css/site.css?v=footer-links-1\""));
+        assert!(html.contains("href=\"/css/site.css?v=theme-6\""));
         let content = html
             .split("<div class=\"content is-medium\">")
             .nth(1)
@@ -1756,7 +1799,8 @@ mod home_navigation_tests {
                 let tab_page = html(&format!("{tab}/index.html"));
                 assert!(tab_page.contains(&format!("data-href=\"{month}\"")));
                 let second = html(&format!("{tab}/archive/2020/01/page/2/index.html"));
-                assert!(second.contains("href=\"/posts/article-2/\""));
+                let suffix = if tab == "all" { "?from=all" } else { "" };
+                assert!(second.contains(&format!("href=\"/posts/article-2/{suffix}\"")));
                 assert!(second.contains(&format!("data-href=\"{base}\"")));
                 assert!(
                     second.contains(&format!("class=\"pagination-previous\" href=\"{month}\""))
@@ -1769,9 +1813,9 @@ mod home_navigation_tests {
             } else {
                 "all/index.html"
             };
-            assert!(html(destination).contains("href=\"/posts/article-3/\""));
-            assert!(html("page/2/index.html").contains("href=\"/posts/article-2/\""));
-            assert!(html("page/3/index.html").contains("href=\"/posts/article-1/\""));
+            assert!(html(destination).contains("href=\"/posts/article-3/?from=all\""));
+            assert!(html("page/2/index.html").contains("href=\"/posts/article-2/?from=all\""));
+            assert!(html("page/3/index.html").contains("href=\"/posts/article-1/?from=all\""));
             for path in [
                 "search/index.html",
                 "archive/2020/01/index.html",
@@ -1782,7 +1826,7 @@ mod home_navigation_tests {
                 assert!(page.contains("data-search-url=\"/search/\""));
                 assert!(page.contains("data-static-search=\"true\""));
             }
-            assert!(html("search/index.html").contains("href=\"/posts/article-3/\""));
+            assert!(html("search/index.html").contains("href=\"/posts/article-3/?from=all\""));
             if home == "about" {
                 assert!(
                     html("index.html")

@@ -249,6 +249,20 @@ impl Navigation {
         Ok(config.navigation)
     }
 
+    pub fn article_listing(&self, section: &str, static_mode: bool) -> serde_json::Value {
+        let tab = self
+            .tabs
+            .iter()
+            .find(|tab| matches!(tab, Tab::Section { id, .. } if id == section))
+            .or_else(|| {
+                self.tabs
+                    .iter()
+                    .find(|tab| tab.id() == self.default_section)
+            });
+        tab.map(|tab| serde_json::json!({"url": self.url(tab, static_mode), "label": tab.label()}))
+            .unwrap_or_else(|| serde_json::json!({"url": "/", "label": "記事"}))
+    }
+
     pub fn links(&self, static_mode: bool) -> serde_json::Value {
         let mut tabs: Vec<_> = self.tabs.iter().collect();
         tabs.sort_by_key(|tab| !matches!(tab, Tab::All { .. }));
@@ -394,8 +408,8 @@ impl<'a> Listing<'a> {
             "url": format!("/posts/{}{suffix}", crate::utils::url_segment(&model.slug)),
             "excerpt": crate::utils::cut_out_string(&crate::utils::markdown::markdown_to_text(model.excerpt.as_deref().unwrap_or(&model.content)), 100),
             "icatch_path": model.icatch_path.as_deref().or(self.default_icatch_path),
-            "created_at": crate::utils::format_datetime(model.created_at, self.timezone),
-            "updated_at": crate::utils::format_datetime(model.updated_at, self.timezone),
+            "created_at": model.created_at.with_timezone(&self.timezone).to_rfc3339(),
+            "updated_at": model.updated_at.with_timezone(&self.timezone).to_rfc3339(),
         })).collect();
         let tab = navigation
             .tabs
@@ -549,7 +563,7 @@ mod integration_tests {
     async fn sections_keep_same_named_taxonomy_separate_and_exclude_fixed_pages() {
         let db = Database::connect("sqlite::memory:").await.unwrap();
         for sql in [
-            "CREATE TABLE article (id INTEGER PRIMARY KEY, title TEXT NOT NULL, slug TEXT UNIQUE NOT NULL, excerpt TEXT, content TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, icatch_path TEXT, table_of_contents BOOLEAN NOT NULL DEFAULT false, deprecated BOOLEAN NOT NULL DEFAULT false, adsense_sidebar BOOLEAN NOT NULL DEFAULT false, adsense_auto_ads BOOLEAN NOT NULL DEFAULT false, section TEXT NOT NULL DEFAULT 'blog')",
+            "CREATE TABLE article (id INTEGER PRIMARY KEY, title TEXT NOT NULL, slug TEXT UNIQUE NOT NULL, excerpt TEXT, content TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, icatch_path TEXT, table_of_contents BOOLEAN NOT NULL DEFAULT false, deprecated BOOLEAN NOT NULL DEFAULT false, successor TEXT, adsense_sidebar BOOLEAN NOT NULL DEFAULT false, adsense_auto_ads BOOLEAN NOT NULL DEFAULT false, section TEXT NOT NULL DEFAULT 'blog')",
             "CREATE TABLE tag (id INTEGER PRIMARY KEY, name TEXT UNIQUE, slug TEXT UNIQUE)",
             "CREATE TABLE category (id INTEGER PRIMARY KEY, name TEXT UNIQUE, slug TEXT UNIQUE)",
             "CREATE TABLE article_tag (article_id INTEGER, tag_id INTEGER, PRIMARY KEY(article_id, tag_id))",

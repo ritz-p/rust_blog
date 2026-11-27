@@ -6,6 +6,8 @@
   <div class="has-text-centered">
     <h1 class="title">404</h1>
     <p class="subtitle has-text-grey">お探しのページは見つかりませんでした。</p>
+    <p class="mb-4">キーワードで記事を探せます。</p>
+    <a class="button is-link" href="{% if static_listings %}/search/{% else %}/search{% endif %}">記事を検索する</a>
     <a class="button is-light" href="/">← トップへ戻る</a>
   </div>
 </section>

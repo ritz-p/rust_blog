@@ -12,7 +12,7 @@ pub fn not_found(_status: Status, req: &Request<'_>) -> Template {
     Template::render(
         "404",
         context! {
-            site_name: "404 Not Found",
+            site_name: req.rocket().state::<CommonConfig>().and_then(|config| config.site_name.as_deref()),
             favicon_path: favicon_path
         },
     )

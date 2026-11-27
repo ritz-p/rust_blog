@@ -2,7 +2,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   const results = document.querySelector('[data-static-listing][data-per]') || document.getElementById('index-results');
   const sidebar = document.querySelector('[data-article-sidebar]');
   const catalog = document.querySelector('[data-taxonomy-index]');
-  if (!results && !sidebar && !catalog) return;
+  const notice = document.querySelector('.article-page > .article-deprecated[data-pending-successor]');
+  if (!results && !sidebar && !catalog && !notice) return;
   const indexPage = results?.dataset.staticSearch === 'true';
   const dynamic = Date.now() >= Number(document.body.dataset.scheduleAt || Infinity);
   const { pathname, origin } = window.location;
@@ -120,6 +121,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     const records = await response.json();
     const now = Date.now();
     const articles = records.filter(article => article.published_at === undefined || article.published_at <= now);
+    if (notice) {
+      const successor = articles.find(article => article.url === notice.dataset.pendingSuccessor);
+      if (successor) {
+        const link = element('a', '', successor.title);
+        link.href = successor.url;
+        notice.append('。後継記事「', link, '」をご覧ください。');
+        delete notice.dataset.pendingSuccessor;
+      }
+    }
     if (sidebar) {
       const index = articles.findIndex(article => article.url === pathname);
       const groups = [['最新記事', articles.slice(0, 5)]];
@@ -138,6 +148,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         menu.append(element('p', 'menu-label', label), list);
         return menu;
       });
+      const adjacent = document.querySelector('.article-adjacent');
+      if (adjacent && index >= 0) {
+        adjacent.replaceChildren();
+        for (const [label, item] of [['前の記事', articles[index + 1]], ['次の記事', articles[index - 1]]]) {
+          if (!item) continue;
+          const link = element('a');
+          link.href = item.url;
+          link.append(element('small', '', label), item.title);
+          adjacent.append(link);
+        }
+      }
       sidebar.replaceChildren(...menus);
     }
     if (catalog) {
@@ -208,12 +229,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     const list = element('div', 'article-list');
     for (const article of matches.slice((page - 1) * per, page * per)) {
+      const cardUrl = section === 'all' ? article.url + '?from=all' : article.url;
       const card = element('article', 'article-card');
       if (article.icatch_path) {
         const imageUrl = new URL(article.icatch_path, window.location.origin);
         if (['http:', 'https:'].includes(imageUrl.protocol)) {
           const imageLink = element('a', 'article-card-image');
-          imageLink.href = article.url;
+          imageLink.href = cardUrl;
           imageLink.tabIndex = -1;
           imageLink.setAttribute('aria-hidden', 'true');
           const image = element('img');
@@ -224,12 +246,18 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
       const body = element('div', 'article-card-body');
       const date = element('p', 'article-card-date');
-      date.append(element('span', 'date-item', `公開日 ${article.created_at}`));
-      date.append(element('span', 'date-item date-updated', ` / 更新日 ${article.updated_at}`));
+      for (const [stamp, label] of [[article.created_at, '公開日'], [article.updated_at, '更新日']]) {
+        if (!stamp || (label === '更新日' && stamp.slice(0, 10) === article.created_at.slice(0, 10))) continue;
+        const time = element('time', '', stamp.slice(0, 10).replaceAll('-', '/'));
+        time.dateTime = stamp;
+        const item = element('span', 'date-item', label === '更新日' ? ' / 更新日 ' : '公開日 ');
+        item.append(time);
+        date.append(item);
+      }
       const title = element('h2', 'article-card-title');
       const titleLink = element('a');
       appendFragments(titleLink, fragments(article.title, terms, false));
-      titleLink.href = article.url;
+      titleLink.href = cardUrl;
       title.append(titleLink);
       body.append(date, title);
       const bodyParts = searching ? fragments(article.body, terms, true) : [];

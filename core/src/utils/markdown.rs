@@ -88,6 +88,19 @@ pub(crate) fn render_markdown<'a>(mut parser: impl Iterator<Item = Event<'a>>) -
                     1,
                 )
             };
+            let mut attributes = String::new();
+            for option in info.split_whitespace().skip(1) {
+                if let Some((name, value)) = option.split_once('=')
+                    && matches!(name, "filename" | "lines")
+                    && !value.is_empty()
+                {
+                    attributes.push_str(&format!(
+                        " data-{name}=\"{}\"",
+                        html_escape::encode_double_quoted_attribute(value)
+                    ));
+                }
+            }
+            let rendered = rendered.replacen("<code", &format!("<code{attributes}"), 1);
             events.push(Event::Html(rendered.into()));
             continue;
         }
@@ -136,7 +149,7 @@ fn highlight_code(code: &str, syntax: &SyntaxReference, syntax_set: &SyntaxSet) 
 fn sanitize_html(html: &str) -> String {
     Builder::default()
         .add_tag_attributes("span", &["class"])
-        .add_tag_attributes("code", &["data-language"])
+        .add_tag_attributes("code", &["data-language", "data-filename", "data-lines"])
         .clean(html)
         .to_string()
 }

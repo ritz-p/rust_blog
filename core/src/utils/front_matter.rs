@@ -13,6 +13,7 @@ pub struct FrontMatter {
     pub table_of_contents: bool,
     #[serde(default)]
     pub deprecated: bool,
+    pub successor: Option<String>,
     #[serde(default)]
     pub adsense_sidebar: bool,
     #[serde(default)]
@@ -50,6 +51,7 @@ impl FrontMatter {
             deleted,
             table_of_contents: false,
             deprecated: false,
+            successor: None,
             adsense_sidebar: false,
             adsense_auto_ads: false,
             created_at,

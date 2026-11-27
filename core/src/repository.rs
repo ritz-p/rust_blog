@@ -71,6 +71,7 @@ mod repository_tests {
             icatch_path: None,
             table_of_contents: false,
             deprecated: false,
+            successor: None,
             adsense_sidebar: false,
             adsense_auto_ads: false,
             section: "blog".into(),

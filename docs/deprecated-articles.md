@@ -17,3 +17,7 @@ categories: []
 設定を変更したら seed を再実行します。静的サイトでは export 後に `static` を `--force-recreate` で再作成してください。記事の公開・非公開や本文は変更しません。設定を削除するか `false` に戻して seed すると注意表示を解除できます。
 
 Markdown 整形 CLI は真偽値を検証し、DB からの Markdown 書き出しでも設定を保持します。確認用の記事は `content/articles/50.md` です。
+
+`successor: current-guide` を併記すると、注意欄からその slug の記事へ移動できます。seed は自己参照と、削除済みまたは存在しない後継記事をエラーにします。
+
+予約公開の後継記事へのリンクは、公開時刻以降に旧記事を開くと表示されます。予約記事を含めて export 済みの静的サイトでは、JavaScript が注意欄を更新するため、公開時刻に再 export する必要はありません。

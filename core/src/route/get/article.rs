@@ -22,6 +22,7 @@ pub async fn article_detail(
     config: &State<CommonConfig>,
     db: &State<DatabaseConnection>,
     adsense: &State<rust_blog::adsense::AdSense>,
+    navigation: &State<rust_blog::sections::Navigation>,
     slug: &str,
 ) -> Result<ArticlePage, Status> {
     let conn = db.inner();
@@ -72,9 +73,17 @@ pub async fn article_detail(
     let created_at = format_datetime(article.created_at, config.timezone);
     let updated_at = format_datetime(article.updated_at, config.timezone);
 
-    let surrounding: Vec<_> = get_surrounding_articles(db, &article)
+    let neighbors = get_surrounding_articles(db, &article)
         .await
-        .map_err(|_| Status::InternalServerError)?
+        .map_err(|_| Status::InternalServerError)?;
+    let key = (article.created_at, article.id);
+    let adjacent = [
+        ("前の記事", neighbors.iter().find(|a| (a.created_at, a.id) < key)),
+        ("次の記事", neighbors.iter().rev().find(|a| (a.created_at, a.id) > key)),
+    ].into_iter().filter_map(|(label, item)| item.map(|a| json!({
+        "label": label, "title": a.title, "url": format!("/posts/{}", crate::utils::url_segment(&a.slug))
+    }))).collect::<Vec<_>>();
+    let surrounding: Vec<_> = neighbors
         .into_iter()
         .map(|model| {
             let slug = model.slug.clone();
@@ -109,6 +118,12 @@ pub async fn article_detail(
     } else {
         rust_blog::adsense::DEFAULT_CSP.as_str()
     };
+    let successor = if let Some(slug) = article.successor.as_deref() {
+        get_article_by_slug(conn, slug).await.map_err(|_| Status::InternalServerError)?
+            .map(|a| json!({"title": a.title, "url": format!("/posts/{}", crate::utils::url_segment(&a.slug))}))
+    } else {
+        None
+    };
     let template = Template::render(
         "article_detail",
         context! {
@@ -121,6 +136,8 @@ pub async fn article_detail(
             metadata: crate::utils::metadata::article_metadata(&article, config, false),
             title: article.title,
             content_html: content,
+            successor: successor,
+            listing: navigation.article_listing(&article.section, false),
             deprecated: article.deprecated,
             created_at: created_at,
             updated_at: updated_at,
@@ -129,6 +146,7 @@ pub async fn article_detail(
             latest_articles: latest_articles,
             article_ads: article_ads,
             nav_integrity: rust_blog::adsense::NAV_INTEGRITY.as_str(),
+            adjacent: adjacent,
             surrounding_articles: surrounding
         },
     );
@@ -230,6 +248,7 @@ mod tests {
                 rocket::Config::figment().merge(("template_dir", &paths.templates_dir)),
             )
             .manage(db)
+            .manage(rust_blog::sections::Navigation::default())
             .manage(AdSense::from_config(&map).unwrap())
             .manage(CommonConfig {
                 articles_per_page: 10,
@@ -288,6 +307,67 @@ mod tests {
         fs::remove_dir_all(root).unwrap();
     }
 
+    async fn article_client(db: sea_orm::DatabaseConnection) -> Client {
+        let rocket = rocket::custom(rocket::Config::figment().merge((
+            "template_dir",
+            concat!(env!("CARGO_MANIFEST_DIR"), "/../templates"),
+        )))
+        .manage(db)
+        .manage(rust_blog::sections::Navigation::default())
+        .manage(rust_blog::adsense::AdSense::default())
+        .manage(CommonConfig {
+            articles_per_page: 10,
+            site_name: Some("Fixture tests".into()),
+            description: None,
+            timezone: chrono_tz::UTC,
+            default_icatch_path: None,
+            favicon_path: None,
+            public_url: None,
+        })
+        .attach(Template::fairing())
+        .mount("/", routes![article_detail]);
+        Client::tracked(rocket).await.unwrap()
+    }
+
+    #[rocket::async_test]
+    async fn deprecated_notice_links_only_to_a_published_successor() {
+        use rust_blog::seed::article::seed_article;
+        use scraper::{Html, Selector};
+
+        let client = article_client(fixture_db().await).await;
+        let db = client
+            .rocket()
+            .state::<sea_orm::DatabaseConnection>()
+            .unwrap();
+        let old = serde_yaml::from_str("title: Old\nslug: old\ncreated_at: '2020-01-01'\ndeprecated: true\nsuccessor: 'guide #2'").unwrap();
+        seed_article(db, &old, "Body").await.unwrap();
+        let mut guide: rust_blog::utils::front_matter::FrontMatter =
+            serde_yaml::from_str("title: New guide\nslug: 'guide #2'").unwrap();
+        for (date, published) in [("2999-01-01", false), ("2020-01-02", true)] {
+            guide.created_at = Some(date.into());
+            seed_article(db, &guide, "Body").await.unwrap();
+            let response = client.get("/posts/old").dispatch().await;
+            assert_eq!(response.status(), Status::Ok);
+            let html = Html::parse_document(&response.into_string().await.unwrap());
+            let notice = html
+                .select(&Selector::parse(".article-deprecated").unwrap())
+                .next()
+                .unwrap();
+            let links: Vec<_> = notice.select(&Selector::parse("a").unwrap()).collect();
+            if published {
+                assert_eq!(links.len(), 1);
+                assert_eq!(links[0].text().collect::<String>(), "New guide");
+                assert_eq!(links[0].attr("href"), Some("/posts/guide%20%232"));
+            } else {
+                assert!(links.is_empty());
+                assert_eq!(
+                    notice.text().collect::<String>(),
+                    "この記事の内容は古いです"
+                );
+            }
+        }
+    }
+
     #[rocket::async_test]
     async fn confirmation_articles_render_through_server_routes() {
         let db = fixture_db().await;
@@ -303,24 +383,7 @@ mod tests {
                 .await
                 .unwrap();
         }
-        let rocket = rocket::custom(rocket::Config::figment().merge((
-            "template_dir",
-            concat!(env!("CARGO_MANIFEST_DIR"), "/../templates"),
-        )))
-        .manage(db)
-        .manage(rust_blog::adsense::AdSense::default())
-        .manage(CommonConfig {
-            articles_per_page: 10,
-            site_name: Some("Fixture tests".into()),
-            description: None,
-            timezone: chrono_tz::UTC,
-            default_icatch_path: None,
-            favicon_path: None,
-            public_url: None,
-        })
-        .attach(Template::fairing())
-        .mount("/", routes![article_detail]);
-        let client = Client::tracked(rocket).await.unwrap();
+        let client = article_client(db).await;
         for number in cases {
             let response = client.get(format!("/posts/{number}")).dispatch().await;
             if number == 37 {
@@ -370,6 +433,7 @@ mod tests {
             icatch_path: None,
             table_of_contents: false,
             deprecated: false,
+            successor: None,
             adsense_sidebar: false,
             adsense_auto_ads: false,
             section: "blog".into(),
@@ -387,6 +451,7 @@ mod tests {
             concat!(env!("CARGO_MANIFEST_DIR"), "/../templates"),
         )))
         .manage(db)
+        .manage(rust_blog::sections::Navigation::default())
         .manage(rust_blog::adsense::AdSense::default())
         .manage(CommonConfig {
             articles_per_page: 10,
@@ -418,7 +483,7 @@ mod tests {
                 .contains("href=\"/posts/highlighted-rust%23intro\""),
             "{html}"
         );
-        assert!(html.contains("href=\"/css/site.css?v=footer-links-1\""));
+        assert!(html.contains("href=\"/css/site.css?v=theme-6\""));
         let content = html
             .split("<div class=\"content is-medium\">")
             .nth(1)

@@ -9,7 +9,7 @@ use crate::{
         query::{PagingQuery, index::IndexQuery},
     },
     repository::article::{ArticlePeriod, get_all_articles, get_article_periods, search_articles},
-    utils::{config::CommonConfig, cut_out_string, format_datetime, markdown::markdown_to_text},
+    utils::{config::CommonConfig, cut_out_string, markdown::markdown_to_text},
 };
 
 #[derive(Clone, Copy)]
@@ -210,8 +210,8 @@ async fn render_index(
                 "title_highlights": title_highlights,
                 "excerpt_highlights": excerpt_highlights,
                 "icatch_path": icatch_path,
-                "created_at": format_datetime(m.created_at, config.timezone),
-                "updated_at": format_datetime(m.updated_at, config.timezone),
+                "created_at": m.created_at.with_timezone(&config.timezone).to_rfc3339(),
+                "updated_at": m.updated_at.with_timezone(&config.timezone).to_rfc3339(),
             })
         })
         .collect();
@@ -333,7 +333,7 @@ mod tests {
             .expect("failed to connect sqlite memory");
         db.execute(Statement::from_string(
             DbBackend::Sqlite,
-            "CREATE TABLE article (id INTEGER PRIMARY KEY, title TEXT NOT NULL, slug TEXT NOT NULL, excerpt TEXT NULL, content TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, icatch_path TEXT NULL, table_of_contents BOOLEAN NOT NULL DEFAULT false, deprecated BOOLEAN NOT NULL DEFAULT false, adsense_sidebar BOOLEAN NOT NULL DEFAULT false, adsense_auto_ads BOOLEAN NOT NULL DEFAULT false, section TEXT NOT NULL DEFAULT 'blog');",
+            "CREATE TABLE article (id INTEGER PRIMARY KEY, title TEXT NOT NULL, slug TEXT NOT NULL, excerpt TEXT NULL, content TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, icatch_path TEXT NULL, table_of_contents BOOLEAN NOT NULL DEFAULT false, deprecated BOOLEAN NOT NULL DEFAULT false, successor TEXT, adsense_sidebar BOOLEAN NOT NULL DEFAULT false, adsense_auto_ads BOOLEAN NOT NULL DEFAULT false, section TEXT NOT NULL DEFAULT 'blog');",
         ))
         .await
         .expect("failed to create article table");
@@ -374,7 +374,8 @@ mod tests {
             let (page, footer) = html.split_once(r#"<footer class="footer">"#).unwrap();
             assert!(!page.contains(r#"class="navbar-item" href="/about""#));
             assert!(footer.contains(r#"href="/about">About</a>"#));
-            assert!(html.contains("href=\"/posts/dec-1\""));
+            let suffix = if base == "/all" { "?from=all" } else { "" };
+            assert!(html.contains(&format!("href=\"/posts/dec-1{suffix}\"")));
             assert!(!html.contains("href=\"/posts/dec-2\""));
             assert!(html.contains(&format!("href=\"{base}?year=2025&month=12&page=1\"")));
             assert!(html.contains(&format!("data-href=\"{base}\"")));

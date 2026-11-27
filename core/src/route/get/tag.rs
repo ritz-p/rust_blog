@@ -9,7 +9,7 @@ use crate::{
         query::{PagingQuery, tag::TagQuery},
     },
     repository::{article::get_articles_by_tag_slug, tag::get_all_tags},
-    utils::{config::CommonConfig, cut_out_string, format_datetime, markdown::markdown_to_text},
+    utils::{config::CommonConfig, cut_out_string, markdown::markdown_to_text},
 };
 
 fn sort_url(slug: &str, sort_key: &str) -> String {
@@ -97,8 +97,8 @@ pub async fn tag_detail(
                             "url": format!("/posts/{}", crate::utils::url_segment(&slug)),
                             "icatch_path": icatch_path,
                             "excerpt": excerpt,
-                            "created_at": format_datetime(article.created_at, config.timezone),
-                    "updated_at": format_datetime(article.updated_at, config.timezone),
+                            "created_at": article.created_at.with_timezone(&config.timezone).to_rfc3339(),
+                    "updated_at": article.updated_at.with_timezone(&config.timezone).to_rfc3339(),
                         })
                     }).collect::<Vec<_>>(),
                     page: page_info.current_page,
@@ -167,7 +167,7 @@ mod tests {
         .expect("failed to create tag table");
         db.execute(Statement::from_string(
             DbBackend::Sqlite,
-            "CREATE TABLE article (id INTEGER PRIMARY KEY, title TEXT NOT NULL, slug TEXT NOT NULL, excerpt TEXT NULL, content TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, icatch_path TEXT NULL, table_of_contents BOOLEAN NOT NULL DEFAULT false, deprecated BOOLEAN NOT NULL DEFAULT false, adsense_sidebar BOOLEAN NOT NULL DEFAULT false, adsense_auto_ads BOOLEAN NOT NULL DEFAULT false, section TEXT NOT NULL DEFAULT 'blog');",
+            "CREATE TABLE article (id INTEGER PRIMARY KEY, title TEXT NOT NULL, slug TEXT NOT NULL, excerpt TEXT NULL, content TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, icatch_path TEXT NULL, table_of_contents BOOLEAN NOT NULL DEFAULT false, deprecated BOOLEAN NOT NULL DEFAULT false, successor TEXT, adsense_sidebar BOOLEAN NOT NULL DEFAULT false, adsense_auto_ads BOOLEAN NOT NULL DEFAULT false, section TEXT NOT NULL DEFAULT 'blog');",
         ))
         .await
         .expect("failed to create article table");

@@ -1,9 +1,73 @@
+let selectedTheme = 'system';
+try {
+  const stored = window.localStorage.getItem('theme');
+  if (stored === 'light' || stored === 'dark') selectedTheme = stored;
+} catch { /* Storage is optional. */ }
+document.documentElement.dataset.theme = selectedTheme;
+
+function highlightLines(code) {
+  const ranges = code.dataset.lines.split(',').flatMap(part => {
+    const match = /^([1-9]\d*)(?:-([1-9]\d*))?$/.exec(part);
+    if (!match) return [];
+    return [[Number(match[1]), Number(match[2] || match[1])]];
+  });
+  const walker = document.createTreeWalker(code, 4);
+  const nodes = [];
+  while (walker.nextNode()) nodes.push(walker.currentNode);
+  let line = 1;
+  for (const node of nodes) {
+    const fragment = document.createDocumentFragment();
+    for (const part of node.data.split(/(\n)/)) {
+      if (part === '\n') line++;
+      if (part && part !== '\n' && ranges.some(([start, end]) => line >= start && line <= end)) {
+        const mark = document.createElement('span');
+        mark.className = 'code-highlight';
+        mark.textContent = part;
+        fragment.append(mark);
+      } else {
+        fragment.append(part);
+      }
+    }
+    node.replaceWith(fragment);
+  }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
+  const theme = document.getElementById('theme-choice');
+  if (theme) {
+    theme.value = selectedTheme;
+    theme.addEventListener('change', () => {
+      document.documentElement.dataset.theme = theme.value;
+      try { window.localStorage.setItem('theme', theme.value); } catch { /* Storage is optional. */ }
+    });
+  }
+  const back = document.querySelector('[data-return-listing]');
+  if (back && new URLSearchParams(window.location.search).get('from') === 'all') {
+    const all = document.querySelector('.article-tabs a[href="/all"], .article-tabs a[href="/all/"]');
+    if (all) {
+      back.href = all.href;
+      back.textContent = '← ' + all.textContent + 'の一覧へ';
+    }
+  }
+  if (window.matchMedia?.('(max-width: 768px)').matches) {
+    for (const toc of document.querySelectorAll('.table-of-contents details')) {
+      if (toc.querySelectorAll('li').length > 6) toc.open = false;
+    }
+  }
+  for (const image of document.querySelectorAll('.article-page .content img[src]')) {
+    if (image.closest('a') || !/^https?:/i.test(image.src)) continue;
+    const link = document.createElement('a');
+    link.href = image.src;
+    link.setAttribute('aria-label', (image.alt || '画像') + 'を原寸で開く');
+    image.before(link);
+    link.append(image);
+  }
   for (const code of document.querySelectorAll('.content pre > code')) {
     const toolbar = document.createElement('div');
     toolbar.className = 'code-toolbar';
     const label = document.createElement('span');
-    label.textContent = code.dataset.language || 'Text';
+    label.textContent = [code.dataset.language || 'Text', code.dataset.filename].filter(Boolean).join(' · ');
+    if (code.dataset.lines) highlightLines(code);
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'button is-small';
@@ -26,6 +90,23 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     toolbar.append(label, button, status);
     code.parentElement.before(toolbar);
+  }
+  for (const scroller of document.querySelectorAll('.content table, .content pre')) {
+    const frame = document.createElement('div');
+    frame.className = 'scroll-frame';
+    scroller.before(frame);
+    frame.append(scroller);
+    const update = () => {
+      const remaining = scroller.scrollWidth - scroller.clientWidth;
+      frame.classList.toggle('more-left', scroller.scrollLeft > 1);
+      frame.classList.toggle('more-right', remaining - scroller.scrollLeft > 1);
+      if (remaining > 1) scroller.tabIndex = 0;
+      else scroller.removeAttribute('tabindex');
+    };
+    scroller.addEventListener('scroll', update, { passive: true });
+    if (window.ResizeObserver) new window.ResizeObserver(update).observe(scroller);
+    window.addEventListener('load', update, { once: true });
+    update();
   }
   const focusLegacyHeading = () => {
     let id;

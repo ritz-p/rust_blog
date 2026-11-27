@@ -1,5 +1,5 @@
 const assert = require('node:assert/strict');
-const { readFileSync } = require('node:fs');
+const { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const { test } = require('node:test');
@@ -32,7 +32,7 @@ async function browser(t, script, query = '', fetch = undefined, html = fixture,
     assign: href => navigations.push(href), replace: href => navigations.push(href),
   };
   for (const name of [script].flat()) {
-    const source = readFileSync(path.join(__dirname, '../../core/assets', name), 'utf8');
+    const source = readFileSync(path.resolve(__dirname, '../../core/assets', name), 'utf8');
     vm.runInNewContext(source, { document, window: { location, addEventListener: dom.window.addEventListener.bind(dom.window) }, URL, URLSearchParams, fetch, Date: { now: () => now } });
     await handler();
   }
@@ -229,6 +229,52 @@ test('one static build reveals scheduled listings and search at the browser cloc
       if (now === due) {
         const option = document.querySelector('[data-period-filter] option:last-child');
         assert.equal(option.dataset.searchHref, '/search/?year=2026&month=09');
+      }
+    }
+  }
+});
+
+test('one export reveals a deprecated article’s successor at publication', {
+  skip: !process.env.RUST_BLOG_TOOLS_DIR && 'Set RUST_BLOG_TOOLS_DIR to run the exporter',
+}, async t => {
+  const root = mkdtempSync(path.join(require('node:os').tmpdir(), 'scheduled-successor-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const dir = path.join(root, 'articles');
+  const fixed = path.join(root, 'fixed');
+  const out = path.join(root, 'dist');
+  mkdirSync(dir);
+  mkdirSync(fixed);
+  const due = Date.parse('2999-01-01T00:00:00Z');
+  const target = 'guide #2';
+  const title = 'New <guide> & tools';
+  for (const article of [
+    { slug: 'old', deprecated: true, successor: target },
+    { slug: 'older', deprecated: true, successor: 'old' },
+    { slug: 'plain', deprecated: true },
+    { slug: 'earlier', created_at: new Date(due - 1000).toISOString() },
+    { slug: target, title, created_at: new Date(due).toISOString() },
+  ]) {
+    const matter = { title: article.slug, created_at: '2020-01-01', tags: [], categories: [], ...article };
+    writeFileSync(path.join(dir, article.slug + '.md'), '---\n' + JSON.stringify(matter) + '\n---\nBody\n');
+  }
+  require('node:child_process').execFileSync('sh', ['docker/export-articles.sh'], {
+    env: { ...process.env, ARTICLE_PATH: dir, FIXED_CONTENT_PATH: fixed, EXPORT_OUTPUT_DIR: out },
+  });
+
+  const records = JSON.parse(readFileSync(path.join(out, 'search-index.json'), 'utf8'));
+  for (const slug of ['old', 'older', 'plain']) {
+    const html = readFileSync(path.join(out, 'posts', slug, 'index.html'), 'utf8');
+    for (const now of [due - 1001, due - 1, due]) {
+      const { document } = await browser(t, path.join(out, 'js/search.js'), 'posts/' + slug + '/',
+        async () => ({ ok: true, json: async () => records }), html, now);
+      const notice = document.querySelector('.article-deprecated');
+      assert.ok(notice.textContent.startsWith('この記事の内容は古いです'));
+      const links = [...notice.querySelectorAll('a')].map(a => [a.textContent, a.getAttribute('href')]);
+      if (slug === 'older') assert.deepEqual(links, [['old', '/posts/old/']]);
+      else if (slug === 'old' && now === due) assert.deepEqual(links, [[title, '/posts/guide%20%232/']]);
+      else {
+        assert.deepEqual(links, []);
+        assert.equal(notice.textContent, 'この記事の内容は古いです');
       }
     }
   }

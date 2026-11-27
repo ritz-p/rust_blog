@@ -15,6 +15,8 @@ struct ArticleMatter<'a> {
     slug: &'a str,
     table_of_contents: bool,
     deprecated: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    successor: Option<&'a str>,
     adsense_sidebar: bool,
     adsense_auto_ads: bool,
     created_at: String,
@@ -69,6 +71,7 @@ async fn documents(db: &impl ConnectionTrait) -> Result<Vec<(PathBuf, String)>> 
             slug: &model.slug,
             table_of_contents: model.table_of_contents,
             deprecated: model.deprecated,
+            successor: model.successor.as_deref(),
             adsense_sidebar: model.adsense_sidebar,
             adsense_auto_ads: model.adsense_auto_ads,
             created_at: model.created_at.to_rfc3339(),
