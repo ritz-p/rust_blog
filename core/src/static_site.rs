@@ -488,6 +488,11 @@ async fn export_article_pages(
             .as_deref()
             .and_then(|slug| published.iter().find(|a| a.slug == slug))
             .map(|a| json!({"title": a.title, "url": static_article_url(&a.slug)}));
+        if successor.is_none()
+            && let Some(slug) = article.successor.as_deref()
+        {
+            ctx.insert("pending_successor_url", &static_article_url(slug));
+        }
         ctx.insert("successor", &successor);
         ctx.insert("deprecated", &article.deprecated);
         ctx.insert(

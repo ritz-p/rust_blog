@@ -2,7 +2,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   const results = document.querySelector('[data-static-listing][data-per]') || document.getElementById('index-results');
   const sidebar = document.querySelector('[data-article-sidebar]');
   const catalog = document.querySelector('[data-taxonomy-index]');
-  if (!results && !sidebar && !catalog) return;
+  const notice = document.querySelector('.article-page > .article-deprecated[data-pending-successor]');
+  if (!results && !sidebar && !catalog && !notice) return;
   const indexPage = results?.dataset.staticSearch === 'true';
   const dynamic = Date.now() >= Number(document.body.dataset.scheduleAt || Infinity);
   const { pathname, origin } = window.location;
@@ -120,6 +121,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     const records = await response.json();
     const now = Date.now();
     const articles = records.filter(article => article.published_at === undefined || article.published_at <= now);
+    if (notice) {
+      const successor = articles.find(article => article.url === notice.dataset.pendingSuccessor);
+      if (successor) {
+        const link = element('a', '', successor.title);
+        link.href = successor.url;
+        notice.append('。後継記事「', link, '」をご覧ください。');
+        delete notice.dataset.pendingSuccessor;
+      }
+    }
     if (sidebar) {
       const index = articles.findIndex(article => article.url === pathname);
       const groups = [['最新記事', articles.slice(0, 5)]];

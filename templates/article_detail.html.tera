@@ -18,7 +18,7 @@
     <article class="article-page" aria-labelledby="post-title">
       {% include "partial/article_header" %}
       {% if deprecated %}
-      <aside class="notification article-deprecated" role="note">この記事の内容は古いです{% if successor %}。後継記事「<a href="{{ successor.url }}">{{ successor.title }}</a>」をご覧ください。{% endif %}</aside>
+      <aside class="notification article-deprecated" role="note"{% if pending_successor_url %} data-pending-successor="{{ pending_successor_url }}"{% endif %}>この記事の内容は古いです{% if successor %}。後継記事「<a href="{{ successor.url }}">{{ successor.title }}</a>」をご覧ください。{% endif %}</aside>
       {% endif %}
       <div class="content is-medium">
         {{ content_html | safe }}
